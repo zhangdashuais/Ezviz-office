@@ -1,0 +1,274 @@
+SOURCE: C:\Users\zhangtianle7\Desktop\[Battery Video Doorbell Kit_CP8] Datasheet.pdf
+PAGES: 19
+
+--- PAGE 1 chars=79 ---
+EZVIZ CP8
+Battery Video Doorbell Kit
+Clearer and smarter
+views at your doorstep
+
+--- PAGE 2 chars=703 ---
+The CP8 Battery Video Doorbell Kit combines sharp 5MP clarity, smart detection, and reliable performance to give
+you total conﬁdence at your door. See every detail, get accurate alerts, and stay connected in real time—so you always know
+what’s happening and can respond quickly with peace of mind.
+5MP
+6
+WDR
+5MP Resolution
+Supports Wi-Fi 6
+Network (2.4GHz)
+9,600 mAh Detachable
+Lithium Battery
+Two-Way Talk
+(Supports Voice Changer
+for Privacy Protection)
+Smart Human
+Motion Detection
+No-Filming
+Privacy Zones
+Color Night
+Vision¹
+Easy
+Installation
+True WDR &
+Distortion Correction
+Supports MicroSD
+Card (Up to 512 GB) &
+Cloud Storage2
+Chime
+Included
+Smart Interation
+with Google Assistant
+& Amazon Alexa³
+
+--- PAGE 3 chars=237 ---
+Crystal-Clear 5MP Resolution
+Captures Every Scene in Crisp 5MP Clarity
+Stop second-guessing who’s at your door. With 5MP resolution,
+the CP8 helps you catch ﬁne details others miss—so you can act with real conﬁdence every time.
+1080P
+5MP
+
+--- PAGE 4 chars=239 ---
+Wide FOV
+Wide Field-Of-View
+Gets The Full View Without Blind Spots
+Catch what others miss at the edges. With a wide ﬁeld of view, the doorbell
+helps you see from wall to wall—so visitors or packages off to the sides never slip out of view.
+
+--- PAGE 5 chars=239 ---
+Color Night Vision
+Lights Up Your Night With Bright Colors1
+Say goodbye to blurry, washed-out night footage. Powered by
+built-in spotlights, the doorbell brings the night to life with vivid,
+full-color clarity, even in near-total darkness.
+
+--- PAGE 6 chars=344 ---
+True WDR &  Distortion Correction
+Balance Uneven Brightness
+Correct Edge Distortion
+WDR
+WDR
+ON
+OFF LDC OFF
+True WDR & Distortion Correction
+Renders Eye-Catching Views With Automatic Perfection
+Powered by advanced WDR and LDC technology, the CP8 delivers crisp, true-to-life images
+without blown highlights, dark shadows, or warped edges.
+LDC ON
+
+--- PAGE 7 chars=282 ---
+Human Motion Detection
+Delivers Alerts
+That Actually Matter
+With smart human detection and a built-in
+PIR sensor, the doorbell alerts you only when
+a person is at your door—no more distractions
+from pets, insects, or passing cars. The moment
+someone arrives, you’ll know right away.
+
+--- PAGE 8 chars=337 ---
+9,600mAh Detachable Battery
+Recharges in Seconds,
+Runs for Days
+The 9,600mAh detachable battery is designed
+to be easily removed, so you can recharge or
+replace it without complicated steps. Simply
+detach, power up, and snap it back in place
+for continuous, reliable performance.
+Replaceable battery is available
+for additional purchase.
+
+--- PAGE 9 chars=283 ---
+Smart Home Compatibility
+Hears The Ring From Inside Your Home
+Enjoy loud, customizable indoor alerts that reach every corner of your home. The kit includes a CH2 chime,
+and for larger homes, you can expand coverage with an additional EZVIZ CH1 Chime4— so you’ll never miss a visitor.
+
+--- PAGE 10 chars=335 ---
+How can I help you?
+Thank you, please leave
+that outside the door.
+Hi, you have a delivery.
+Two-Way Talk With Voice Changer
+Responds In Real Time While Keeping Yourself Private
+Answer the door with a simple tap. If you’re home alone or don’t want to reveal yourself,  just turn on the voice
+changer for extra privacy and peace of mind.
+
+--- PAGE 11 chars=251 ---
+Wi-Fi 6 (2.4 GHz)
+Made For Reliable Performance
+And Faster Transmission
+With the CP8, distance will barely
+bother you. Equipped with cutting-edge
+Wi-Fi 6 technology, it provides stable
+doorbell and your router, even
+in large homes with multiple walls.
+
+--- PAGE 12 chars=183 ---
+Weatherproof Design
+Stays Protected In Any Weather
+Built to handle the outdoors, the CP8 features a durable, weatherproof design that stands up to rain, heat,
+and changing conditions.
+
+--- PAGE 13 chars=774 ---
+Easy Installation
+Sets Up Your Doorbell Without Any Hussle
+Skip the hassle of complicated setups. The doorbell is designed for quick and easy installation,
+so you can get it up and running in minutes—no wiring or professional help needed.
+.
+Screw the mounting bracket to any surface
+with the included metal screws and click your
+doorbell into place.
+Connect your Battery Doorbell and included
+chime to the EZVIZ App and follow the steps
+to customize your settings.
+Step 1: Connect Step 2 : Mount Step 3 : Recharge
+Remove the battery and then connect it to
+a power outlet to charge via the power
+adapter (DC5V / 2A, purchase separately).
+Download the User Manual
+User Manual
+Scan
+Scan the QR Code
+by using Safari, Chrome (Get User Manual)
+by using EZVIZ App (Add Your Device)
+
+--- PAGE 14 chars=271 ---
+Supports MicroSD Card2 Supports EZVIZ CloudPlay Storage2
+Local & Cloud Storage
+Trusts On Your Extra-Large, Sate Storage Options
+You can secure your recorded videos on a local microSD card of up to 512 GB,
+or subscribe to EZVIZ CloudPlay for fully-encrypted cloud storage.
+
+--- PAGE 15 chars=404 ---
+H.265 Video Compression
+Video Storage SpaceEnhanced Viewing Pleasure
+With Smaller Video Files
+50%
+Required Bandwidth
+50%
+Compared to the prevailing H.264 video
+compression technology, H.265 creates
+a more fluid viewing experience with
+recorded videos. Meanwhile, you won’t
+have to worry about large video ﬁles
+taking up too much of your storage
+space – H.265 technology reduces their
+sizes by up to 50%.5
+
+--- PAGE 16 chars=454 ---
+We’re Committed To Protecting With Trust
+We put security as the primary goal of every product and system that we build,
+and assiduously improve our practices to better protect your device, data and privacy.
+TLS
+Data Transmission
+Encryption
+End-to-end
+Data Encryption
+AES
+Data Encryption
+Our global certiﬁcations in the ﬁelds of information security, privacy
+information security, and cloud security
+Learn more about our security practices >
+Privacy Zone6
+
+--- PAGE 17 chars=975 ---
+When Color Night Vision is enabled, the CP8 renders color night vision within 1 meter, according to EZVIZ Lab’s test results under standard conditions.
+The microSD card must be purchased separately. Cloud storage service is only available in certain markets. Please verify the availability before making any purchase.
+Google Assistant and Amazon Alexa are not available in certain languages and countries. When integrating the CP8 with these third-party devices, users can enable live
+streaming on their supported devices, but cannot receive incoming video calls or use the chime function.
+EZVIZ CH1 Chime can not only be used as a chime, but also as a Wi-Fi repeater. It requires purchase separately.
+Data from EZVIZ Lab‘s test results under standard conditions. The video compression efﬁciency will vary with the frequency and complexity of the activity captured, and
+other environmental factors.
+Users can draw in rectangles to customize up to 4 privacy zones.
+1
+2
+3
+4
+5
+6
+
+--- PAGE 18 chars=1486 ---
+CS-CP8
+Camera Parameters
+Image Sensor 1/2.8" Progressive Scan CMOS
+(Supports low light sensitivity)
+Lens 2.3 mm @ F2.2
+Max. Resolution 5 MP
+True-WDR Supports
+DNR 2D/3D DNR
+Video Compression H.265 / H.264
+Frame Rate Max: 15fps; Self-Adaptive During Network Transmission
+Day & Night IR-cut Filter with Auto-switching
+Color Night Vision Supports (See face clearly at 1 meter)
+Weatherproof Supports
+PIR Sensor
+Sensing Angle 120°
+Detection Distance Max. 7m
+Detection Sensitivity User adjustable (High: 7 meter, Mid-high: 5 meter, Medium:
+4 meter, Mid-low: 3 meter and Low: up to 2 meter)
+Chime
+Communication Method 433/868 MHz
+Multiple Ringtones Supports (supports 20 kinds of ringtones)
+Power Supply AC 110 ~ 240V
+Network Protocol EZVIZ Cloud Proprietary Protocol
+Network Parameters
+Two-Way Talk Supports
+Wi-Fi Standard IEEE802.11b, 802.11g, 802.11n, 802.11ax (Wi-Fi 6)
+Frequency Range 2.4GHz ~ 2.4835GHz
+Channel Bandwidth Supports 20MHz
+Battery
+Battery Capacity 9600mAh Detachable Lithium Battery
+Charging Input 5V 2A
+Smart Functions
+Intelligent Alarm Smart Human Motion Detection + PIR Motion Detection
+Security 64/128-bit WEP,WPA/WPA2, WPA-PSK/WPA2-PSK, WPS
+Transmission Rate 11b: 11Mbps,11g: 54Mbps,11n: 150Mbps
+General
+Operation Conditions -10°C to 45°C, Humidity 95% or less (non-condensing)
+Product Size (LWH) 56× 36.2 ×150 mm (Doorbell)
+73.3 ×51.8 × 59.5 mm (Chime)
+Packaging Size 120 × 103mm × 190mm
+Net Weight 341 g (Doorbell)
+59 g (Chime)
+Weight with Package 670 g
+Specifications
+
+--- PAGE 19 chars=474 ---
+Speciﬁcations are subject to change without notice.  "       ", "             " and other trademarks and logos
+are the properties of EZVIZ in various jurisdictions.
+- Doorbell × 1
+-Mounting Bracket (Pre-installed) × 1
+-Inclined Mounting Bracket × 1
+-Drill Template × 1
+-Chime × 1
+-Type-C Cable × 1
+-Screw Kit × 1
+-Pin × 1
+-Regulatory Information × 4
+-Quick Start Guide × 1
+-Video/Audio Monitoring Sticker  × 1
+In the box Certifications
+www.ezviz.com
+CE / REACH / WEEE / RoHS

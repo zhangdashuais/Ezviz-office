@@ -1,0 +1,82 @@
+Request URL
+https://ecadmin-api.ys7.com/api/route/euJavaApi/get/support/ecadmin/download_info/list
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+10.1.27.101:443
+Referrer Policy
+strict-origin-when-cross-origin
+access-control-allow-headers
+Authorization,Apptimestamp,Sign,Appurl,X-Requested-With,Content-Type,ecadmin-area,Action-Log-Url,time-zone,lang
+access-control-allow-methods
+GET,POST,OPTIONS
+access-control-allow-origin
+*
+access-control-max-age
+7200
+cache-control
+no-cache, private
+connection
+keep-alive
+content-encoding
+gzip
+content-type
+application/json
+date
+Wed, 27 May 2026 14:18:21 GMT
+server
+Tengine
+transfer-encoding
+chunked
+vary
+Accept-Encoding
+x-protected-by
+openRASP
+x-request-id
+7b991c3e33c449eb01dbc75c686225da
+accept
+application/json, text/plain, */*
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+action-log-url
+https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportDownloadCenter/SupportDownloadInfo/SupportDownloadInfoList?table%5Bpage%5D=1&table%5BpageSize%5D=20
+apptimestamp
+1779891501
+appurl
+https://ecadmin-api.ys7.com
+authorization
+bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZWNhZG1pbi1hcGkueXM3LmNvbS9hdXRoL2xvZ2luIiwiaWF0IjoxNzc5ODgzOTIyLCJleHAiOjE3Nzk5NzAzMjIsIm5iZiI6MTc3OTg4MzkyMiwianRpIjoid1ZyTzBTWnpPT0l5ZUJvcSIsInN1YiI6OTg0NiwicHJ2IjoiMjNiZDVjODk0OWY2MDBhZGIzOWU3MDFjNDAwODcyZGI3YTU5NzZmNyIsInRlbmFudF9pZCI6ImV6IiwiYWRtaW5fbmFtZSI6InpoYW5ndGlhbmxlNyJ9.FPrKyvsBUVOpckhxFXY6dzleEjIqq6yjEwytUubyGjs
+connection
+keep-alive
+content-length
+24
+content-type
+application/json
+host
+ecadmin-api.ys7.com
+origin
+https://ecadmin.ys7.com
+referer
+https://ecadmin.ys7.com/
+sec-ch-ua
+"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+cors
+sec-fetch-site
+same-site
+sign
+53198A1085934A22917D94503180C40E
+time-zone
+Asia/Shanghai
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36

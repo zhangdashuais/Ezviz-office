@@ -1,0 +1,14 @@
+node_modules/
+runtime_uploads/
+
+.pw-ecadmin-auto-profile/
+.pw-ecadmin-profile/
+.pw-ezviz-shop-profile/
+
+.env
+.env.*
+*.log
+
+网站账号密码*.xlsx
+*账号密码*.xlsx
+~$*

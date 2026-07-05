@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF Upload to HTML Links</title>
+  <style>
+    :root {
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border: #dbe3ef;
+      --page: #f4f7fb;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      background: var(--page);
+      color: var(--text);
+      padding: 32px;
+    }
+
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    label {
+      min-width: 86px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      min-width: 280px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--accent-hover); }
+    button:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+    .status {
+      white-space: pre-wrap;
+      min-height: 42px;
+      margin: 16px 0;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: var(--muted);
+      background: #f8fafc;
+      font-size: 13px;
+    }
+
+    .status.ok {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
+
+    .status.warn {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font: 13px/1.5 Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PDF Upload to HTML Links</h1>
+    <p>Upload PDF files and copy the generated li/a HTML snippets.</p>
+
+    <div class="row">
+      <label for="apiInput">Upload API</label>
+      <input id="apiInput" type="text" value="https://fs.ezvizlife.com/upload.php">
+    </div>
+
+    <div class="row">
+      <label for="fileInput">PDF Files</label>
+      <input id="fileInput" type="file" accept=".pdf,application/pdf" multiple>
+      <button id="uploadBtn">Upload</button>
+      <button id="copyBtn" disabled>Copy HTML</button>
+    </div>
+
+    <div id="status" class="status">Choose one or more PDF files.</div>
+    <textarea id="output" placeholder="Generated HTML will appear here..."></textarea>
+  </main>
+
+  <script>
+    const apiInput = document.getElementById("apiInput");
+    const fileInput = document.getElementById("fileInput");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const statusEl = document.getElementById("status");
+    const outputEl = document.getElementById("output");
+
+    function setStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = "status" + (type ? " " + type : "");
+    }
+
+    function buildFormData(file) {
+      const formData = new FormData();
+      formData.append("app", "service");
+      formData.append("flag", "attach");
+      formData.append("quality", "100");
+      formData.append("ext", "pdf,zip,rar,exe,bin,dav,apk");
+      formData.append("size", "102400");
+      formData.append("path_rule", "custom");
+      formData.append("path", "");
+      formData.append("purge", "1");
+      formData.append("file", file, file.name);
+      return formData;
+    }
+
+    function responseUrl(payload) {
+      if (payload && payload.uri) {
+        const uri = String(payload.uri).replace(/^\/+/, "");
+        return "https://mfs.ezvizlife.com/" + uri.replace(/^mfs\.ezvizlife\.com\/?/i, "");
+      }
+
+      if (payload && payload.full_url) {
+        return String(payload.full_url)
+          .replace(/^https?:\/\/s3\.amazonaws\.com\/mfs\.ezvizlife\.com\/?/i, "https://mfs.ezvizlife.com/")
+          .replace(/^https?:\/\/mfs\.ezvizlife\.com\/?/i, "https://mfs.ezvizlife.com/");
+      }
+
+      return "";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function getPdfTitle(fileName, url) {
+      const source = fileName || url.split("/").pop() || "";
+      const withoutQuery = source.split(/[?#]/)[0];
+      const withoutExt = withoutQuery.replace(/\.pdf$/i, "");
+
+      try {
+        return decodeURIComponent(withoutExt.replace(/\+/g, " "));
+      } catch (_) {
+        return withoutExt.replace(/\+/g, " ");
+      }
+    }
+
+    function buildPdfLinkHtml(fileName, url) {
+      const title = getPdfTitle(fileName, url);
+      return [
+        "            <li>",
+        '                <a target="_blank" href="' + escapeHtml(url) + '">' + escapeHtml(title) + "</a>",
+        "            </li>"
+      ].join("\n");
+    }
+
+    async function uploadPdf(file, uploadApi) {
+      const response = await fetch(uploadApi, {
+        method: "POST",
+        body: buildFormData(file)
+      });
+      const text = await response.text();
+      let payload;
+
+      try {
+        payload = JSON.parse(text);
+      } catch (_) {
+        throw new Error("Upload API did not return JSON: " + text.slice(0, 200));
+      }
+
+      if (!response.ok || payload.status === false) {
+        throw new Error(payload.message || payload.msg || "HTTP " + response.status);
+      }
+
+      const url = responseUrl(payload);
+      if (!url) throw new Error("Upload succeeded, but no full_url or uri was returned.");
+      return url;
+    }
+
+    uploadBtn.addEventListener("click", async () => {
+      const files = Array.from(fileInput.files || []);
+      const uploadApi = apiInput.value.trim() || "https://fs.ezvizlife.com/upload.php";
+
+      if (!files.length) {
+        setStatus("Choose PDF files first.", "warn");
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      copyBtn.disabled = true;
+      outputEl.value = "";
+      setStatus("Uploading PDF files...");
+
+      const links = [];
+      const errors = [];
+
+      for (const file of files) {
+        try {
+          const url = await uploadPdf(file, uploadApi);
+          links.push(buildPdfLinkHtml(file.name, url));
+          setStatus("Uploaded " + file.name);
+        } catch (error) {
+          errors.push(file.name + ": " + (error && error.message ? error.message : String(error)));
+        }
+      }
+
+      outputEl.value = links.join("\n");
+      copyBtn.disabled = links.length === 0;
+      setStatus(
+        errors.length ? "Done, but some files failed:\n" + errors.join("\n") : "Done. Generated " + links.length + " HTML links.",
+        errors.length ? "warn" : "ok"
+      );
+      uploadBtn.disabled = false;
+    });
+
+    copyBtn.addEventListener("click", async () => {
+      const text = outputEl.value.trim();
+      if (!text) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("HTML copied.", "ok");
+      } catch (_) {
+        outputEl.select();
+        document.execCommand("copy");
+        setStatus("HTML copied.", "ok");
+      }
+    });
+  </script>
+</body>
+</html>

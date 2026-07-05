@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Akiitu 一键内联工具</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="sidebar">
+    <div class="sidebar-header">Akiitu Toolbox</div>
+
+    <div class="nav-group">
+      <div class="nav-label">核心功能</div>
+      <div class="nav-items-wrapper">
+        <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
+        <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">上架自动化</div>
+      <div class="nav-items-wrapper">
+        <div class="nav-item" data-target="tab-pdf-upload">PDF 上传转地址</div>
+        <div class="nav-item" data-target="tab-spec-upload">Spec 参数解析</div>
+        <div class="nav-item" data-target="tab-spec-excel-build">Datasheet 生成 Spec 表</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">后台管理操作功能</div>
+      <div class="nav-items-wrapper">
+        <div class="nav-item" data-target="tab-product-replace">后台产品一键替换（开发中）</div>
+        <div class="nav-item" data-target="tab-ecadmin-platform">资料上传平台</div>
+        <div class="nav-item" data-target="tab-language-package">语言包上传</div>
+        <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
+        <div class="nav-item" data-target="tab-campaign-tools">Banner / Popup / 巡查</div>
+      </div>
+    </div>
+
+    <div style="margin-top: auto; padding: 20px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border);">
+      v2.0.0 Stable
+    </div>
+  </div>
+
+  <div class="main-container">
+    <header class="main-header">
+      <div class="page-title" id="pageTitle">一键内联打包</div>
+      <div style="font-size: 14px; color: var(--text-muted);">当前环境: Windows Workspace</div>
+    </header>
+
+    <main class="content-area">
+      <div id="tab-inline" class="tab-content active">
+        <div class="card">
+          <h3>内联配置</h3>
+          <p class="desc">批量处理 HTML、CSS 和 JS 资源，生成单文件离线包。支持图片上传、CDN 替换或接口同步。</p>
+
+          <div class="row">
+            <label>业务版本</label>
+            <select id="versionSelect">
+              <option value="src/main-default.js">默认 (Standard)</option>
+              <option value="src/main-akiitu.js">Akiitu (Custom)</option>
+              <option value="src/main-beanview.js">Beanview (Lite)</option>
+            </select>
+
+            <label>图片处理</label>
+            <select id="imageModeSelect">
+              <option value="upload">远程接口上传</option>
+              <option value="prefix">CDN 静态前缀</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label>资源地址</label>
+            <input id="imageBaseInput" type="text" value="https://mfs.ezvizlife.com/" style="flex: 1;">
+          </div>
+
+          <div class="row">
+            <label>上传接口</label>
+            <input id="uploadApiInput" type="text" value="https://fs.ezvizlife.com/upload.php" style="flex: 1;">
+          </div>
+
+          <div class="row">
+            <label>选择文件夹</label>
+            <input id="folderInput" type="file" webkitdirectory directory multiple>
+          </div>
+
+          <div class="row" style="margin-bottom: 0;">
+            <label>执行处理</label>
+            <select id="htmlSelect" style="width: 200px;"></select>
+            <button id="runBtn">开始一键内联</button>
+          </div>
+        </div>
+
+        <div id="status" class="status">等待任务启动...</div>
+        <textarea id="output" placeholder="处理后的 HTML 代码预览..."></textarea>
+      </div>
+
+      <div id="tab-pdf-upload" class="tab-content">
+        <div class="card">
+          <h3>PDF 上传转地址</h3>
+          <p class="desc">按抓包里的 fs.ezvizlife.com 上传请求发送 PDF，返回可复制的文件地址。</p>
+
+          <div class="row">
+            <label>上传接口</label>
+            <input id="pdfUploadApiInput" type="text" value="https://fs.ezvizlife.com/upload.php" style="flex: 1;">
+          </div>
+
+          <div class="row">
+            <label>PDF 文件</label>
+            <input id="pdfFileInput" type="file" accept=".pdf,application/pdf" multiple>
+            <button id="pdfUploadBtn">开始上传</button>
+            <button id="pdfCopyBtn" disabled>复制地址</button>
+          </div>
+        </div>
+
+        <div id="pdfUploadStatus" class="status">请选择一个或多个 PDF 文件。</div>
+        <textarea id="pdfUploadOutput" placeholder="上传成功后的地址会显示在这里..."></textarea>
+      </div>
+
+      <div id="tab-spec-upload" class="tab-content">
+        <div class="card">
+          <h3>Spec 参数解析</h3>
+          <p class="desc">解析 Excel 详细参数，生成 PC 和 mall_us mobile 两段规格 HTML。</p>
+
+          <div class="row">
+            <label>Excel 文件</label>
+            <input id="specFileInput" type="file" accept=".xlsx,.xls">
+            <label>手机固定列数</label>
+            <select id="specFixedNumSelect" style="width: 90px;">
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+            <label>语种</label>
+            <select id="specLangSelect" style="width: 160px;"></select>
+          </div>
+
+          <div class="row">
+            <label>标题</label>
+            <input id="specTitleInput" type="text" value="Specifications" style="width: 240px;">
+            <label>图片地址</label>
+            <input id="specImageSrcInput" type="text" placeholder="https://mfs.ezvizlife.com/..." style="flex: 1;">
+            <label>图片说明</label>
+            <input id="specImageAltInput" type="text" style="width: 220px;">
+            <button id="specGenerateBtn">生成</button>
+          </div>
+        </div>
+
+        <div id="specStatus" class="status">请先选择 Excel 文件。</div>
+
+        <div class="card spec-output-card">
+          <div class="row">
+            <h3 style="margin: 0;">PC 详细参数</h3>
+            <button id="specCopyPcBtn" disabled>复制 PC</button>
+          </div>
+          <textarea id="specPcOutput" placeholder="PC HTML 输出..."></textarea>
+          <div id="specPcPreview" class="spec-preview"></div>
+        </div>
+
+        <div class="card spec-output-card">
+          <div class="row">
+            <h3 style="margin: 0;">mall_us mobile 详细参数</h3>
+            <button id="specCopyMobileBtn" disabled>复制 Mobile</button>
+          </div>
+          <textarea id="specMobileOutput" placeholder="Mobile HTML 输出..."></textarea>
+          <div id="specMobilePreview" class="spec-preview"></div>
+        </div>
+      </div>
+
+      <div id="tab-text" class="tab-content">
+        <div class="card">
+          <h3>文字翻译</h3>
+          <p class="desc">自动识别页面中硬编码的中文字符，转换为 {{t('...')}} 格式，并生成语言包 Key-Value 表格。</p>
+
+          <div class="row">
+            <label>上传源码</label>
+            <input type="file" id="textFileInput" accept=".html">
+            <label>变量前缀</label>
+            <input id="langPrefixInput" type="text" value="goods.Alarm_light">
+            <button id="textProcessBtn">解析并提取</button>
+            <button id="textDownloadBtn" disabled>导出 i18n 文件</button>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <label>语言包表格</label>
+            <input type="file" id="langExcelInput" accept=".xlsx,.xls,.csv">
+            <button id="langExcelParseBtn">解析表格</button>
+          </div>
+        </div>
+
+        <div id="textStatus" class="status">请上传文件以开始解析。</div>
+
+        <div id="tableContainer" style="display:none;" class="card">
+          <div class="row" style="gap: 8px; margin-bottom: 12px;">
+            <button id="convertedTabBtn" style="padding: 6px 12px; border: 1px solid var(--border); background: #e2e8f0; border-radius: 6px;">转换表</button>
+            <button id="existingTabBtn" style="padding: 6px 12px; border: 1px solid var(--border); background: #fff; border-radius: 6px;">已有表</button>
+          </div>
+
+          <div id="convertedTablePanel">
+            <table id="langTable" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead style="background: #f8fafc; text-align: left;">
+                <tr>
+                  <th style="padding: 12px; border-bottom: 2px solid var(--border);">Key (变量名)</th>
+                  <th style="padding: 12px; border-bottom: 2px solid var(--border);">Value (原文内容)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div id="existingTablePanel" style="display:none;">
+            <p class="desc" style="margin-top: 0;">以下为转换前已存在的 {{t('goods.xxxx')}} 文案。</p>
+            <table id="existingLangTable" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead style="background: #f8fafc; text-align: left;">
+                <tr>
+                  <th style="padding: 12px; border-bottom: 2px solid var(--border);">Key (变量名)</th>
+                  <th style="padding: 12px; border-bottom: 2px solid var(--border);">Value (语言值)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <textarea id="textOutput" placeholder="代码转换结果..."></textarea>
+        <iframe id="textPreviewFrame" title="页面预览"></iframe>
+      </div>
+
+      <div id="tab-product-replace" class="tab-content">
+        <div class="card">
+          <h3>后台产品一键替换</h3>
+          <p class="desc">功能开发中... 敬请期待。</p>
+        </div>
+      </div>
+
+      <div id="tab-ecadmin-platform" class="tab-content">
+        <div class="card">
+          <h3>服务中心资料上传平台</h3>
+          <p class="desc">选择产品资料文件夹或多份文件后，系统会自动识别文件名包含“高清图”的图片，以及 datasheet / PDF 文件，并按后台流程创建下载资料、扩展语言、更新产品背景图。</p>
+
+          <div class="form-grid">
+            <label>产品标题</label>
+            <input id="ecProductTitleInput" type="text" placeholder="例如 EP8 Ultra">
+
+            <label>关联产品搜索</label>
+            <input id="ecProductSearchInput" type="text" placeholder="默认使用产品标题">
+
+            <label>文件类型</label>
+            <select id="ecFileTypeSelect">
+              <option value="Product Datasheet" selected>Product Datasheet</option>
+              <option value="Firmware and Software">Firmware and Software</option>
+              <option value="Limited Warranty">Limited Warranty</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <label>状态</label>
+            <select id="ecStatusSelect">
+              <option value="enabled" selected>启用</option>
+              <option value="disabled">停用</option>
+            </select>
+
+            <label>权重</label>
+            <input id="ecWeightInput" type="number" value="0" min="0">
+
+            <label>后台账号</label>
+            <input id="ecUsernameInput" type="text" placeholder="已登录可留空">
+
+            <label>后台密码</label>
+            <input id="ecPasswordInput" type="password" placeholder="已登录可留空">
+          </div>
+
+          <div class="row">
+            <label>资料文件夹</label>
+            <input id="ecFilesInput" type="file" multiple webkitdirectory directory>
+          </div>
+
+          <div class="row">
+            <label>或选择文件</label>
+            <input id="ecFilesLooseInput" type="file" multiple>
+          </div>
+
+          <div class="check-row">
+            <label><input id="ecSharePointCheckbox" type="checkbox" checked> 生成 SharePoint 归档计划（不上传）</label>
+            <label><input id="ecCreateDownloadCheckbox" type="checkbox" checked> 创建下载中心资料</label>
+            <label><input id="ecExtendLanguagesCheckbox" type="checkbox" checked> 访问扩展接口生成语言</label>
+            <label><input id="ecUpdateProductImageCheckbox" type="checkbox" checked> 更新产品背景图</label>
+          </div>
+
+          <div class="card inner-card">
+            <h3>SharePoint 归档</h3>
+            <p class="desc">当前只生成 SharePoint 归档计划，不会实际上传文件。Datasheet 和 spec Excel 会列入 Product Translation 下的产品文件夹计划；其余素材会按你选择的素材类目列入对应文件夹计划。</p>
+            <div class="form-grid">
+              <label>Product Translation</label>
+              <input id="ecTranslationRootInput" type="text" value="Shared Documents/05_Website/00_Product Translation">
+
+              <label>素材根目录</label>
+              <input id="ecMaterialRootInput" type="text" value="Shared Documents/05_Website">
+
+              <label>素材类目</label>
+              <select id="ecMaterialCategorySelect">
+                <option value="">请选择类目</option>
+                <option value="01_Key Visual">01_Key Visual</option>
+                <option value="02_Product Images">02_Product Images</option>
+                <option value="03_Video">03_Video</option>
+                <option value="04_Banner">04_Banner</option>
+                <option value="05_Other">05_Other</option>
+              </select>
+
+              <label>自定义类目</label>
+              <input id="ecMaterialCategoryCustomInput" type="text" placeholder="如果下拉里没有，在这里填写文件夹名">
+            </div>
+          </div>
+
+          <div id="ecDetectedFiles" class="detected-files">等待选择文件。</div>
+
+          <div class="row" style="margin-bottom: 0;">
+            <button id="ecRunBtn">开始执行</button>
+            <button id="ecDetectBtn" type="button">仅识别文件</button>
+            <button id="ecClearBtn" type="button">清空日志</button>
+          </div>
+        </div>
+
+        <div id="ecStatus" class="status">本地服务默认地址：http://localhost:3217。先启动服务后再执行。</div>
+        <textarea id="ecLogOutput" placeholder="执行日志会显示在这里..."></textarea>
+      </div>
+
+      <div id="tab-language-package" class="tab-content">
+        <div class="card">
+          <h3>语言包上传</h3>
+          <p class="desc">选择一个站点，上传 .xls / .xlsx 语言包。系统会先复用或登录商城后台，再直接提交语言包上传接口。</p>
+          <div class="row">
+            <button id="languageReloadSitesBtn" type="button">加载站点</button>
+            <button id="languageSelectAllBtn" type="button">全选站点</button>
+            <button id="languageClearSitesBtn" type="button">清空站点</button>
+          </div>
+          <div class="form-grid">
+            <label>商城账号</label>
+            <input id="languageShopUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
+            <label>商城密码</label>
+            <input id="languageShopPasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
+          </div>
+          <div id="languageSites" class="site-grid">站点尚未加载。</div>
+        </div>
+
+        <div class="card">
+          <h3>上传数据</h3>
+          <div class="form-grid">
+            <label>语言代码</label>
+            <input id="languageCodeInput" type="text" placeholder="例如 en-US；留空时从文件名自动识别">
+            <label>语言包文件</label>
+            <input id="languagePackageInput" type="file" accept=".xls,.xlsx">
+          </div>
+          <div class="row">
+            <button id="languageUploadBtn" type="button">上传语言包</button>
+          </div>
+        </div>
+
+        <div id="languageStatus" class="status">请先加载站点。</div>
+        <textarea id="languageOutput" placeholder="语言包上传结果会显示在这里..."></textarea>
+      </div>
+
+      <div id="tab-wtb-tools" class="tab-content">
+        <div class="card">
+          <h3>WTB 产品购买链接</h3>
+          <p class="desc">选择一个站点后，填写单个产品或上传 Excel 批量配置产品详情页的购买平台链接。</p>
+          <div class="row">
+            <button id="wtbReloadSitesBtn" type="button">加载站点</button>
+            <button id="wtbSelectAllBtn" type="button">全选站点</button>
+            <button id="wtbClearSitesBtn" type="button">清空站点</button>
+          </div>
+          <div class="form-grid">
+            <label>商城账号</label>
+            <input id="wtbShopUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
+            <label>商城密码</label>
+            <input id="wtbShopPasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
+          </div>
+          <div id="wtbSites" class="site-grid">站点尚未加载。</div>
+        </div>
+
+        <div class="card">
+          <h3>链接数据</h3>
+          <p class="desc">Excel 表头支持“产品名称 / 购买平台 / 购买链接”，也支持 “Product Name / Platform / URL”。</p>
+          <div class="form-grid">
+            <label>产品名称</label>
+            <input id="wtbProductNameInput" type="text" placeholder="例如 H8c">
+            <label>购买平台</label>
+            <input id="wtbPlatformInput" type="text" placeholder="例如 Shopee">
+            <label>购买链接</label>
+            <input id="wtbUrlInput" type="text" placeholder="https://...">
+            <label>批量 Excel</label>
+            <input id="wtbExcelInput" type="file" accept=".xlsx">
+          </div>
+          <div class="row">
+            <button id="wtbBuildPlanBtn" type="button">生成 WTB 清单（不提交后台）</button>
+            <button id="wtbSubmitBtn" type="button">执行 WTB 后台配置</button>
+          </div>
+        </div>
+
+        <div id="wtbStatus" class="status">请先加载站点。</div>
+        <textarea id="wtbOutput" placeholder="WTB 清单和后台配置结果会显示在这里..."></textarea>
+      </div>
+
+      <div id="tab-campaign-tools" class="tab-content">
+        <div class="card">
+          <h3>Banner / Popup / 巡查</h3>
+          <p class="desc">活动配置入口来自 Website-backend。Banner 执行后台配置后会自动放到目标位置，发布后会巡查链接，UTM 问题会自动修复，失效链接会返回结果。</p>
+
+          <div class="row">
+            <button id="campaignReloadSitesBtn" type="button">加载站点</button>
+            <button id="campaignSelectAllBtn" type="button">全选站点</button>
+            <button id="campaignClearSitesBtn" type="button">清空站点</button>
+          </div>
+          <div class="form-grid">
+            <label>商城账号</label>
+            <input id="campaignShopUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
+            <label>商城密码</label>
+            <input id="campaignShopPasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
+          </div>
+          <div id="campaignSites" class="site-grid">站点尚未加载。</div>
+        </div>
+
+        <div class="card">
+          <h3>Banner 数据</h3>
+          <div class="form-grid">
+            <label>标题 Headline</label>
+            <input id="bannerHeadlineInput" type="text" placeholder="例如 EP8 Ultra">
+            <label>链接 Link</label>
+            <input id="bannerLinkInput" type="text" placeholder="https://www.ezviz.com/...">
+            <label>副标题 Slogan</label>
+            <input id="bannerSloganInput" type="text">
+            <label>型号 Model</label>
+            <input id="bannerModelInput" type="text">
+            <label>简介 Introduction</label>
+            <input id="bannerIntroInput" type="text">
+            <label>字体颜色</label>
+            <select id="bannerColorSelect">
+              <option value="White" selected>White</option>
+              <option value="Black">Black</option>
+            </select>
+            <label>轮播位置</label>
+            <input id="bannerPositionInput" type="text" value="普通站点第 1 位；波兰站第 2 位" readonly>
+            <label>上线时间 UTC</label>
+            <input id="bannerOnlineInput" type="datetime-local">
+            <label>下线时间 UTC</label>
+            <input id="bannerOfflineInput" type="datetime-local">
+          </div>
+          <div class="row">
+            <label>PC 图片</label>
+            <input id="bannerPcImageInput" type="file" accept=".jpg,.jpeg,.png,.gif">
+            <label>Mobile 图片</label>
+            <input id="bannerMobileImageInput" type="file" accept=".jpg,.jpeg,.png,.gif">
+          </div>
+          <div class="check-row">
+            <label><input id="bannerNoMoreButtonInput" type="checkbox"> 隐藏 More 按钮</label>
+            <label><input id="bannerOpenNewTabInput" type="checkbox"> 新窗口打开</label>
+            <label><input id="bannerPublishInput" type="checkbox"> 上传后发布</label>
+          </div>
+          <div class="row">
+            <button id="bannerBuildPlanBtn" type="button">生成 Banner 清单（不提交后台）</button>
+            <button id="bannerSubmitBtn" type="button">执行 Banner 后台配置</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Popup 数据</h3>
+          <div class="form-grid">
+            <label>Popup Name</label>
+            <input id="popupNameInput" type="text">
+            <label>Popup Brief</label>
+            <input id="popupBriefInput" type="text">
+            <label>展示位置</label>
+            <select id="popupWhereInput">
+              <option value="all page" selected>all page</option>
+              <option value="home page">home page</option>
+              <option value="custom page">custom page</option>
+            </select>
+            <label>频率</label>
+            <select id="popupFrequencyInput">
+              <option value="once per day" selected>once per day</option>
+              <option value="only once">only once</option>
+            </select>
+            <label>开始时间</label>
+            <input id="popupStartInput" type="datetime-local">
+            <label>结束时间</label>
+            <input id="popupEndInput" type="datetime-local">
+            <label>Web Url</label>
+            <input id="popupWebUrlInput" type="text" placeholder="https://www.ezviz.com/...">
+            <label>Mobile Url</label>
+            <input id="popupMobileUrlInput" type="text" placeholder="默认同 Web Url">
+          </div>
+          <div class="row">
+            <label>Popup 图片</label>
+            <input id="popupImageInput" type="file" accept=".jpg,.jpeg,.png,.gif">
+          </div>
+          <div class="check-row">
+            <label><input id="popupEnableInput" type="checkbox" checked> 提交后启用</label>
+          </div>
+          <div class="row">
+            <button id="popupBuildPlanBtn" type="button">生成 Popup 清单（不提交后台）</button>
+            <button id="popupSubmitBtn" type="button">执行 Popup 后台配置</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>巡查</h3>
+          <p class="desc">按勾选站点运行首页活动 rendered 巡查，检查 banner / popup 链接可达性和 UTM。</p>
+          <div class="row">
+            <label>巡查类型</label>
+            <select id="campaignAuditPlacementSelect">
+              <option value="banner" selected>banner</option>
+              <option value="popup">popup</option>
+              <option value="all">banner + popup</option>
+            </select>
+            <label>Popup 等待 ms</label>
+            <input id="campaignPopupWaitInput" type="number" value="5000" min="0">
+            <button id="campaignRunAuditBtn" type="button">开始巡查</button>
+            <button id="campaignFixBannerUtmBtn" type="button">修复 Banner UTM</button>
+          </div>
+        </div>
+
+        <div id="campaignStatus" class="status">请先加载站点。</div>
+        <textarea id="campaignOutput" placeholder="任务清单、UTM 链接和巡查结果会显示在这里..."></textarea>
+      </div>
+
+      <div id="tab-spec-excel-build" class="tab-content">
+        <div class="card">
+          <h3>Datasheet 生成 Spec 表</h3>
+          <p class="desc">按 C9c Dual 3K 参考表的多国家表头格式，把 datasheet / PDF 中的 Specifications 文本整理成统一 Excel。</p>
+
+          <div class="row">
+            <label>PDF Datasheet</label>
+            <input id="specExcelPdfInput" type="file" accept=".pdf,application/pdf">
+            <button id="specExcelExtractPdfBtn" type="button">从 PDF 提取</button>
+          </div>
+
+          <div class="row">
+            <label>产品类别</label>
+            <select id="specExcelCategorySelect" style="width: 160px;">
+              <option value="smarthome" selected>Smarthome</option>
+              <option value="camera">Camera</option>
+            </select>
+            <label>产品型号</label>
+            <input id="specExcelModelInput" type="text" placeholder="例如 CS-CP8" style="width: 220px;">
+            <label>导出文件名</label>
+            <input id="specExcelOutputNameInput" type="text" placeholder="例如 CP8 spec.xlsx" style="width: 220px;">
+          </div>
+
+          <label style="display:block; margin-bottom: 8px;">Specifications 文本</label>
+          <textarea id="specExcelTextInput" class="spec-excel-textarea" placeholder="粘贴从 PDF / datasheet 提取出来的 Specifications 正文。支持“参数：值”“参数 值”和参数名单独成行、下一行为值的形式。"></textarea>
+
+          <div class="row" style="margin-top: 12px; margin-bottom: 0;">
+            <button id="specExcelGenerateBtn">生成 Spec Excel</button>
+            <button id="specExcelDownloadBtn" disabled>下载 Excel</button>
+            <button id="specExcelClearBtn" type="button">清空</button>
+          </div>
+        </div>
+
+        <div id="specExcelStatus" class="status">上传 PDF 后可直接提取 Specifications，也可以手动粘贴文本后生成多国家表头 Spec Excel。</div>
+
+        <div class="card">
+          <h3>预览</h3>
+          <div id="specExcelPreview" class="spec-excel-preview"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="src/ui.js"></script>
+  <script src="src/module-inline.js"></script>
+  <script src="src/module-pdf-upload.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="src/module-spec-upload.js"></script>
+  <script src="src/module-spec-excel-build.js"></script>
+  <script src="src/module-text.js"></script>
+  <script src="src/module-ecadmin-platform.js"></script>
+  <script src="src/module-language-package.js"></script>
+  <script src="src/module-campaign-tools.js?v=20260702-2"></script>
+</body>
+</html>

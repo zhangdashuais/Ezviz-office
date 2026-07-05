@@ -1,0 +1,100 @@
+
+FILE D:\产品\Ezivz\C8c 2-Camera\upload\C8c 2-Camera spec.xlsx
+sheet=Spec rows=93 cols=52 freeze=A17
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Specifikációk', None, 'Προδιαγραφές', None, 'Spezifikationen', None, 'Specifiche', None, 'Specifikace', None, 'Specifikacije', None, 'Caractéristiques', None, 'Specyfikacje', None]
+row3=['Model', 'CS-C8c-R210-1R5WFL', 'Модель', 'CS-C8c-R210-1R5WFL', 'Modell', 'CS-C8c-R210-1R5WFL', 'Μοντέλο', 'CS-C8c-R210-1R5WFL', 'Modell', 'CS-C8c-R210-1R5WFL', 'Modello', 'Modello CS-C8c-R210-1R5WFL', 'Model', 'CS-C8c-R210-1R5WFL', 'Model', 'CS-C8c-R210-1R5WFL', 'Modèle', 'CS-C8c-R210-1R5WFL', 'Model', 'CS-C8c-R210-1R5WFL']
+widths=[37.0, 45.109375, 37.0, 54.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875]
+merge_count=284 first=['W4:X4', 'AG4:AH4', 'Y4:Z4', 'A15:B15', 'AK42:AL42', 'AM42:AN42', 'C15:D15', 'Q51:Q59', 'AC32:AD32', 'U15:V15', 'AE32:AF32', 'W15:X15', 'AW32:AX32', 'O15:P15', 'Y15:Z15', 'AY32:AZ32', 'AO32:AP32', 'AQ32:AR32']
+cats=[(4, 'Camera'), (15, 'Video & Audio'), (22, 'Network'), (32, 'Functions'), (39, 'Storage'), (42, 'General'), (50, 'In the box'), (60, 'Certifications')]
+tail=[]
+
+FILE D:\产品\Ezivz\c8c 3k\upload\C8c 3K-R210 spec.xlsx
+sheet=Spec rows=92 cols=52 freeze=A44
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Specifikációk', None, 'Προδιαγραφές', None, 'Spezifikationen', None, 'Specifiche', None, 'Specifikace', None, 'Specifikacije', None, 'Caractéristiques', None, 'Specyfikacje', None]
+row3=['Model', 'CS-C8c-R210-1R5WFL', 'Модель', 'CS-C8c-R210-1R5WFL', 'Modell', 'CS-C8c-R210-1R5WFL', 'Μοντέλο', 'CS-C8c-R210-1R5WFL', 'Modell', 'CS-C8c-R210-1R5WFL', 'Modello', 'Modello CS-C8c-R210-1R5WFL', 'Model', 'CS-C8c-R210-1R5WFL', 'Model', 'CS-C8c-R210-1R5WFL', 'Modèle', 'CS-C8c-R210-1R5WFL', 'Model', 'CS-C8c-R210-1R5WFL']
+widths=[37.0, 45.125, 37.0, 54.875, 37.0, 53.875, 37.0, 53.875, 37.0, 53.875, 37.0, 53.875]
+merge_count=284 first=['W4:X4', 'AG4:AH4', 'Y4:Z4', 'AK42:AL42', 'A15:B15', 'C15:D15', 'AM42:AN42', 'M59:N59', 'U15:V15', 'AC32:AD32', 'W15:X15', 'AE32:AF32', 'O15:P15', 'Y15:Z15', 'AW32:AX32', 'AO32:AP32', 'AY32:AZ32', 'AQ32:AR32']
+cats=[(4, 'Camera'), (15, 'Video & Audio'), (22, 'Network'), (32, 'Functions'), (39, 'Storage'), (42, 'General'), (50, 'In the box'), (59, 'Certifications')]
+tail=[]
+
+FILE D:\产品\Ezivz\C9c Dual 3K\upload\C9c Dual 3K spec.xlsx
+sheet=Spec rows=94 cols=53 freeze=AG2
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Műszaki adatok', None, 'Προδιαγραφές', None, 'Technische Daten', None, 'Specifiche', None, 'Technické údaje', None, 'Technické údaje', None, 'Spécifications', None, 'Specyfikacja', None]
+row3=['Model', 'CS-C9c-R105-8H55WFL', 'Модель', 'CS-C9c-R105-8H55WFL', 'Modell', 'CS-C9c-R105-8H55WFL', 'Μοντέλο', 'CS-C9c-R105-8H55WFL', 'Modell', 'CS-C9c-R105-8H55WFL', 'Modello', 'Modello CS-C9c-R105-8H55WFL', 'Model', 'CS-C9c-R105-8H55WFL', 'Model', 'CS-C9c-R105-8H55WFL', 'Modèle', 'CS-C9c-R105-8H55WFL', 'Model', 'CS-C9c-R105-8H55WFL']
+widths=[37.0, 45.125, 35.5, 56.5, 37.0, 53.875, 37.0, 53.875, 37.0, 53.875, 37.0, 53.875]
+merge_count=275 first=['AW61:AX61', 'W4:X4', 'AG4:AH4', 'AO61:AP61', 'Y4:Z4', 'AC45:AD45', 'K24:L24', 'O53:P53', 'AQ45:AR45', 'W24:X24', 'AE41:AF41', 'Y24:Z24', 'AG41:AH41', 'AU54:AU60', 'AW4:AX4', 'AW54:AW60', 'C1:D1', 'AA24:AB24']
+cats=[(4, 'Camera'), (17, 'Video & Audio'), (24, 'Network'), (34, 'Function'), (41, 'Storage'), (45, 'General'), (53, 'In the box'), (61, 'Certifications')]
+tail=[]
+
+FILE D:\产品\Ezivz\Ep8\Upload\EP8-Ultra_spec.xlsx
+sheet=Spec rows=62 cols=53 freeze=AO41
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Specifikációk', None, 'Προδιαγραφές', None, 'Spezifikationen', None, 'Specifiche', None, 'Specifikace', None, 'Specifikacije', None, 'Caractéristiques', None, 'Specyfikacje', None]
+row3=['Model', 'CS-EP8 Ultra', 'Модель', 'CS-EP8 Ультра', 'Modell', 'CS-EP8 Ultra', 'Μοντέλο', 'CS-EP8 Ultra', 'Modell', 'CS-EP8 Ultra', 'Modello', 'CS-EP8 Ultra', 'Model', 'CS-EP8 Ultra', 'Model', 'CS-EP8 Ultra', 'Modèle', 'CS-EP8 Ultra', 'Model', 'CS-EP8 Ultra']
+widths=[37.0, 45.125, 35.5, 56.5, 37.0, 53.875, 37.0, 53.875, 37.0, 53.875, 37.0, 53.875]
+merge_count=355 first=['AS38:AT38', 'AU38:AV38', 'AM38:AN38', 'AW38:AX38', 'AM13:AN13', 'E8:F8', 'AO13:AP13', 'AW4:AX4', 'O32:P32', 'AQ8:AR8', 'AS8:AT8', 'AQ2:AR2', 'AS2:AT2', 'AM25:AN25', 'AO25:AP25', 'S20:T20', 'A28:B28', 'K28:L28']
+cats=[(4, 'Camera Parameters'), (8, 'Video Parameters'), (13, 'PIR Sensor'), (17, 'Storage'), (20, 'Interface'), (25, 'Network Parameters'), (28, 'Functions'), (32, 'Wi-Fi Parameters'), (38, 'General'), (46, 'In the box'), (61, 'Certifications')]
+tail=[(50, None, '- Drill Template'), (51, None, '- Chime'), (52, None, '- Battery × 2'), (53, None, '- Type-C Cable'), (54, None, '- Pin'), (55, None, '- Screw Kit'), (56, None, '- U-Shaped Wire × 2'), (57, None, '- Wire Connector × 2'), (58, None, '- Regulatory Information × 4'), (59, None, '- Quick Start Guide'), (60, None, '- Video / Audio Monitoring Sticker'), (61, 'Certifications', None), (62, 'Certifications', 'CE / REACH / WEEE / RoHS')]
+
+FILE D:\产品\Ezivz\H6c G1\upload\H6c G1 2K_spec.xlsx
+sheet=Spec rows=53 cols=52 freeze=C2
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Műszaki adatok', None, 'Προδιαγραφές', None, 'Technische Daten', None, 'Specifiche', None, 'Specifikace', None, 'Specifikacije', None, 'Caractéristiques', None, 'Specyfikacje', None]
+row3=['Specifications', 'CS-H6c-R200-1L3WFL', 'Технические характеристики', 'CS-H6c-R200-1L3WFL', 'Specifikációk', 'CS-H6c-R200-1L3WFL', 'Προδιαγραφές', 'CS-H6c-R200-1L3WFL', 'Spezifikationen', 'CS-H6c-R200-1L3WFL', 'Specifiche', 'CS-H6c-R200-1L3WFL', 'Specifikace', 'CS-H6c-R200-1L3WFL', 'Specifikacije', 'CS-H6c-R200-1L3WFL', 'Caractéristiques', 'CS-H6c-R200-1L3WFL', 'Specyfikacje', 'CS-H6c-R200-1L3WFL']
+widths=[37.0, 45.109375, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875]
+merge_count=300 first=['A44:A51', 'W4:X4', 'AG4:AH4', 'Y4:Z4', 'AU23:AV23', 'A15:B15', 'M43:N43', 'C15:D15', 'U15:V15', 'W15:X15', 'O15:P15', 'Y15:Z15', 'E23:F23', 'G23:H23', 'AM23:AN23', 'AO23:AP23', 'AA44:AA51', 'AI44:AI51']
+cats=[(4, 'Camera'), (12, 'Compression'), (15, 'Image'), (18, 'Network'), (23, 'Interface'), (27, 'Wi-Fi'), (35, 'General'), (43, 'In the box'), (52, 'Certifications')]
+tail=[(41, 'Packaging Dimensions', '103 × 103 × 168 mm (4.06 × 4.06 × 6.61 inch)'), (42, 'Net Weight', '222 g (0.49 lb)'), (43, 'In the box', None), (44, 'In the box', '- H6c G1 Camera'), (45, None, '- Power Adapter'), (46, None, '- Power Cable'), (47, None, '- Drill Template'), (48, None, '- Mounting Plate'), (49, None, '- Screw Kit'), (50, None, '- Regulatory Information × 2'), (51, None, '- Quick Start Guide'), (52, 'Certifications', None), (53, 'Certifications', 'CE / UL / WEEE / REACH / RoHS')]
+
+FILE D:\产品\Ezivz\H8c pro 3k\upload\H8c Pro 3K-R210 spec.xlsx
+sheet=Spec rows=90 cols=52 freeze=A50
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Specifikációk', None, 'Προδιαγραφές', None, 'Spezifikationen', None, 'Specifiche', None, 'Specifikace', None, 'Specifikacije', None, 'Caractéristiques', None, 'Specyfikacje', None]
+row3=['Model', 'CS-H8c-R210-1R5WFL', 'Модель', 'CS-H8c-R210-1R5WFL', 'Modell', 'CS-H8c-R210-1R5WFL', 'Μοντέλο', 'CS-H8c-R210-1R5WFL', 'Modell', 'CS-H8c-R210-1R5WFL', 'Modello', 'Modello CS-H8c-R210-1R5WFL', 'Model', 'CS-H8c-R210-1R5WFL', 'Model', 'CS-H8c-R210-1R5WFL', 'Modèle', 'CS-H8c-R210-1R5WFL', 'Model', 'CS-H8c-R210-1R5WFL']
+widths=[37.0, 45.109375, 37.0, 54.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875]
+merge_count=284 first=['W4:X4', 'K49:L49', 'AG4:AH4', 'Y4:Z4', 'A15:B15', 'Y38:Z38', 'C15:D15', 'AA38:AB38', 'AC32:AD32', 'AS38:AT38', 'U15:V15', 'AE32:AF32', 'AU38:AV38', 'W15:X15', 'AW32:AX32', 'AW38:AX38', 'AM38:AN38', 'AY32:AZ32']
+cats=[(4, 'Camera'), (15, 'Video & Audio'), (22, 'Network'), (32, 'Functions'), (38, 'Storage'), (41, 'General'), (49, 'In the box'), (57, 'Certifications')]
+tail=[]
+
+FILE D:\产品\Ezivz\H8c Pro 4G\Upload\H8c Pro 4G spec.xlsx
+sheet=Spec rows=86 cols=52 freeze=A2
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Specifikációk', None, 'Προδιαγραφές', None, 'Spezifikationen', None, 'Specifiche', None, 'Specifikace', None, 'Specifikacije', None, 'Caractéristiques', None, 'Specyfikacje', None]
+row3=['Model', 'CS-H8c-R210-1R5WFL4G', 'Модель', 'CS-H8c-R210-1R5WFL4G', 'Modell', 'CS-H8c-R210-1R5WFL4G', 'Μοντέλο', 'CS-H8c-R210-1R5WFL4G', 'Modell', 'CS-H8c-R210-1R5WFL4G', 'Modello', 'Modello CS-H8c-R210-1R5WFL4G', 'Model', 'CS-H8c-R210-1R5WFL4G', 'Model', 'CS-H8c-R210-1R5WFL4G', 'Modèle', 'CS-H8c-R210-1R5WFL4G', 'Model', 'CS-H8c-R210-1R5WFL4G']
+widths=[37.0, 45.109375, 37.0, 54.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875]
+merge_count=284 first=['W4:X4', 'AG4:AH4', 'Y4:Z4', 'AU23:AV23', 'A15:B15', 'AC45:AD45', 'C15:D15', 'O53:P53', 'U15:V15', 'W15:X15', 'O15:P15', 'Y15:Z15', 'E23:F23', 'G23:H23', 'AM23:AN23', 'AO23:AP23', 'AQ45:AR45', 'K4:L4']
+cats=[(4, 'Camera'), (15, 'Video & Audio'), (23, 'Network'), (27, 'Functions'), (34, 'Storage'), (37, 'General'), (45, 'In the box'), (53, 'Certifications')]
+tail=[]
+
+FILE D:\产品\Ezivz\H8c Pro 4K\upload\H8c Pro 4K spec.xlsx
+sheet=Spec rows=91 cols=52 freeze=A2
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Műszaki adatok', None, 'Προδιαγραφές', None, 'Technische Daten', None, 'Specifiche', None, 'Technické údaje', None, 'Technické údaje', None, 'Spécifications', None, 'Specyfikacja', None]
+row3=['Model', 'CS-H8c-R200-8H8WKFL', 'Модель', 'CS-H8c-R200-8H8WKFL', 'Modell', 'CS-H8c-R200-8H8WKFL', 'Μοντέλο', 'CS-H8c-R200-8H8WKFL', 'Modell', 'CS-H8c-R200-8H8WKFL', 'Modello', 'CS-H8c-R200-8H8WKFL', 'Modelka', 'CS-H8c-R200-8H8WKFL', 'Model', 'CS-H8c-R200-8H8WKFL', 'Modèle', 'CS-H8c-R200-8H8WKFL', 'Model', 'CS-H8c-R200-8H8WKFL']
+widths=[37.0, 45.109375, 37.0, 54.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875]
+merge_count=282 first=['W4:X4', 'AG4:AH4', 'AU23:AV23', 'Y4:Z4', 'AK42:AL42', 'A15:B15', 'AM42:AN42', 'C15:D15', 'U15:V15', 'K33:L33', 'W15:X15', 'AM23:AN23', 'E23:F23', 'O15:P15', 'AO23:AP23', 'G23:H23', 'Y15:Z15', 'Y58:Z58']
+cats=[(4, 'Camera'), (15, 'Video & Audio'), (23, 'Network'), (33, 'Functions'), (39, 'Storage'), (42, 'General'), (50, 'In the box'), (58, 'Certifications')]
+tail=[]
+
+FILE D:\产品\Ezivz\H8c Pro 4K\upload\H8c Pro 4K-R210 spec.xlsx
+sheet=Spec rows=91 cols=52 freeze=A2
+row1=['1_English (English-英文)', None, '2_Русский (Russian-俄语)', None, '5_Magyar (Hungarian-匈牙利语)', None, '6_Ελληνικά (Greek-希腊语)', None, '7_Deutsch (German-德语)', None, '8_Italiano (Italian-意大利语)', None, '9_Český (Czech-捷克语)', None, '10_Slovensko (Slovak-斯洛伐克语)', None, '11_Français (France-法语)', None, '12_Polski (Polish-波兰语)', None]
+row2=['Specifications', None, 'Технические характеристики', None, 'Műszaki adatok', None, 'Προδιαγραφές', None, 'Technische Daten', None, 'Specifiche', None, 'Technické údaje', None, 'Technické údaje', None, 'Spécifications', None, 'Specyfikacja', None]
+row3=['Model', 'CS-H8c-R200-8H8WKFL', 'Модель', 'CS-H8c-R200-8H8WKFL', 'Modell', 'CS-H8c-R200-8H8WKFL', 'Μοντέλο', 'CS-H8c-R200-8H8WKFL', 'Modell', 'CS-H8c-R200-8H8WKFL', 'Modello', 'CS-H8c-R200-8H8WKFL', 'Modelka', 'CS-H8c-R200-8H8WKFL', 'Model', 'CS-H8c-R200-8H8WKFL', 'Modèle', 'CS-H8c-R200-8H8WKFL', 'Model', 'CS-H8c-R200-8H8WKFL']
+widths=[37.0, 45.109375, 37.0, 54.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875, 37.0, 53.88671875]
+merge_count=282 first=['W4:X4', 'AG4:AH4', 'AU23:AV23', 'Y4:Z4', 'AK42:AL42', 'A15:B15', 'AM42:AN42', 'C15:D15', 'U15:V15', 'K33:L33', 'W15:X15', 'AM23:AN23', 'E23:F23', 'O15:P15', 'AO23:AP23', 'G23:H23', 'Y15:Z15', 'Y58:Z58']
+cats=[(4, 'Camera'), (15, 'Video & Audio'), (23, 'Network'), (33, 'Functions'), (39, 'Storage'), (42, 'General'), (50, 'In the box'), (58, 'Certifications')]
+tail=[]
+
+FILE D:\产品\Ezivz\RS20Max\RS20 Max spec.xlsx
+sheet=Sheet1 rows=81 cols=125 freeze=F3
+row1=['1_English (English-英文)', None, None, None, None, '2_Русский (Russian-俄语)', None, None, None, None, '5_Magyar (Hungarian-匈牙利语)', None, None, None, None, '6_Ελληνικά (Greek-希腊语)', None, None, None, None]
+row2=['Specifications', None, None, None, None, 'Технические характеристики', None, None, None, None, 'Specifikációk', None, None, None, None, 'Προδιαγραφές', None, None, None, None]
+row3=['Model', 'CS-RE7 Edge', None, None, None, 'Модель', 'CS-RE7 Edge', None, None, None, 'Modell', 'CS-RE7 Edge', None, None, None, 'Μοντέλο', 'CS-RE7 Edge', None, None, None]
+widths=[40.21875, 8.77734375, 8.21875, 8.33203125, 8.6640625, 14.21875, 13.0, 13.0, 13.0, 13.0, 13.0, 13.0]
+merge_count=1949 first=['CN24:CQ24', 'B74:E74', 'BO52:BR52', 'B68:E68', 'AA12:AD12', 'CN26:CQ26', 'B76:E76', 'AA14:AD14', 'BN70:BN79', 'AU62:AX62', 'DH40:DK40', 'CN19:CQ19', 'DR37:DU37', 'DH76:DK76', 'BI69:BM69', 'CX51:DA51', 'CN50:CQ50', 'BE79:BH79']
+cats=[(4, 'Navigation'), (7, 'Cleaning Features'), (13, 'Vacuuming'), (23, 'Mopping'), (29, 'Runtime'), (33, 'Robot'), (41, 'Robot Accessories'), (45, 'Robot Accessories'), (49, 'Base Station'), (55, 'Smart Features'), (64, 'General'), (69, 'In the box \n'), (80, 'Certifications')]
+tail=[(69, 'In the box \n', None), (70, 'In the box', '- Robot Vacuum Cleaner'), (71, None, '- Base Station'), (72, None, '- High-Efficiency Filter'), (73, None, '- Mop Cloth × 4'), (74, None, '- Cleaning Tool'), (75, None, '- Camera Sticker'), (76, None, '- Quick Start Guide × 2'), (77, None, '- Regulatory Information'), (78, None, '- Quick Start Guide ×2'), (79, None, '- Regulatory Information'), (80, 'Certifications', None), (81, 'Certifications', 'CE-EMC / CE-LVD / CE-RED / ErP / CE-ROHS / REACH SVHC / WEEE / UKCA / CB / UN38.3')]
