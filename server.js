@@ -5,6 +5,12 @@ const path = require("path");
 const zlib = require("zlib");
 const { spawn } = require("child_process");
 const { chromium } = require("playwright");
+const { createWtbFeature } = require("./src/server/features/wtb");
+const { registerWtbRoutes } = require("./src/server/routes/wtb-routes");
+const { createLanguagePackageFeature } = require("./src/server/features/language-package");
+const { registerLanguagePackageRoutes } = require("./src/server/routes/language-package-routes");
+const { createEcadminPlatformFeature } = require("./src/server/features/ecadmin-platform");
+const { registerEcadminPlatformRoutes } = require("./src/server/routes/ecadmin-platform-routes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -1507,474 +1513,6 @@ async function productEditorKeywordSnapshot(page) {
   }).catch(() => []);
 }
 
-async function probeLanguagePackageUpload(page, filePath, logs) {
-  if (!filePath || !fs.existsSync(filePath)) {
-    throw new Error("语言包文件不存在：" + filePath);
-  }
-  const captured = [];
-  const onRequest = (request) => {
-    const url = request.url();
-    if (!/ezvizlife\.com|language|upload|webuploader|xls|xlsx/i.test(url)) return;
-    captured.push({
-      type: "request",
-      method: request.method(),
-      url,
-      postData: request.postData() || ""
-    });
-  };
-  const onResponse = (response) => {
-    const url = response.url();
-    if (!/ezvizlife\.com|language|upload|webuploader|xls|xlsx/i.test(url)) return;
-    captured.push({
-      type: "response",
-      status: response.status(),
-      url
-    });
-  };
-
-  page.on("request", onRequest);
-  page.on("response", onResponse);
-  try {
-    await page.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(2500);
-    logLine(logs, "进入后台首页，准备打开 Language Management。");
-    const clickedLanguage = await page.evaluate(() => {
-      const link = [...document.querySelectorAll("a")].find((el) => {
-        const text = (el.innerText || el.textContent || "").trim();
-        const href = el.getAttribute("href") || "";
-        return text === "Language Management" || href === "/language/index";
-      });
-      if (!link) return false;
-      link.click();
-      return true;
-    });
-    if (!clickedLanguage) {
-      await page.goto("https://shop.ezvizlife.com/language/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-    }
-    await page.waitForTimeout(3500);
-    logLine(logs, "已进入 Language Management：" + page.url());
-
-    const clickedEdit = await page.evaluate(() => {
-      const candidates = [...document.querySelectorAll("[ng-click], a, button")].filter((el) => {
-        const visible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-        const ngClick = el.getAttribute("ng-click") || "";
-        const text = (el.innerText || el.textContent || "").trim();
-        return visible && (/edit\s*\(\s*lang\.lang_code\s*\)/i.test(ngClick) || /^edit$/i.test(text));
-      });
-      const target = candidates[0];
-      if (!target) return { ok: false, reason: "没有找到 edit(lang.lang_code) 元素" };
-      target.click();
-      return {
-        ok: true,
-        text: (target.innerText || target.textContent || "").trim(),
-        ngClick: target.getAttribute("ng-click") || ""
-      };
-    });
-    if (!clickedEdit.ok) throw new Error(clickedEdit.reason || "没有找到语言编辑入口。");
-    logLine(logs, "已点击语言编辑入口：" + JSON.stringify(clickedEdit));
-    await page.waitForTimeout(3000);
-
-    const inputSelector = 'div[id^="rt_"] input[type="file"], input[type="file"][name="file"], input[type="file"][accept*=".xls"]';
-    const inputCount = await page.locator(inputSelector).count().catch(() => 0);
-    if (!inputCount) throw new Error("没有找到语言包上传 input[type=file]。");
-    const fileInput = page.locator(inputSelector).nth(inputCount - 1);
-    const inputInfo = await page.evaluate((selector) => {
-      return [...document.querySelectorAll(selector)].map((input, index) => {
-        const parent = input.parentElement;
-        const rect = parent?.getBoundingClientRect?.() || input.getBoundingClientRect();
-        return {
-          index,
-          name: input.getAttribute("name") || "",
-          accept: input.getAttribute("accept") || "",
-          parentId: parent?.id || "",
-          parentStyle: parent?.getAttribute("style") || "",
-          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
-        };
-      });
-    }, inputSelector).catch(() => []);
-    logLine(logs, "语言包上传 input 数量：" + inputCount + " / " + JSON.stringify(inputInfo));
-    const chooserPromise = page.waitForEvent("filechooser", { timeout: 15000 }).catch(() => null);
-    const clickedUpload = await page.evaluate((selector) => {
-      const inputs = [...document.querySelectorAll(selector)];
-      const input = inputs[inputs.length - 1];
-      const parent = input?.parentElement;
-      const label = parent?.querySelector("label") || parent || input;
-      if (!label) return false;
-      label.click();
-      return true;
-    }, inputSelector);
-    let chooser = clickedUpload ? await chooserPromise : null;
-    if (chooser) {
-      await chooser.setFiles(filePath);
-      logLine(logs, "已通过文件选择器选择语言包文件：" + filePath);
-    } else {
-      await fileInput.setInputFiles(filePath);
-      logLine(logs, "文件选择器未弹出，已直接设置语言包文件：" + filePath);
-    }
-    await page.waitForTimeout(1500);
-
-    const clickedConfirm = await page.evaluate(() => {
-      const visible = (el) => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-      const buttons = [...document.querySelectorAll(".modal button, .modal a, button, a")].filter(visible);
-      const target = buttons.find((el) => /^(Confirm|OK|确定|确认)$/i.test((el.innerText || el.textContent || "").trim()))
-        || buttons.find((el) => /btn-primary|btn-confirm/.test(String(el.className || "")));
-      if (!target) return { ok: false, buttons: buttons.map((el) => (el.innerText || el.textContent || "").trim()).filter(Boolean).slice(0, 20) };
-      target.click();
-      return { ok: true, text: (target.innerText || target.textContent || "").trim(), cls: String(target.className || "") };
-    });
-    logLine(logs, "点击语言包弹窗确认按钮：" + JSON.stringify(clickedConfirm));
-    if (!clickedConfirm.ok) throw new Error("没有找到语言包弹窗 Confirm 按钮。");
-    await page.waitForTimeout(12000);
-
-    const visibleText = await visibleTextSafe(page, 1800);
-    return {
-      currentUrl: page.url(),
-      filePath,
-      captured,
-      visibleText
-    };
-  } finally {
-    page.off("request", onRequest);
-    page.off("response", onResponse);
-  }
-}
-
-function inferLangCodeFromFile(file) {
-  const name = path.basename(file?.originalname || file?.filename || "");
-  const match = name.match(/^([a-z]{2}(?:-[A-Z]{2})?)/);
-  return match ? match[1] : "";
-}
-
-async function submitLanguagePackageToBackend(body, files, logs) {
-  const config = readCampaignConfig();
-  const site = requireSingleCampaignSite(config, body);
-  const file = files?.languagePackage?.[0];
-  if (!file?.path || !fs.existsSync(file.path)) {
-    throw new Error("请先选择语言包 Excel 文件。");
-  }
-
-  const langCode = String(body.langCode || "").trim() || inferLangCodeFromFile(file);
-  if (!langCode) {
-    throw new Error("请填写语言代码，例如 en-US；也可以用 en-US.xlsx 这种文件名自动识别。");
-  }
-
-  const context = await getShopContext();
-  const page = await getOpenPage(context);
-  page.setDefaultTimeout(30000);
-  const backendPage = await ensureShopLoggedIn(page, {
-    ...body,
-    credentialDomain: credentialDomainForSite(site),
-    credentialGroup: "Website"
-  }, logs);
-
-  logLine(logs, "进入 Language Management 建立语言后台登录态。");
-  await backendPage.goto("https://shop.ezvizlife.com/language/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await backendPage.waitForTimeout(2500);
-
-  const fileBuffer = fs.readFileSync(file.path);
-  logLine(logs, "直接提交语言包上传接口：/language/upload，lang_code=" + langCode);
-  const response = await backendPage.request.post("https://shop.ezvizlife.com/language/upload", {
-    multipart: {
-      lang_code: langCode,
-      file: {
-        name: path.basename(file.originalname || file.filename || file.path),
-        mimeType: /\.xlsx$/i.test(file.originalname || file.filename || "") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/vnd.ms-excel",
-        buffer: fileBuffer
-      }
-    },
-    timeout: 60000
-  });
-
-  const responseText = await response.text().catch(() => "");
-  let responseJson = null;
-  try {
-    responseJson = JSON.parse(responseText);
-  } catch {}
-  if (!response.ok()) {
-    throw new Error("语言包上传接口返回异常：" + response.status() + " " + responseText.slice(0, 300));
-  }
-
-  logLine(logs, "语言包上传接口返回状态：" + response.status());
-  await backendPage.goto("https://shop.ezvizlife.com/language/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await backendPage.waitForTimeout(1500);
-
-  return {
-    mode: "direct-post",
-    site,
-    langCode,
-    fileName: file.originalname || file.filename,
-    uploadUrl: "https://shop.ezvizlife.com/language/upload",
-    status: response.status(),
-    response: responseJson || responseText.slice(0, 1000),
-    currentUrl: backendPage.url()
-  };
-}
-
-function normalizeWtbHeader(value) {
-  return String(value || "").trim().toLowerCase().replace(/[\s_\-（）()：:]+/g, "");
-}
-
-function readWtbWorkbook(file) {
-  if (!file?.path || !fs.existsSync(file.path)) return [];
-  const entries = zipEntries(fs.readFileSync(file.path));
-  const shared = sharedStrings(entries.get("xl/sharedStrings.xml"));
-  const rows = readRows(entries.get("xl/worksheets/sheet1.xml"), shared).filter((row) =>
-    row && row.some((cell) => String(cell || "").trim())
-  );
-  if (!rows.length) return [];
-
-  const headers = rows[0].map(normalizeWtbHeader);
-  const productIndex = headers.findIndex((item) => ["产品名称", "产品名", "productname", "product", "name"].includes(item));
-  const platformIndex = headers.findIndex((item) => ["购买平台", "平台", "platform", "shop", "store", "retailer"].includes(item));
-  const urlIndex = headers.findIndex((item) => ["购买链接", "链接", "link", "url", "buyurl", "href"].includes(item));
-  if (productIndex < 0 || platformIndex < 0 || urlIndex < 0) {
-    throw new Error("WTB Excel 表头需要包含：产品名称、购买平台、购买链接。");
-  }
-
-  return rows.slice(1).map((row, index) => ({
-    rowNumber: index + 2,
-    productName: String(row[productIndex] || "").trim(),
-    platform: String(row[platformIndex] || "").trim(),
-    url: String(row[urlIndex] || "").trim()
-  })).filter((item) => item.productName || item.platform || item.url);
-}
-
-function buildWtbRows(body, files) {
-  const rows = [];
-  if (files?.excel?.[0]) rows.push(...readWtbWorkbook(files.excel[0]));
-  const productName = String(body.productName || "").trim();
-  const platform = String(body.platform || "").trim();
-  const url = String(body.url || "").trim();
-  if (productName || platform || url) {
-    rows.unshift({ rowNumber: "single", productName, platform, url });
-  }
-  rows.forEach((row) => {
-    if (!row.productName) throw new Error("WTB 第 " + row.rowNumber + " 行缺少产品名称。");
-    if (!row.platform) throw new Error("WTB 第 " + row.rowNumber + " 行缺少购买平台。");
-    if (!row.url) throw new Error("WTB 第 " + row.rowNumber + " 行缺少购买链接。");
-    if (!/^https?:\/\//i.test(row.url)) throw new Error("WTB 第 " + row.rowNumber + " 行购买链接必须以 http:// 或 https:// 开头。");
-  });
-  return rows;
-}
-
-function groupWtbRows(rows) {
-  const grouped = new Map();
-  for (const row of rows) {
-    const key = row.productName.trim().toLowerCase();
-    if (!grouped.has(key)) grouped.set(key, { productName: row.productName.trim(), links: [] });
-    grouped.get(key).links.push({ platform: row.platform.trim(), url: row.url.trim(), rowNumber: row.rowNumber });
-  }
-  return [...grouped.values()];
-}
-
-async function findAndOpenProductEdit(page, productName, logs) {
-  await page.goto("https://shop.ezvizlife.com/goods/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
-
-  async function clickMatchingRow() {
-    return page.evaluate((targetName) => {
-      const normalizedTarget = targetName.trim().toLowerCase();
-      function visible(el) {
-        return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-      }
-      const rows = [...document.querySelectorAll("tr")].filter(visible);
-      const exactRow = rows.find((row) => {
-        const cells = [...row.querySelectorAll("td")].map((td) => (td.innerText || "").trim().toLowerCase());
-        return cells.some((cell) => cell === normalizedTarget);
-      });
-      const fuzzyRow = rows.find((row) => (row.innerText || "").trim().toLowerCase().includes(normalizedTarget));
-      const row = exactRow || fuzzyRow;
-      if (!row) return { ok: false };
-      const controls = [...row.querySelectorAll("a, button")].filter(visible);
-      const edit = controls.find((el) => /^(edit|编辑)$/i.test((el.innerText || el.textContent || "").trim()))
-        || controls.find((el) => /\/goods\/add\?id=|\/goods\/edit/i.test(el.getAttribute("href") || ""));
-      if (!edit) return { ok: false, reason: "找到产品行，但没有找到 Edit 按钮。", rowText: row.innerText };
-      const href = edit.href || edit.getAttribute("href") || "";
-      edit.click();
-      return { ok: true, href, rowText: row.innerText };
-    }, productName);
-  }
-
-  let clicked = await clickMatchingRow();
-  if (!clicked.ok) {
-    const searched = await page.evaluate((targetName) => {
-      function visible(el) {
-        return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-      }
-      const textInputs = [...document.querySelectorAll("input")].filter((input) => {
-        const type = (input.getAttribute("type") || "text").toLowerCase();
-        return visible(input) && !input.disabled && ["", "text", "search"].includes(type);
-      });
-      const input = textInputs[0];
-      if (!input) return { ok: false, reason: "没有找到产品搜索输入框。" };
-      input.focus();
-      input.value = targetName;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      const buttons = [...document.querySelectorAll("button, a, input[type='button'], input[type='submit']")].filter(visible);
-      const search = buttons.find((el) => /search|查询|搜索/i.test((el.innerText || el.value || el.textContent || "").trim())) || buttons[0];
-      if (!search) return { ok: false, reason: "没有找到搜索按钮。" };
-      search.click();
-      return { ok: true };
-    }, productName);
-    logLine(logs, "产品搜索：" + JSON.stringify(searched));
-    await page.waitForTimeout(3500);
-    clicked = await clickMatchingRow();
-  }
-
-  if (!clicked.ok) {
-    throw new Error("没有在产品列表中找到产品：" + productName + (clicked.reason ? "；" + clicked.reason : ""));
-  }
-  logLine(logs, "已打开产品编辑：" + productName + " / " + JSON.stringify({ href: clicked.href, rowText: clicked.rowText?.slice(0, 240) }));
-  await page.waitForTimeout(5000);
-  return page.url();
-}
-
-async function fillProductWhereToBuyLinks(page, links, logs) {
-  await openProductAdditionalInformation(page, logs);
-  const result = await page.evaluate((nextLinks) => {
-    const pane = document.querySelector("#replenish.tab-pane.active") || document.querySelector("#replenish") || document;
-    function visible(el) {
-      return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-    }
-    function setInputValue(input, value) {
-      input.focus();
-      input.value = value;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    function findInputAfterLabel(platform) {
-      const normalized = platform.trim().toLowerCase();
-      const labels = [...pane.querySelectorAll("label, span, div, td, th")].filter((el) => {
-        const text = (el.innerText || el.textContent || "").replace(/[:：]/g, "").trim().toLowerCase();
-        return visible(el) && text === normalized;
-      });
-      for (const label of labels) {
-        const container = label.closest(".form-group, .form-horizontal, .row, tr, div") || label.parentElement;
-        const scoped = [...(container?.querySelectorAll("input[type='text'], input:not([type]), textarea") || [])].filter(visible);
-        if (scoped.length) return scoped[0];
-        let node = label;
-        for (let i = 0; i < 8 && node; i += 1) {
-          node = node.nextElementSibling || node.parentElement?.nextElementSibling;
-          const input = node?.matches?.("input, textarea") ? node : node?.querySelector?.("input[type='text'], input:not([type]), textarea");
-          if (visible(input)) return input;
-        }
-      }
-      const named = [...pane.querySelectorAll("input, textarea")].find((input) => {
-        const text = [input.name, input.id, input.getAttribute("ng-model"), input.getAttribute("placeholder")].join(" ").toLowerCase();
-        return visible(input) && text.includes(normalized);
-      });
-      return named || null;
-    }
-
-    const applied = [];
-    const missing = [];
-    for (const item of nextLinks) {
-      const input = findInputAfterLabel(item.platform);
-      if (!input) {
-        missing.push(item.platform);
-        continue;
-      }
-      setInputValue(input, item.url);
-      applied.push({
-        platform: item.platform,
-        url: item.url,
-        name: input.name || "",
-        model: input.getAttribute("ng-model") || ""
-      });
-    }
-    return { applied, missing };
-  }, links);
-
-  if (result.missing.length) {
-    throw new Error("没有找到这些购买平台的输入框：" + result.missing.join(", "));
-  }
-  logLine(logs, "WTB 字段已填写：" + JSON.stringify(result.applied));
-  return result;
-}
-
-async function saveCurrentProductAndCapture(page, logs) {
-  const captured = [];
-  const onRequest = (request) => {
-    if (/\/goods\/do-edit-goods/i.test(request.url())) {
-      captured.push({ method: request.method(), url: request.url(), postData: request.postData() || "" });
-    }
-  };
-  const onResponse = (response) => {
-    if (/\/goods\/do-edit-goods/i.test(response.url())) {
-      captured.push({ status: response.status(), url: response.url() });
-    }
-  };
-  page.on("request", onRequest);
-  page.on("response", onResponse);
-  try {
-    await clickTextInProductEditor(page, /^complete$/i, "Complete", logs);
-    await page.waitForTimeout(5000);
-  } finally {
-    page.off("request", onRequest);
-    page.off("response", onResponse);
-  }
-  const saveRequest = captured.find((item) => item.postData);
-  if (!saveRequest) throw new Error("没有捕获到产品保存请求 /goods/do-edit-goods。");
-  const saveResponse = [...captured].reverse().find((item) => item.status);
-  if (saveResponse && saveResponse.status >= 400) {
-    throw new Error("产品保存接口返回异常状态：" + saveResponse.status);
-  }
-  logLine(logs, "WTB 保存请求已发送：" + saveRequest.url);
-  return { requestUrl: saveRequest.url, responseStatus: saveResponse?.status || null };
-}
-
-function buildWtbPlan(body, files) {
-  const rows = buildWtbRows(body, files);
-  const products = groupWtbRows(rows);
-  return {
-    mode: "wtb-plan",
-    productCount: products.length,
-    linkCount: rows.length,
-    products
-  };
-}
-
-async function submitWtbToBackend(body, files, logs) {
-  const config = readCampaignConfig();
-  const site = requireSingleCampaignSite(config, body);
-  const rows = buildWtbRows(body, files);
-  const products = groupWtbRows(rows);
-  if (!products.length) throw new Error("请填写单条 WTB 数据，或上传 WTB Excel。");
-
-  const context = await getShopContext();
-  const page = await getOpenPage(context);
-  page.setDefaultTimeout(30000);
-  const backendPage = await ensureShopLoggedIn(page, {
-    ...body,
-    credentialDomain: credentialDomainForSite(site),
-    credentialGroup: "Website"
-  }, logs);
-
-  const results = [];
-  for (const product of products) {
-    logLine(logs, "开始处理 WTB 产品：" + product.productName);
-    const editUrl = await findAndOpenProductEdit(backendPage, product.productName, logs);
-    const applied = await fillProductWhereToBuyLinks(backendPage, product.links, logs);
-    const save = await saveCurrentProductAndCapture(backendPage, logs);
-    results.push({
-      productName: product.productName,
-      editUrl,
-      links: product.links,
-      applied: applied.applied,
-      save
-    });
-  }
-
-  return {
-    mode: "playwright-form-save",
-    site,
-    productCount: results.length,
-    linkCount: rows.length,
-    results
-  };
-}
-
 async function fillPopupTime(page, selector, value) {
   if (!value) return;
   await page.locator(selector).first().evaluate((el, nextValue) => {
@@ -2429,201 +1967,6 @@ async function submitWtbConfig(body, logs) {
       text: data ? "" : text.slice(0, 1200)
     }
   };
-}
-
-async function createDownloadInfo(page, payload, files, logs) {
-  const createUrl = "https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportDownloadCenter/SupportDownloadInfo/SupportDownloadInfoCreate";
-  await ensureLoggedIn(page, createUrl, payload, logs);
-  await page.waitForTimeout(2500);
-
-  logLine(logs, "填写下载资料标题。");
-  const titleInput = page.locator(".el-form-item").filter({ hasText: "标题" }).first().locator("input").first();
-  await titleInput.fill(payload.title);
-  await page.getByRole("button", { name: "快捷转换" }).click();
-  await page.waitForTimeout(800);
-
-  logLine(logs, "按标题搜索并关联产品：" + payload.productSearch);
-  await clickFormSelect(page, "关联产品", 0);
-  const productInput = page.locator(".el-form-item").filter({ hasText: "关联产品" }).locator("input").last();
-  await productInput.fill(payload.productSearch);
-  await page.waitForTimeout(1800);
-  await clickVisibleOption(page, payload.productSearch);
-  await page.keyboard.press("Escape").catch(() => {});
-
-  logLine(logs, "选择文件类型：" + payload.fileType);
-  await clickFormSelect(page, "文件类型", 0);
-  await clickVisibleOption(page, payload.fileType);
-
-  logLine(logs, "选择上传类型：上传文件。");
-  await clickFormSelect(page, "上传类型", 0);
-  await clickVisibleOption(page, "上传文件");
-  await page.waitForTimeout(1000);
-
-  logLine(logs, "上传 datasheet：" + path.basename(files.datasheet.path));
-  await setFileByLabel(page, "上传", files.datasheet.path);
-  await page.waitForTimeout(9000);
-  const addressText = await formItemText(page, "地址");
-  logLine(logs, "文件地址：" + addressText.replace(/\s+/g, " "));
-
-  logLine(logs, "上传图标高清图：" + path.basename(files.highResImage.path));
-  await setFileByLabel(page, "图标", files.highResImage.path);
-  await page.waitForTimeout(7000);
-  const iconText = await formItemText(page, "图标");
-  logLine(logs, "图标地址：" + iconText.replace(/\s+/g, " "));
-
-  const isEnabled = payload.status !== "disabled";
-  const switchState = await page.evaluate(() => {
-    const root = [...document.querySelectorAll(".el-form-item")].find((el) => (el.querySelector(".el-form-item__label")?.innerText || "").trim() === "状态");
-    return !!root?.querySelector('input[type="checkbox"]')?.checked;
-  });
-  if (switchState !== isEnabled) {
-    await page.evaluate(() => {
-      const root = [...document.querySelectorAll(".el-form-item")].find((el) => (el.querySelector(".el-form-item__label")?.innerText || "").trim() === "状态");
-      root?.querySelector(".el-switch")?.click();
-    });
-  }
-
-  const weightInput = page.locator(".el-form-item").filter({ hasText: "权重" }).locator("input").first();
-  await weightInput.fill(String(payload.weight || 0));
-
-  logLine(logs, "提交下载资料。");
-  await page.getByRole("button", { name: "提交" }).click();
-  await page.waitForTimeout(5000);
-
-  const listUrl = "https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportDownloadCenter/SupportDownloadInfo/SupportDownloadInfoList?table%5Bpage%5D=1&table%5BpageSize%5D=20";
-  await page.goto(listUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(5000);
-  const rowExists = (await visibleText(page, 2500)).includes(payload.title);
-  if (!rowExists) throw new Error("提交后没有在列表第一页找到：" + payload.title);
-
-  await page.evaluate((title) => {
-    const row = [...document.querySelectorAll("tr")].find((r) => r.innerText.includes(title));
-    const edit = [...(row?.querySelectorAll("button,a,span") || [])].find((el) => el.innerText.trim() === "编辑");
-    edit?.click();
-  }, payload.title);
-  await page.waitForTimeout(4000);
-  const editUrl = page.url();
-  const match = editUrl.match(/[?&](?:downloadId|download_id)=([^&]+)/i);
-  const downloadId = match ? decodeURIComponent(match[1]) : "";
-  if (!downloadId) throw new Error("未能从编辑页地址提取 downloadId：" + editUrl);
-  logLine(logs, "下载资料 downloadId：" + downloadId);
-  return { downloadId, editUrl };
-}
-
-async function triggerLanguageExtend(context, title, downloadId, logs) {
-  const extendUrl = `https://support.ezviz.com/backend/api/ecadmin_support_download_info_extend?download_id=${encodeURIComponent(downloadId)}&language_title=${encodeURIComponent(title)}`;
-  logLine(logs, "访问语言扩展接口：" + extendUrl);
-  const page = await context.newPage();
-  await page.goto(extendUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(2500);
-  await page.close().catch(() => {});
-  return extendUrl;
-}
-
-async function updateProductImage(page, payload, file, logs) {
-  const listUrl = "https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportProductManage/SupportProduct/SupportProductList?table%5Bpage%5D=1&table%5BpageSize%5D=20&table%5BproductTitle%5D=" + encodeURIComponent(payload.title);
-  await ensureLoggedIn(page, listUrl, payload, logs);
-  await page.waitForTimeout(5000);
-
-  logLine(logs, "打开产品编辑：" + payload.title);
-  await page.evaluate((title) => {
-    const row = [...document.querySelectorAll("tr")].find((r) => r.innerText.toLowerCase().includes(title.toLowerCase()));
-    const edit = [...(row?.querySelectorAll("button,a,span") || [])].find((el) => el.innerText.trim() === "编辑");
-    edit?.click();
-  }, payload.title);
-  await page.waitForTimeout(4000);
-
-  const before = await page.evaluate(() => {
-    const root = [...document.querySelectorAll(".el-form-item")].find((el) => (el.querySelector(".el-form-item__label")?.innerText || "").trim() === "背景图");
-    return root?.querySelector("img")?.src || "";
-  });
-  logLine(logs, "原背景图：" + before);
-
-  logLine(logs, "重新上传产品高清图：" + path.basename(file.path));
-  await setFileByLabel(page, "背景图", file.path);
-  await page.waitForTimeout(8000);
-
-  const after = await page.evaluate(() => {
-    const root = [...document.querySelectorAll(".el-form-item")].find((el) => (el.querySelector(".el-form-item__label")?.innerText || "").trim() === "背景图");
-    return root?.querySelector("img")?.src || "";
-  });
-  logLine(logs, "新背景图：" + after);
-
-  await page.evaluate(() => {
-    const dialogs = [...document.querySelectorAll(".el-dialog, .el-overlay-dialog, [role='dialog']")];
-    const scope = dialogs.find((d) => d.innerText.includes("产品名称") && d.innerText.includes("背景图")) || document;
-    const submit = [...scope.querySelectorAll("button")].find((b) => b.innerText.trim() === "提交");
-    submit?.click();
-  });
-  await page.waitForTimeout(5000);
-  return after;
-}
-
-function cleanFolderSegment(value) {
-  return String(value || "")
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "-")
-    .replace(/\s+/g, " ")
-    .slice(0, 120);
-}
-
-function isSameUpload(a, b) {
-  if (!a || !b) return false;
-  return a.path === b.path || (a.originalname === b.originalname && a.size === b.size);
-}
-
-function buildSharePointPlan(payload, files, logs) {
-  const productFolder = cleanFolderSegment(payload.title);
-  const translationRoot = payload.translationRoot || SHAREPOINT_DEFAULTS.translationRoot;
-  const materialRoot = payload.materialRoot || SHAREPOINT_DEFAULTS.materialRoot;
-  const category = cleanFolderSegment(payload.materialCategory);
-  const allFiles = files.allFiles || [];
-
-  const specExcel = files.specExcel || allFiles.find((file) => /\.(xlsx|xls)$/i.test(file.originalname || file.filename));
-  const translationFiles = [files.datasheet, specExcel].filter(Boolean);
-  const materialFiles = allFiles.filter((file) => {
-    return !translationFiles.some((picked) => isSameUpload(file, picked));
-  });
-
-  const translationFolder = `${translationRoot}/${productFolder}`;
-  const materialFolder = category ? `${materialRoot}/${category}/${productFolder}` : "";
-
-  const plan = {
-    status: "planned",
-    note: "当前本地服务不能直接调用 Codex SharePoint 连接器；已生成可执行归档计划。若接入企业 SharePoint 授权或浏览器上传流程，可按此计划执行。",
-    site: {
-      hostname: SHAREPOINT_DEFAULTS.hostname,
-      sitePath: SHAREPOINT_DEFAULTS.sitePath
-    },
-    folders: {
-      translationFolder,
-      materialFolder
-    },
-    translationFiles: translationFiles.map((file) => ({
-      name: file.originalname || file.filename,
-      localPath: file.path,
-      role: isSameUpload(file, files.datasheet) ? "datasheet" : "specExcel"
-    })),
-    materialFiles: materialFiles.map((file) => ({
-      name: file.originalname || file.filename,
-      localPath: file.path
-    }))
-  };
-
-  if (!specExcel) {
-    plan.warning = "未识别到 spec Excel。Product Translation 文件夹将只包含 datasheet。";
-  }
-
-  if (!category) {
-    plan.warning = [plan.warning, "未选择素材类目，素材归档目标文件夹为空。"].filter(Boolean).join(" ");
-  }
-
-  logLine(logs, "SharePoint 归档计划已生成。");
-  logLine(logs, "Product Translation 文件夹：" + translationFolder);
-  if (materialFolder) logLine(logs, "素材类目文件夹：" + materialFolder);
-  logLine(logs, "Product Translation 文件数：" + plan.translationFiles.length);
-  logLine(logs, "素材文件数：" + plan.materialFiles.length);
-  return plan;
 }
 
 function readCampaignConfig() {
@@ -3095,6 +2438,51 @@ async function auditAndRepairBannerAfterSubmit(site, body, logs) {
   };
 }
 
+const wtbFeature = createWtbFeature({
+  fs,
+  path,
+  logLine,
+  zipEntries,
+  sharedStrings,
+  readRows,
+  readCampaignConfig,
+  requireSingleCampaignSite,
+  getShopContext,
+  getOpenPage,
+  ensureShopLoggedIn,
+  credentialDomainForSite,
+  openProductAdditionalInformation,
+  clickTextInProductEditor
+});
+
+const languagePackageFeature = createLanguagePackageFeature({
+  fs,
+  path,
+  logLine,
+  visibleTextSafe,
+  readCampaignConfig,
+  requireSingleCampaignSite,
+  getShopContext,
+  getOpenPage,
+  ensureShopLoggedIn,
+  credentialDomainForSite,
+  SHOP_DASHBOARD_URL
+});
+
+const ecadminPlatformFeature = createEcadminPlatformFeature({
+  path,
+  logLine,
+  normalizeBool,
+  visibleText,
+  clickFormSelect,
+  clickVisibleOption,
+  formItemText,
+  setFileByLabel,
+  ensureLoggedIn,
+  getContext,
+  SHAREPOINT_DEFAULTS
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
@@ -3165,7 +2553,7 @@ app.post("/api/campaign/shop-login-check", async (req, res) => {
     }
     let languageUploadProbe = null;
     if (normalizeBool(req.body?.probeLanguageUpload)) {
-      languageUploadProbe = await probeLanguagePackageUpload(
+      languageUploadProbe = await languagePackageFeature.probeLanguagePackageUpload(
         backendPage,
         String(req.body?.languagePackagePath || "").trim(),
         logs
@@ -3204,43 +2592,9 @@ app.post("/api/campaign/popup-plan", upload.fields([
   }
 });
 
-app.post("/api/campaign/wtb-plan", upload.fields([
-  { name: "excel", maxCount: 1 }
-]), (req, res) => {
-  try {
-    res.json({ ok: true, plan: buildWtbPlan(req.body || {}, req.files || {}) });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error && error.message ? error.message : String(error) });
-  }
-});
+registerWtbRoutes(app, { upload, wtbFeature, logLine });
 
-app.post("/api/campaign/wtb-submit", upload.fields([
-  { name: "excel", maxCount: 1 }
-]), async (req, res) => {
-  const logs = [];
-  try {
-    const result = await submitWtbToBackend(req.body || {}, req.files || {}, logs);
-    logLine(logs, "WTB 后台提交流程完成。");
-    res.json({ ok: true, logs, result });
-  } catch (error) {
-    logLine(logs, "WTB 后台提交失败：" + (error && error.message ? error.message : String(error)));
-    res.status(500).json({ ok: false, error: error && error.message ? error.message : String(error), logs });
-  }
-});
-
-app.post("/api/language-package/upload", upload.fields([
-  { name: "languagePackage", maxCount: 1 }
-]), async (req, res) => {
-  const logs = [];
-  try {
-    const result = await submitLanguagePackageToBackend(req.body || {}, req.files || {}, logs);
-    logLine(logs, "语言包上传流程完成。");
-    res.json({ ok: true, logs, result });
-  } catch (error) {
-    logLine(logs, "语言包上传失败：" + (error && error.message ? error.message : String(error)));
-    res.status(500).json({ ok: false, error: error && error.message ? error.message : String(error), logs });
-  }
-});
+registerLanguagePackageRoutes(app, { upload, languagePackageFeature, logLine });
 
 app.post("/api/campaign/banner-submit", upload.fields([
   { name: "pcImage", maxCount: 1 },
@@ -3326,78 +2680,7 @@ app.get("/api/campaign/audit-job/:jobId", (req, res) => {
   res.json({ ok: true, job: campaignAuditJobView(job) });
 });
 
-app.post("/api/ecadmin/run", upload.fields([
-  { name: "datasheet", maxCount: 1 },
-  { name: "highResImage", maxCount: 1 },
-  { name: "specExcel", maxCount: 1 },
-  { name: "allFiles", maxCount: 200 }
-]), async (req, res) => {
-  const logs = [];
-  try {
-    const body = req.body || {};
-    const files = {
-      datasheet: req.files?.datasheet?.[0],
-      highResImage: req.files?.highResImage?.[0],
-      specExcel: req.files?.specExcel?.[0],
-      allFiles: req.files?.allFiles || []
-    };
-    const payload = {
-      title: String(body.title || "").trim(),
-      productSearch: String(body.productSearch || body.title || "").trim(),
-      fileType: String(body.fileType || "Product Datasheet"),
-      status: String(body.status || "enabled"),
-      weight: String(body.weight || "0"),
-      username: String(body.username || "").trim(),
-      password: String(body.password || ""),
-      createDownload: normalizeBool(body.createDownload),
-      extendLanguages: normalizeBool(body.extendLanguages),
-      updateProductImage: normalizeBool(body.updateProductImage),
-      sharePoint: normalizeBool(body.sharePoint),
-      translationRoot: String(body.translationRoot || SHAREPOINT_DEFAULTS.translationRoot).trim(),
-      materialRoot: String(body.materialRoot || SHAREPOINT_DEFAULTS.materialRoot).trim(),
-      materialCategory: String(body.materialCategory || "").trim()
-    };
-
-    if (!payload.title) throw new Error("产品标题不能为空。");
-    if (payload.createDownload && (!files.datasheet || !files.highResImage)) {
-      throw new Error("创建下载资料需要 datasheet 和高清图。");
-    }
-    if (payload.updateProductImage && !files.highResImage) {
-      throw new Error("更新产品背景图需要高清图。");
-    }
-
-    const result = {};
-    if (payload.sharePoint) {
-      result.sharePointPlan = buildSharePointPlan(payload, files, logs);
-    }
-
-    const needsEcadmin = payload.createDownload || payload.extendLanguages || payload.updateProductImage;
-    const context = needsEcadmin ? await getContext() : null;
-    const page = context ? (context.pages().find((p) => p.url().includes("ecadmin.ys7.com")) || context.pages()[0] || await context.newPage()) : null;
-    if (page) page.setDefaultTimeout(25000);
-
-    if (payload.createDownload) {
-      Object.assign(result, await createDownloadInfo(page, payload, files, logs));
-    }
-
-    if (payload.extendLanguages) {
-      if (!result.downloadId) {
-        throw new Error("需要先创建下载资料，才能访问扩展语言接口。");
-      }
-      result.extendUrl = await triggerLanguageExtend(context, payload.title, result.downloadId, logs);
-    }
-
-    if (payload.updateProductImage) {
-      result.productImageUrl = await updateProductImage(page, payload, files.highResImage, logs);
-    }
-
-    logLine(logs, "流程完成。");
-    res.json({ ok: true, logs, result });
-  } catch (error) {
-    logLine(logs, "流程中断：" + (error && error.message ? error.message : String(error)));
-    res.status(500).json({ ok: false, error: error && error.message ? error.message : String(error), logs });
-  }
-});
+registerEcadminPlatformRoutes(app, { upload, ecadminPlatformFeature, logLine });
 
 app.listen(PORT, () => {
   console.log(`Office software platform is running at http://localhost:${PORT}/inline-packager.html`);

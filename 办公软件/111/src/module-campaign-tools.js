@@ -241,6 +241,19 @@
         lines.push("   保存接口：" + item.save.requestUrl);
         lines.push("   保存状态：" + (item.save.responseStatus || "已发送"));
       }
+      if (item.frontendCheck) {
+        const check = item.frontendCheck;
+        const label = check.status === "passed" ? "通过" : check.status === "failed" ? "未通过" : "未执行";
+        lines.push("   前台复查：" + label);
+        if (check.productUrl) lines.push("   前台页面：" + check.productUrl);
+        if (check.reason) lines.push("   复查说明：" + check.reason);
+        (check.checkedUrls || []).slice(0, 3).forEach((checked) => {
+          lines.push("   已检查：" + checked.url + (checked.status ? " / " + checked.status : ""));
+          if (checked.missing && checked.missing.length) {
+            lines.push("   缺失：" + checked.missing.map((link) => link.platform).join(", "));
+          }
+        });
+      }
       lines.push("");
     });
     lines.push("关键日志：");
@@ -542,13 +555,20 @@
   }
   async function submitWtb() {
     el.wtbSubmit.disabled = true;
-    setWtbStatus("正在执行 WTB 后台配置。会打开真实后台并保存产品，请不要关闭浏览器...");
-    writeWtbOutput("WTB 后台配置执行中。系统会按产品名称找到编辑页，进入 Additional Information，填写购买平台链接，然后点击 Complete 保存。");
+    setWtbStatus("正在执行 WTB 后台配置。保存后会自动打开前台页面复查，请不要关闭浏览器...");
+    writeWtbOutput("WTB 后台配置执行中。系统会按产品名称找到编辑页，填写购买平台链接并保存；保存后会自动二次检查前台是否能看到对应平台或链接。");
     revealWtbOutput();
     try {
       const payload = await postForm("/api/campaign/wtb-submit", wtbFormData());
       writeWtbOutput(renderWtbSubmitResult(payload));
-      setWtbStatus("WTB 后台配置完成。", "ok");
+      const checks = (((payload || {}).result || {}).results || []).map((item) => item.frontendCheck?.status).filter(Boolean);
+      if (checks.includes("failed")) {
+        setWtbStatus("WTB 已保存，但前台复查有未通过项，请查看结果。", "warn");
+      } else if (checks.includes("skipped")) {
+        setWtbStatus("WTB 已保存，但有产品未能定位前台页复查，请查看结果。", "warn");
+      } else {
+        setWtbStatus("WTB 后台配置完成，前台复查通过。", "ok");
+      }
       revealWtbOutput();
     } catch (error) {
       setWtbStatus("WTB 后台配置失败：" + (error.message || error), "warn");
