@@ -35,6 +35,7 @@
         <div class="nav-item" data-target="tab-language-package">语言包上传</div>
         <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
         <div class="nav-item" data-target="tab-campaign-tools">Banner / Popup / 巡查</div>
+        <div class="nav-item" data-target="tab-ezviz-site-audit">EZVIZ 官网定时巡查</div>
       </div>
     </div>
 
@@ -521,6 +522,22 @@
         <textarea id="campaignOutput" placeholder="任务清单、UTM 链接和巡查结果会显示在这里..."></textarea>
       </div>
 
+      <div id="tab-ezviz-site-audit" class="tab-content">
+        <div class="card">
+          <h3>EZVIZ 官网随机产品巡查</h3>
+          <p class="desc">动态读取 EZVIZ 国际站地区列表，每个站点从 Security Cameras 与 Smart Home 中随机抽取产品，依次检查标语、Detail、Specifications 和 Support。</p>
+          <div class="row">
+            <label for="ezvizSiteAuditSampleSize">每站随机产品数</label>
+            <input id="ezvizSiteAuditSampleSize" type="number" value="5" min="1" max="20">
+            <button id="ezvizSiteAuditRunBtn" type="button">开始全站巡查</button>
+          </div>
+          <p class="desc">定时策略：每 3 天运行一次。电脑关机时本地任务无法执行；下次开机不保证补跑。</p>
+        </div>
+
+        <div id="ezvizSiteAuditStatus" class="status">等待启动 EZVIZ 官网巡查任务。</div>
+        <textarea id="ezvizSiteAuditOutput" placeholder="站点、随机产品、巡查进度和问题清单会显示在这里..."></textarea>
+      </div>
+
       <div id="tab-spec-excel-build" class="tab-content">
         <div class="card">
           <h3>Datasheet 生成 Spec 表</h3>
@@ -576,5 +593,6 @@
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
   <script src="src/module-campaign-tools.js?v=20260702-2"></script>
+  <script src="src/module-ezviz-site-audit.js"></script>
 </body>
 </html>

@@ -409,6 +409,9 @@
         const cssBlocks = [];
         const inlinedScripts = [];
         const keptRemoteScripts = [];
+        const jqueryScripts = [];
+        const localScriptSources = [];
+        const remoteScriptSources = [];
         const warnings = [];
 
         const head = doc.head;
@@ -421,6 +424,11 @@
           const cssLinks = head.querySelectorAll("link[rel~='stylesheet'][href]");
           cssLinks.forEach((linkEl) => {
             const href = linkEl.getAttribute("href") || "";
+            const cssFileName = href.split(/[?#]/, 1)[0].split("/").pop().toLowerCase();
+            if (cssFileName === "normalize.css" || cssFileName === "webflow.css") {
+              warnings.push("Skipped Webflow base CSS: " + href);
+              return;
+            }
             if (isRemote(href)) {
               warnings.push("跳过远程 CSS: " + href);
               return;
@@ -439,9 +447,31 @@
         const allScripts = Array.from(doc.querySelectorAll("script[src]"));
         allScripts.forEach((scriptEl) => {
           const src = scriptEl.getAttribute("src") || "";
+          const scriptFileName = src.split(/[?#]/, 1)[0].split("/").pop().toLowerCase();
+          const isJquery = /^jquery(?:[-.].*)?\.js$/.test(scriptFileName);
+
+          if (isJquery) {
+            if (isRemote(src)) {
+              jqueryScripts.push(scriptEl.outerHTML);
+            } else {
+              const jqueryText = findFileContent(fileMap, indexDir, src);
+              if (jqueryText == null) {
+                warnings.push("Missing jQuery file: " + src);
+              } else {
+                jqueryScripts.push(`<script>\n${escapeScriptClose(jqueryText)}\n</script>`);
+              }
+            }
+            return;
+          }
+
+          if (scriptFileName !== "webflow.js") {
+            warnings.push("Skipped non-webflow JS: " + src);
+            return;
+          }
 
           if (isRemote(src)) {
             keptRemoteScripts.push(scriptEl.outerHTML);
+            remoteScriptSources.push(src);
             return;
           }
 
@@ -455,30 +485,41 @@
           const typePart = typeAttr ? ` type="${typeAttr}"` : "";
           const closeScriptTag = "</" + "script>";
           inlinedScripts.push(`<script${typePart}>\n${escapeScriptClose(jsText)}\n${closeScriptTag}`);
+          localScriptSources.push(src);
         });
 
         allScripts.forEach((node) => node.remove());
 
-        const bodyInner = doc.body.innerHTML.trim();
+        const bodyInner = `<div class="product-content-webflow">\n${doc.body.innerHTML.trim()}\n</div>`;
 
         const baseStyle = "img{\n  width: auto !important;\n}";
         const rawStyleContent = [baseStyle, ...cssBlocks].join("\n\n");
         const cssStats = sanitizeGeneratedCss(rawStyleContent);
-        const styleContent = cssStats.css;
+        const styleContent = `.product-content-webflow {\n${cssStats.css}\n}`;
         const styleTag = `<style>\n${styleContent}\n</style>`;
 
-        const scriptBlock = [
-          ...inlinedScripts,
-          ...keptRemoteScripts
-        ].join("\n\n");
+        const webflowScripts = [...inlinedScripts, ...keptRemoteScripts];
+        const scriptBlock = jqueryScripts.length && webflowScripts.length
+          ? [
+              "<script>var jq_1 = $.noConflict(true); window.$ = window.jQuery = jq_1;</script>",
+              ...jqueryScripts,
+              "<script>var jq_3 = $.noConflict(true); window.$ = window.jQuery = jq_3;</script>",
+              ...webflowScripts,
+              "<script>window.$ = window.jQuery = jq_1;</script>"
+            ].join("\n\n")
+          : [...jqueryScripts, ...webflowScripts].join("\n\n");
 
         const resultRaw = [
+          "<!-- product detail webflow -->",
           styleTag,
           bodyInner,
           scriptBlock
         ]
           .filter(Boolean)
           .join("\n\n");
+
+        warnings.push(`JS upload pending (local): ${localScriptSources.length ? localScriptSources.join(", ") : "none"}`);
+        warnings.push(`JS remote references: ${remoteScriptSources.length ? remoteScriptSources.join(", ") : "none"}`);
 
         return {
           resultRaw,
