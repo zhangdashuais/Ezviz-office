@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "ecadmin": "node server.js",
+    "audit:ezviz-sites": "node scripts/run-ezviz-site-audit.js --sample-size 5",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

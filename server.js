@@ -11,6 +11,8 @@ const { createLanguagePackageFeature } = require("./src/server/features/language
 const { registerLanguagePackageRoutes } = require("./src/server/routes/language-package-routes");
 const { createEcadminPlatformFeature } = require("./src/server/features/ecadmin-platform");
 const { registerEcadminPlatformRoutes } = require("./src/server/routes/ecadmin-platform-routes");
+const { createEzvizSiteAuditFeature } = require("./src/server/features/ezviz-site-audit");
+const { registerEzvizSiteAuditRoutes } = require("./src/server/features/ezviz-site-audit/routes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -32,6 +34,8 @@ const NEW_SHOP_POPUP_INDEX_URL = "https://new-shop.ezvizlife.com/popup/index";
 const NEW_SHOP_API_BASE = "https://sgpshop-api.ezvizlife.com";
 const FS_UPLOAD_URL = "https://fs.ezvizlife.com/upload.php";
 const SHOP_WTB_INDEX_URL = "https://shop.ezvizlife.com/whereToBuy/index";
+
+const ezvizSiteAuditFeature = createEzvizSiteAuditFeature({ chromium });
 
 fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
 
@@ -2681,6 +2685,7 @@ app.get("/api/campaign/audit-job/:jobId", (req, res) => {
 });
 
 registerEcadminPlatformRoutes(app, { upload, ecadminPlatformFeature, logLine });
+registerEzvizSiteAuditRoutes(app, { feature: ezvizSiteAuditFeature });
 
 app.listen(PORT, () => {
   console.log(`Office software platform is running at http://localhost:${PORT}/inline-packager.html`);
