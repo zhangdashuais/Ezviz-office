@@ -11,7 +11,7 @@
     <div class="sidebar-header">Akiitu Toolbox</div>
 
     <div class="nav-group">
-      <div class="nav-label">核心功能</div>
+      <div class="nav-label">基础工具</div>
       <div class="nav-items-wrapper">
         <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
@@ -19,7 +19,7 @@
     </div>
 
     <div class="nav-group">
-      <div class="nav-label">上架自动化</div>
+      <div class="nav-label">产品资料处理</div>
       <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-pdf-upload">PDF 上传转地址</div>
         <div class="nav-item" data-target="tab-spec-upload">Spec 参数解析</div>
@@ -28,13 +28,32 @@
     </div>
 
     <div class="nav-group">
-      <div class="nav-label">后台管理操作功能</div>
+      <div class="nav-label">产品上架与维护</div>
       <div class="nav-items-wrapper">
-        <div class="nav-item" data-target="tab-product-replace">后台产品一键替换（开发中）</div>
-        <div class="nav-item" data-target="tab-ecadmin-platform">资料上传平台</div>
+        <div class="nav-item" data-target="tab-specification-translation">Specification 翻译上架</div>
         <div class="nav-item" data-target="tab-language-package">语言包上传</div>
         <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
+        <div class="nav-item" data-target="tab-product-replace">后台产品一键替换（开发中）</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">资料平台</div>
+      <div class="nav-items-wrapper">
+        <div class="nav-item" data-target="tab-ecadmin-platform">资料上传平台</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">营销运营</div>
+      <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-campaign-tools">Banner / Popup / 巡查</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">巡查与质量</div>
+      <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-ezviz-site-audit">EZVIZ 官网定时巡查</div>
       </div>
     </div>
@@ -578,6 +597,36 @@
           <div id="specExcelPreview" class="spec-excel-preview"></div>
         </div>
       </div>
+
+      <div id="tab-specification-translation" class="tab-content">
+        <div class="card">
+          <h3>Specification 翻译上架</h3>
+          <p class="desc">从商品 Detail 的 UEditor 读取现有 Specification HTML，使用 Excel 对应语言列替换文字，并原样保留所有 img 的 src 和 alt。请先预览，确认后再保存。</p>
+          <div class="row">
+            <label>站点</label>
+            <select id="specTranslationSite"><option value="fr" selected>France (fr)</option></select>
+            <label>产品</label>
+            <input id="specTranslationProduct" type="text" value="CP8" style="width:180px;">
+            <label>语言列</label>
+            <input id="specTranslationLocale" type="text" value="fr" style="width:100px;">
+          </div>
+          <div class="row">
+            <label>翻译 Excel</label>
+            <input id="specTranslationExcel" type="file" accept=".xlsx">
+            <button id="specTranslationPreview" type="button">生成预览</button>
+            <button id="specTranslationSubmit" type="button" disabled>Complete 保存</button>
+          </div>
+        </div>
+        <div id="specTranslationStatus" class="status">请上传已包含目标语言列的 Spec Excel。</div>
+        <div class="card spec-output-card">
+          <h3>生成的 Specification HTML</h3>
+          <textarea id="specTranslationHtml" placeholder="预览生成的 HTML…"></textarea>
+        </div>
+        <div class="card spec-output-card">
+          <h3>执行日志</h3>
+          <textarea id="specTranslationLogs" placeholder="页面定位、替换数量和保存结果…"></textarea>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -594,5 +643,6 @@
   <script src="src/module-language-package.js"></script>
   <script src="src/module-campaign-tools.js?v=20260702-2"></script>
   <script src="src/module-ezviz-site-audit.js"></script>
+  <script src="src/module-specification-translation.js"></script>
 </body>
 </html>
