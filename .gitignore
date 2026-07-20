@@ -1,10 +1,12 @@
 node_modules/
 runtime_uploads/
+runtime/
 outputs/
 
 .pw-ecadmin-auto-profile/
 .pw-ecadmin-profile/
 .pw-ezviz-shop-profile/
+.playwright-cli/
 
 .env
 .env.*

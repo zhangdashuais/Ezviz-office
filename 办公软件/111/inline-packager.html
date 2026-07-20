@@ -423,7 +423,7 @@
       <div id="tab-tdk-config" class="tab-content">
         <div class="card">
           <h3>TDK 配置通道</h3>
-          <p class="desc">用于整理站点页面的 Title、Description 和 Keywords。当前开放模板下载、数据校验和预览；后台提交逻辑将在配置规则确认后接入。</p>
+          <p class="desc">用于批量配置国际站 Title、Keyword 和 Discription。校验通过后会复用商城后台登录态，直接调用 TDK 接口逐行新增配置。</p>
           <div class="row">
             <a class="button" id="tdkTemplateDownload" href="templates/TDK配置模板.xlsx" download>下载 TDK 信息模板</a>
           </div>
@@ -437,12 +437,12 @@
           </div>
           <div class="row">
             <button id="tdkValidateBtn" type="button">校验并预览</button>
-            <button id="tdkSubmitBtn" type="button" disabled title="等待确认后台配置规则">执行 TDK 后台配置（待开放）</button>
+            <button id="tdkSubmitBtn" type="button" disabled title="校验通过后可提交">执行 TDK 后台配置</button>
           </div>
         </div>
 
-        <div id="tdkStatus" class="status">请先下载模板并填写，或上传已有 TDK Excel。</div>
-        <textarea id="tdkOutput" placeholder="字段校验、数据预览和问题行会显示在这里..."></textarea>
+        <div id="tdkStatus" class="status">请先下载四字段模板并填写，或上传已有 TDK Excel。</div>
+        <textarea id="tdkOutput" placeholder="字段校验、数据预览、逐行提交结果和日志会显示在这里..."></textarea>
       </div>
 
       <div id="tab-campaign-tools" class="tab-content">

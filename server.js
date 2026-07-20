@@ -22,6 +22,8 @@ const { createSpecificationTranslationFeature } = require("./src/server/features
 const { registerSpecificationTranslationRoutes } = require("./src/server/routes/specification-translation-routes");
 const { registerCampaignRoutes } = require("./src/server/routes/campaign-routes");
 const { registerAssetUploadRoutes } = require("./src/server/routes/asset-upload-routes");
+const { createTdkManagement } = require("./src/server/features/tdk-management");
+const { registerTdkRoutes } = require("./src/server/routes/tdk-routes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -40,6 +42,7 @@ const SHOP_LOGIN_URL = "https://usauth.ezvizlife.com/signIn?from=ezviz_mall_glob
 const SHOP_LOGOUT_URL = "https://sgpwww.ezvizlife.com/login/logout.html";
 const NEW_SHOP_POPUP_EDIT_URL = "https://new-shop.ezvizlife.com/popup/edit";
 const NEW_SHOP_POPUP_INDEX_URL = "https://new-shop.ezvizlife.com/popup/index";
+const NEW_SHOP_TDK_INDEX_URL = "https://new-shop.ezvizlife.com/tdk/index";
 const NEW_SHOP_API_BASE = "https://sgpshop-api.ezvizlife.com";
 const FS_UPLOAD_URL = "https://fs.ezvizlife.com/upload.php";
 const SHOP_WTB_INDEX_URL = "https://shop.ezvizlife.com/whereToBuy/index";
@@ -658,7 +661,21 @@ registerCampaignRoutes(app, {
   campaignAuditIssues, startCampaignAuditJob, campaignAuditJobs
 });
 
+const tdkManagement = createTdkManagement({
+  fs,
+  logLine,
+  NEW_SHOP_API_BASE,
+  NEW_SHOP_TDK_INDEX_URL,
+  readCampaignConfig,
+  requireSingleCampaignSite,
+  getShopContext: browserAuth.getShopContext,
+  getOpenPage: browserAuth.getOpenPage,
+  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
+  credentialDomainForSite
+});
+
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
+registerTdkRoutes(app, { upload, tdkManagement, logLine });
 registerAssetUploadRoutes(app, { upload });
 
 registerSpecificationTranslationRoutes(app, {
