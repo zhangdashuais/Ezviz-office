@@ -24,6 +24,12 @@ function registerWtbRoutes(app, deps) {
       res.status(500).json({ ok: false, error: error && error.message ? error.message : String(error), logs });
     }
   });
+
+  app.get("/api/campaign/wtb-reports/:filename", (req, res) => {
+    const reportPath = wtbFeature.getReportPath(req.params.filename);
+    if (!reportPath) return res.status(404).json({ ok: false, error: "WTB 执行报告不存在。" });
+    res.download(reportPath);
+  });
 }
 
 module.exports = { registerWtbRoutes };

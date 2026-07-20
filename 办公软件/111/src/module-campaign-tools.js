@@ -231,10 +231,15 @@
     lines.push("");
     if (result.site) lines.push("站点：" + result.site.name + " (" + result.site.siteCode + ")");
     lines.push("产品数：" + (result.productCount || 0));
+    lines.push("成功：" + (result.successCount || 0));
+    lines.push("失败/跳过：" + (result.failedCount || 0));
     lines.push("链接数：" + (result.linkCount || 0));
+    if (result.report && result.report.reportUrl) lines.push("执行报告：" + location.origin + result.report.reportUrl);
     lines.push("");
     (result.results || []).forEach((item, index) => {
       lines.push((index + 1) + ". " + item.productName);
+      lines.push("   状态：" + (item.status === "completed" ? "成功" : "失败/已跳过"));
+      if (item.error) lines.push("   错误：" + item.error);
       if (item.editUrl) lines.push("   后台编辑页：" + item.editUrl);
       (item.links || []).forEach((link) => lines.push("   " + link.platform + "：" + link.url));
       if (item.save) {
@@ -398,9 +403,6 @@
 
   function appendWtbSites(formData) {
     const selected = selectedWtbSiteCodes();
-    if (!selected.length) {
-      throw new Error("请至少勾选一个站点。");
-    }
     formData.append("sites", JSON.stringify(selected));
   }
 
@@ -561,8 +563,19 @@
     try {
       const payload = await postForm("/api/campaign/wtb-submit", wtbFormData());
       writeWtbOutput(renderWtbSubmitResult(payload));
+      const result = (payload || {}).result || {};
+      if (result.report?.reportUrl) {
+        const link = document.createElement("a");
+        link.href = result.report.reportUrl;
+        link.download = result.report.filename || "WTB执行报告.xlsx";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
       const checks = (((payload || {}).result || {}).results || []).map((item) => item.frontendCheck?.status).filter(Boolean);
-      if (checks.includes("failed")) {
+      if (result.failedCount > 0) {
+        setWtbStatus(`WTB 批量配置完成：成功 ${result.successCount || 0} 个，失败/跳过 ${result.failedCount} 个；执行报告已下载。`, "warn");
+      } else if (checks.includes("failed")) {
         setWtbStatus("WTB 已保存，但前台复查有未通过项，请查看结果。", "warn");
       } else if (checks.includes("skipped")) {
         setWtbStatus("WTB 已保存，但有产品未能定位前台页复查，请查看结果。", "warn");

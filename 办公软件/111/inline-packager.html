@@ -33,6 +33,7 @@
         <div class="nav-item" data-target="tab-specification-translation">Specification 翻译上架</div>
         <div class="nav-item" data-target="tab-language-package">语言包上传</div>
         <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
+        <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
         <div class="nav-item" data-target="tab-product-replace">后台产品一键替换（开发中）</div>
       </div>
     </div>
@@ -381,7 +382,7 @@
       <div id="tab-wtb-tools" class="tab-content">
         <div class="card">
           <h3>WTB 产品购买链接</h3>
-          <p class="desc">选择一个站点后，填写单个产品或上传 Excel 批量配置产品详情页的购买平台链接。</p>
+          <p class="desc">上传 Excel 后优先根据 Product Page URL 自动识别站点；URL 无法识别时，使用手动勾选的单个站点。系统按 Product 找到产品，再按 Channel 填写 Purchasing Link。</p>
           <div class="row">
             <button id="wtbReloadSitesBtn" type="button">加载站点</button>
             <button id="wtbSelectAllBtn" type="button">全选站点</button>
@@ -398,7 +399,7 @@
 
         <div class="card">
           <h3>链接数据</h3>
-          <p class="desc">Excel 表头支持“产品名称 / 购买平台 / 购买链接”，也支持 “Product Name / Platform / URL”。</p>
+          <p class="desc">支持本模板字段 Product / Product Page URL / Channel / Purchasing Link，并兼容“产品名称 / 购买平台 / 购买链接”。Excel 中的全部工作表都会读取。</p>
           <div class="form-grid">
             <label>产品名称</label>
             <input id="wtbProductNameInput" type="text" placeholder="例如 H8c">
@@ -417,6 +418,31 @@
 
         <div id="wtbStatus" class="status">请先加载站点。</div>
         <textarea id="wtbOutput" placeholder="WTB 清单和后台配置结果会显示在这里..."></textarea>
+      </div>
+
+      <div id="tab-tdk-config" class="tab-content">
+        <div class="card">
+          <h3>TDK 配置通道</h3>
+          <p class="desc">用于整理站点页面的 Title、Description 和 Keywords。当前开放模板下载、数据校验和预览；后台提交逻辑将在配置规则确认后接入。</p>
+          <div class="row">
+            <a class="button" id="tdkTemplateDownload" href="templates/TDK配置模板.xlsx" download>下载 TDK 信息模板</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>配置数据</h3>
+          <div class="form-grid">
+            <label for="tdkExcelInput">TDK Excel</label>
+            <input id="tdkExcelInput" type="file" accept=".xlsx,.xls">
+          </div>
+          <div class="row">
+            <button id="tdkValidateBtn" type="button">校验并预览</button>
+            <button id="tdkSubmitBtn" type="button" disabled title="等待确认后台配置规则">执行 TDK 后台配置（待开放）</button>
+          </div>
+        </div>
+
+        <div id="tdkStatus" class="status">请先下载模板并填写，或上传已有 TDK Excel。</div>
+        <textarea id="tdkOutput" placeholder="字段校验、数据预览和问题行会显示在这里..."></textarea>
       </div>
 
       <div id="tab-campaign-tools" class="tab-content">
@@ -544,13 +570,14 @@
       <div id="tab-ezviz-site-audit" class="tab-content">
         <div class="card">
           <h3>EZVIZ 官网随机产品巡查</h3>
-          <p class="desc">动态读取 EZVIZ 国际站地区列表，每个站点从 Security Cameras 与 Smart Home 中随机抽取产品，依次检查标语、Detail、Specifications 和 Support。</p>
+          <p class="desc">动态读取 EZVIZ 国际站地区列表，每个站点从 Security Cameras 与 Smart Home 中随机抽取产品，只检查标语和 Detail 正文是否存在、语言是否与站点一致；不检查页面内链接、Support、Datasheet 或图片。</p>
           <div class="row">
             <label for="ezvizSiteAuditSampleSize">每站随机产品数</label>
             <input id="ezvizSiteAuditSampleSize" type="number" value="5" min="1" max="20">
             <button id="ezvizSiteAuditRunBtn" type="button">开始全站巡查</button>
           </div>
-          <p class="desc">定时策略：每 3 天运行一次。电脑关机时本地任务无法执行；下次开机不保证补跑。</p>
+          <p class="desc">定时策略：服务启动后自动补跑到期任务，之后每 2 天运行一次。结果保存到 outputs/ezviz-site-audit，每份 Excel 包含执行摘要、产品明细和问题清单。</p>
+          <div id="ezvizSiteAuditScheduleStatus" class="status">正在读取定时巡查状态...</div>
         </div>
 
         <div id="ezvizSiteAuditStatus" class="status">等待启动 EZVIZ 官网巡查任务。</div>
@@ -641,6 +668,7 @@
   <script src="src/module-text.js"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
+  <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260702-2"></script>
   <script src="src/module-ezviz-site-audit.js"></script>
   <script src="src/module-specification-translation.js"></script>

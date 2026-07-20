@@ -3,6 +3,7 @@
   const sampleSizeInput = document.getElementById("ezvizSiteAuditSampleSize");
   const statusElement = document.getElementById("ezvizSiteAuditStatus");
   const outputElement = document.getElementById("ezvizSiteAuditOutput");
+  const scheduleElement = document.getElementById("ezvizSiteAuditScheduleStatus");
   if (!runButton || !sampleSizeInput || !statusElement || !outputElement) return;
 
   function setStatus(message, type) {
@@ -62,6 +63,22 @@
     outputElement.scrollTop = outputElement.scrollHeight;
   }
 
+  async function loadSchedule() {
+    if (!scheduleElement) return;
+    try {
+      const response = await fetch("/api/ezviz-site-audit/schedule");
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "读取失败");
+      const schedule = payload.schedule;
+      const next = schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : "等待计算";
+      const last = schedule.lastFinishedAt ? new Date(schedule.lastFinishedAt).toLocaleString() : "尚未执行";
+      scheduleElement.textContent = `定时巡查已启用：每 ${schedule.intervalDays} 天；上次完成：${last}；下次执行：${next}；最近 Excel：${schedule.lastReportPath || "尚未生成"}`;
+    } catch (error) {
+      scheduleElement.textContent = `定时巡查状态读取失败：${error?.message || String(error)}`;
+      scheduleElement.classList.add("warn");
+    }
+  }
+
   async function pollJob(jobId) {
     while (true) {
       const response = await fetch(`/api/ezviz-site-audit/jobs/${encodeURIComponent(jobId)}`);
@@ -103,4 +120,6 @@
       runButton.disabled = false;
     }
   });
+
+  loadSchedule();
 })();

@@ -1,4 +1,4 @@
-function registerEzvizSiteAuditRoutes(app, { feature }) {
+function registerEzvizSiteAuditRoutes(app, { feature, scheduler }) {
   app.post("/api/ezviz-site-audit/product-taglines", async (req, res) => {
     try {
       const result = await feature.auditProductTaglineUrl(req.body?.url);
@@ -33,6 +33,16 @@ function registerEzvizSiteAuditRoutes(app, { feature }) {
       return;
     }
     res.json({ ok: true, job });
+  });
+
+  app.get("/api/ezviz-site-audit/schedule", (req, res) => {
+    res.json({ ok: true, schedule: scheduler?.getState() || { enabled: false } });
+  });
+
+  app.post("/api/ezviz-site-audit/schedule/run", (req, res) => {
+    const job = scheduler?.runNow();
+    if (!job) return res.status(409).json({ ok: false, error: "已有官网巡查任务正在运行。" });
+    res.json({ ok: true, job, schedule: scheduler.getState() });
   });
 }
 

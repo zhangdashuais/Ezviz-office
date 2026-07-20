@@ -33,7 +33,6 @@ function createEzvizSiteAuditFeature({ chromium }) {
       const context = await browser.newContext();
       const page = await context.newPage();
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-      await page.waitForSelector("#J_items", { timeout: 30000 });
       return await auditProductDetailPage(page);
     } finally {
       await browser.close();
@@ -47,6 +46,7 @@ function createEzvizSiteAuditFeature({ chromium }) {
       id,
       status: "running",
       sampleSize,
+      source: options.source || "manual",
       startedAt: new Date().toISOString(),
       finishedAt: null,
       progress: null,
@@ -81,7 +81,11 @@ function createEzvizSiteAuditFeature({ chromium }) {
     return jobs.get(String(id || "")) || null;
   }
 
-  return { auditProductTaglineUrl, auditProductDetailUrl, startRandomAuditJob, getRandomAuditJob };
+  function hasRunningRandomAuditJob() {
+    return [...jobs.values()].some((job) => job.status === "running");
+  }
+
+  return { auditProductTaglineUrl, auditProductDetailUrl, startRandomAuditJob, getRandomAuditJob, hasRunningRandomAuditJob };
 }
 
 module.exports = { createEzvizSiteAuditFeature, assertAllowedEzvizUrl };

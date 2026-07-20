@@ -64,13 +64,14 @@ function createShopCredentials(options = {}) {
     const result = [];
     for (const rowMatch of String(xml || "").matchAll(/<row\b[^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)) {
       const row = [];
-      for (const cell of rowMatch[2].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+      for (const cell of rowMatch[2].matchAll(/<c\b([^>]*?)(?:\s*\/\s*>|>([\s\S]*?)<\/c>)/g)) {
         const ref = cell[1].match(/\br="([A-Z]+\d+)"/)?.[1];
         if (!ref) continue;
         const type = cell[1].match(/\bt="([^"]+)"/)?.[1];
-        let value = cell[2].match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? "";
+        const content = cell[2] || "";
+        let value = content.match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? "";
         if (type === "s") value = shared[Number(value)] ?? "";
-        if (type === "inlineStr") value = [...cell[2].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((item) => decode(item[1])).join("");
+        if (type === "inlineStr") value = [...content.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((item) => decode(item[1])).join("");
         row[columnIndex(ref)] = decode(value).trim();
       }
       result[Number(rowMatch[1]) - 1] = row;

@@ -7,6 +7,9 @@ const SITE_LANGUAGE_BY_SLUG = {
   uk: "en",
   au: "en",
   ca: "en",
+  la: "es",
+  arg: "es",
+  br: "pt",
   de: "de",
   es: "es",
   fr: "fr",
@@ -22,7 +25,16 @@ const SITE_LANGUAGE_BY_SLUG = {
   id: "id",
   kr: "ko",
   jp: "ja",
-  cn: "zh"
+  cn: "zh",
+  my: "ms",
+  cis: "ru",
+  cz: "cs",
+  be: "nl",
+  eu: "en",
+  ro: "ro",
+  ar: "ar",
+  af: "en",
+  sa: "ar"
 };
 
 const LATIN_HINTS = {
@@ -35,7 +47,11 @@ const LATIN_HINTS = {
   pl: ["i", "z", "dla", "twój", "dom", "więcej", "bez", "na"],
   pt: ["o", "a", "os", "as", "e", "com", "para", "sua", "casa", "mais", "uma"],
   tr: ["ve", "ile", "için", "ev", "daha", "akıllı", "bir"],
-  vi: ["và", "với", "cho", "nhà", "thông minh", "hơn", "của"]
+  vi: ["và", "với", "cho", "nhà", "thông minh", "hơn", "của"],
+  id: ["dan", "dengan", "untuk", "rumah", "pintar", "lebih", "anda", "keamanan", "kamera", "yang"],
+  ms: ["dan", "dengan", "untuk", "rumah", "pintar", "lebih", "anda", "keselamatan", "kamera", "yang"],
+  ro: ["și", "cu", "pentru", "casa", "inteligent", "mai", "securitate", "cameră", "fără"],
+  cs: ["pro", "váš", "domov", "chytrý", "více", "bezpečnost", "kamera", "bez", "snadno"]
 };
 
 function normalizeLanguage(value) {

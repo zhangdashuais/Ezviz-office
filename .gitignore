@@ -1,5 +1,6 @@
 node_modules/
 runtime_uploads/
+outputs/
 
 .pw-ecadmin-auto-profile/
 .pw-ecadmin-profile/

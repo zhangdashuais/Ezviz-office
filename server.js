@@ -12,6 +12,7 @@ const { createEcadminPlatformFeature } = require("./src/server/features/ecadmin-
 const { registerEcadminPlatformRoutes } = require("./src/server/routes/ecadmin-platform-routes");
 const { createEzvizSiteAuditFeature } = require("./src/server/features/ezviz-site-audit");
 const { registerEzvizSiteAuditRoutes } = require("./src/server/features/ezviz-site-audit/routes");
+const { createEzvizSiteAuditScheduler, TWO_DAYS_MS } = require("./src/server/features/ezviz-site-audit/scheduler");
 const { createShopCredentials } = require("./src/server/features/shop-credentials");
 const { createProductManagement } = require("./src/server/features/product-management");
 const { createBannerManagement } = require("./src/server/features/banner-management");
@@ -20,6 +21,7 @@ const { createBrowserAuth } = require("./src/server/features/browser-auth");
 const { createSpecificationTranslationFeature } = require("./src/server/features/specification-translation");
 const { registerSpecificationTranslationRoutes } = require("./src/server/routes/specification-translation-routes");
 const { registerCampaignRoutes } = require("./src/server/routes/campaign-routes");
+const { registerAssetUploadRoutes } = require("./src/server/routes/asset-upload-routes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -43,6 +45,13 @@ const FS_UPLOAD_URL = "https://fs.ezvizlife.com/upload.php";
 const SHOP_WTB_INDEX_URL = "https://shop.ezvizlife.com/whereToBuy/index";
 
 const ezvizSiteAuditFeature = createEzvizSiteAuditFeature({ chromium });
+const ezvizSiteAuditScheduler = createEzvizSiteAuditScheduler({
+  feature: ezvizSiteAuditFeature,
+  intervalMs: Number(process.env.EZVIZ_SITE_AUDIT_INTERVAL_MS) || TWO_DAYS_MS,
+  sampleSize: Number(process.env.EZVIZ_SITE_AUDIT_SAMPLE_SIZE) || 5,
+  outputDir: path.join(ROOT, "outputs", "ezviz-site-audit"),
+  statePath: path.join(ROOT, "runtime", "ezviz-site-audit-schedule.json")
+});
 const shopCredentials = createShopCredentials({
   desktopRoot: DESKTOP_ROOT,
   backendRoot: WEBSITE_BACKEND_ROOT,
@@ -649,6 +658,9 @@ registerCampaignRoutes(app, {
   campaignAuditIssues, startCampaignAuditJob, campaignAuditJobs
 });
 
+registerWtbRoutes(app, { upload, wtbFeature, logLine });
+registerAssetUploadRoutes(app, { upload });
+
 registerSpecificationTranslationRoutes(app, {
   upload,
   logLine,
@@ -660,8 +672,9 @@ registerSpecificationTranslationRoutes(app, {
 });
 
 registerEcadminPlatformRoutes(app, { upload, ecadminPlatformFeature, logLine });
-registerEzvizSiteAuditRoutes(app, { feature: ezvizSiteAuditFeature });
+registerEzvizSiteAuditRoutes(app, { feature: ezvizSiteAuditFeature, scheduler: ezvizSiteAuditScheduler });
 
 app.listen(PORT, () => {
   console.log(`Office software platform is running at http://localhost:${PORT}/inline-packager.html`);
+  if (process.env.EZVIZ_SITE_AUDIT_SCHEDULE_ENABLED !== "0") ezvizSiteAuditScheduler.start();
 });

@@ -19,21 +19,21 @@
 - 短文本证据不足时标记为 `unknown`，不直接报错
 - 仅将高置信度、明显与站点语种不一致的标语加入问题清单
 
-产品详情页巡查：
+产品详情页巡查（当前随机/定时巡查范围）：
 
 - 从 `.site-product-btns-link.J_SiteProductDetailLink` 进入详情页
-- 检查 `#J_items` 中的 Detail、Specifications、Support 导航是否完整
-- 分别检查 Detail 与 Specifications 内容语种是否与站点一致
-- 检查 Support 产品页是否可访问、产品级导航是否存在
-- 检查 Support 是否包含 Datasheet
-- 检查 Support 图片是否缺少地址或加载失败
+- 检查产品详情页能否打开、Detail 正文是否存在
+- 检查产品标语是否存在
+- 检查产品标语语言是否与站点一致
+- 检查 Detail 正文语言是否与站点一致
+- 不检查 Support、Datasheet、图片、导航菜单或页面内链接
 
 随机多站点任务：
 
 - 从 `/choose-country-region` 动态发现站点
 - 从每个站点导航读取 Security Cameras 与 Smart Home 分类
 - 每个站点从两个分类中随机抽取 5 个不重复产品
-- 对每个产品依次执行标语、Detail、Specifications、Support 巡查
+- 对每个产品只执行标语与 Detail 存在性、语种一致性巡查
 - 通过后台异步任务持续返回进度和问题清单
 
 现有巡查逻辑暂未迁移，仍由 `server.js` 中的 Campaign Audit 流程调用外部 `Website-backend/website-audit` 脚本。

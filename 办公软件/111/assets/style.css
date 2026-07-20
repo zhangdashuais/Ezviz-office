@@ -185,7 +185,8 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-button {
+button,
+.button {
   border: 0;
   background: var(--accent);
   color: #fff;
@@ -194,9 +195,12 @@ button {
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s;
+  display: inline-block;
+  text-decoration: none;
 }
 
-button:hover { background: var(--accent-hover); }
+button:hover,
+.button:hover { background: var(--accent-hover); }
 button:disabled { background: #cbd5e1; cursor: not-allowed; }
 
 .status { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; padding: 10px; border-radius: 6px; border: 1px solid transparent; }

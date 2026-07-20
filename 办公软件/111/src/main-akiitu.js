@@ -137,10 +137,20 @@
           return fileBlobMap.get(resolved);
         }
 
-        for (const [k, v] of fileBlobMap.entries()) {
-          if (k.endsWith("/" + normalizedRaw) || k.endsWith(normalizedRaw)) {
-            return v;
-          }
+        const pathParts = normalizedRaw.split("/").filter(Boolean);
+        const structuralTail = pathParts.length > 1 ? pathParts.slice(1).join("/") : normalizedRaw;
+        const structuralMatches = [...fileBlobMap.entries()].filter(([key]) =>
+          key === structuralTail || key.endsWith("/" + structuralTail)
+        );
+        if (structuralMatches.length === 1) {
+          return structuralMatches[0][1];
+        }
+
+        const exactSuffixMatches = [...fileBlobMap.entries()].filter(([key]) =>
+          key.endsWith("/" + normalizedRaw) || key.endsWith(normalizedRaw)
+        );
+        if (exactSuffixMatches.length === 1) {
+          return exactSuffixMatches[0][1];
         }
 
         return null;
@@ -163,7 +173,7 @@
           for (const item of srcsetValue.split(",")) {
             const part = item.trim();
             if (!part) continue;
-            const urlPart = part.split(/\s+/)[0];
+            const urlPart = part.replace(/\s+\d+(?:\.\d+)?[wx]\s*$/i, "");
             items.push(urlPart);
           }
         }
@@ -184,6 +194,18 @@
       }
 
       async function uploadImage(file, uploadApi) {
+        try {
+          const localForm = new FormData();
+          localForm.append("file", file, file.name);
+          localForm.append("uploadApi", uploadApi);
+          const localResponse = await fetch("/api/assets/upload-image", { method: "POST", body: localForm });
+          const localPayload = await localResponse.json();
+          if (localResponse.ok && localPayload.ok && localPayload.url) return localPayload.url;
+          throw new Error(localPayload.error || "本地图片上传代理失败");
+        } catch (error) {
+          console.warn("本地图片上传代理不可用，尝试浏览器直传：", error);
+        }
+
         const mimeCandidates = Array.from(new Set([
           file.type,
           "image/png",
@@ -257,9 +279,8 @@
           const nextItems = value.split(",").map((item) => {
             const trimmed = item.trim();
             if (!trimmed) return item;
-            const parts = trimmed.split(/\s+/);
-            const oldUrl = parts[0];
-            const descriptor = parts.slice(1).join(" ");
+            const descriptor = trimmed.match(/\s+(\d+(?:\.\d+)?[wx])\s*$/i)?.[1] || "";
+            const oldUrl = descriptor ? trimmed.slice(0, trimmed.length - descriptor.length).trimEnd() : trimmed;
             const replaced = Object.prototype.hasOwnProperty.call(mapping, oldUrl) ? mapping[oldUrl] : oldUrl;
             return descriptor ? (replaced + " " + descriptor) : replaced;
           });
