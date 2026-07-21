@@ -5,6 +5,9 @@
 (function () {
   const excelInput = document.getElementById("tdkExcelInput");
   const validateButton = document.getElementById("tdkValidateBtn");
+  const submitButton = document.getElementById("tdkSubmitBtn");
+  const shopUsernameInput = document.getElementById("tdkShopUsernameInput");
+  const shopPasswordInput = document.getElementById("tdkShopPasswordInput");
   const statusElement = document.getElementById("tdkStatus");
   const outputElement = document.getElementById("tdkOutput");
   if (!excelInput || !validateButton || !statusElement || !outputElement) return;
@@ -88,9 +91,66 @@
       const issues = REQUIRED_HEADERS.filter((header) => !headers.includes(header)).map((header) => `缺少必填表头：${header}`);
       issues.push(...validateRows(rows));
       renderPreview(sheetName, rows, issues);
-      setStatus(issues.length ? `校验完成：发现 ${issues.length} 个问题，正式配置前请修正。` : `校验通过：共 ${rows.length} 行，可等待接入后台配置规则。`, issues.length ? "warn" : "ok");
+      submitButton.disabled = issues.length > 0;
+      setStatus(issues.length ? `校验完成：发现 ${issues.length} 个问题，正式配置前请修正。` : `校验通过：共 ${rows.length} 行，可以执行后台配置。`, issues.length ? "warn" : "ok");
     } catch (error) {
       setStatus(`读取失败：${error && error.message ? error.message : String(error)}`, "warn");
+    } finally {
+      validateButton.disabled = false;
+    }
+  });
+
+  excelInput.addEventListener("change", () => {
+    submitButton.disabled = true;
+    setStatus("文件已更换，请重新校验。", "warn");
+  });
+
+  function renderSubmitResult(data) {
+    const result = data.result || {};
+    const lines = [
+      "TDK 后台配置结果",
+      `提交数据：${result.submittedRows || 0} 行`,
+      `跳过数据：${result.skippedRows || 0} 行`,
+      `处理站点：${result.siteCount || 0} 个`,
+      ""
+    ];
+    (result.results || []).forEach((item) => {
+      lines.push(`${item.site.name} (${item.site.siteCode})：导入 ${item.rowCount} 行，列表复核 ${item.verifiedCount}/${item.rowCount}`);
+      lines.push(`后台返回：${item.importMessage || "无"}`);
+    });
+    if (result.skippedRecordIds && result.skippedRecordIds.length) {
+      lines.push("", "已跳过：" + result.skippedRecordIds.join(", "));
+    }
+    if (data.logs && data.logs.length) lines.push("", "执行日志：", ...data.logs);
+    outputElement.value = lines.join("\n");
+  }
+
+  submitButton.addEventListener("click", async () => {
+    const file = excelInput.files && excelInput.files[0];
+    if (!file) {
+      setStatus("请选择 TDK Excel 文件。", "warn");
+      return;
+    }
+    if (!window.confirm("确认将 Excel 中非 skip 的 TDK 数据提交到对应商城后台吗？")) return;
+    submitButton.disabled = true;
+    validateButton.disabled = true;
+    setStatus("正在按站点登录并导入 TDK，请不要关闭页面...");
+    const form = new FormData();
+    form.append("tdkExcel", file);
+    if (shopUsernameInput?.value.trim()) form.append("shopUsername", shopUsernameInput.value.trim());
+    if (shopPasswordInput?.value) form.append("shopPassword", shopPasswordInput.value);
+    try {
+      const response = await fetch("/api/tdk/submit", { method: "POST", body: form });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        const details = (data.issues || []).join("；");
+        throw new Error((data.error || "TDK 后台配置失败。") + (details ? " " + details : ""));
+      }
+      renderSubmitResult(data);
+      setStatus(`TDK 后台配置完成：提交 ${data.result.submittedRows} 行，复核 ${data.result.results.reduce((sum, item) => sum + item.verifiedCount, 0)}/${data.result.submittedRows} 行。`, "ok");
+    } catch (error) {
+      setStatus("TDK 后台配置失败：" + (error.message || error), "warn");
+      submitButton.disabled = false;
     } finally {
       validateButton.disabled = false;
     }

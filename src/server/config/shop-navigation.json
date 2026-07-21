@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "capturedAt": "2026-07-21",
+  "sourceUrl": "https://shop.ezvizlife.com/templates/index",
+  "baseUrl": "https://shop.ezvizlife.com",
+  "selectors": {
+    "sidebar": ".sidebar",
+    "navigation": ".sidebar .nav-bar",
+    "links": ".sidebar .nav-bar a[href]"
+  },
+  "notes": [
+    "The live page uses .nav-bar inside .sidebar; no element with the literal .navigation class was present when captured.",
+    "Duplicate responsive sidebar copies can exist in the DOM. Scripts should deduplicate entries by route and label.",
+    "Some routes redirect to another EZVIZ backend host at runtime, for example TDK redirects to new-eu-shop.ezvizlife.com."
+  ],
+  "groups": [
+    {
+      "id": "store-management",
+      "label": "Store Management",
+      "items": [
+        { "id": "language-management", "label": "Language Management", "route": "/language/index" },
+        { "id": "homepage", "label": "Homepage", "route": "/pages/index" },
+        { "id": "custom-page", "label": "Custom Page", "route": "/templates/index" },
+        { "id": "newsroom", "label": "Newsroom", "route": "/news/index" },
+        { "id": "category-page", "label": "Category Page", "route": "/category/index" },
+        { "id": "map-management", "label": "Map Management", "route": "/map/index" },
+        { "id": "customization", "label": "Customization", "route": "/config/edit" },
+        { "id": "contact", "label": "Contact", "route": "/mailtemplate/index" },
+        { "id": "contact-submission", "label": "Contact Submission", "route": "/feedback/index" },
+        { "id": "tdk", "label": "TDK", "route": "/tdk/index", "observedFinalUrl": "https://new-eu-shop.ezvizlife.com/tdk/index" },
+        { "id": "where-to-buy", "label": "Where to buy", "route": "/whereToBuy/index" },
+        { "id": "cloudplay", "label": "Cloudplay", "route": "/cloudplay/index" },
+        { "id": "popup", "label": "Popup", "route": "/config/popup", "automationUrl": "https://new-shop.ezvizlife.com/popup/index" },
+        { "id": "legal", "label": "Legal", "route": "/config/legal-edit" },
+        { "id": "topic-manage", "label": "Topic Manage", "route": "/topic-management/index" },
+        { "id": "combination", "label": "Combination", "route": "/combination/index" },
+        { "id": "campaign", "label": "Campaign", "route": "/campaign/index" },
+        { "id": "award", "label": "Award", "route": "/award/index" }
+      ]
+    },
+    {
+      "id": "mall-management",
+      "label": "Mall Management",
+      "items": [
+        { "id": "mall-homepage", "label": "Mall Homepage", "route": "/mall-pages/index" },
+        { "id": "mall-category-page", "label": "Mall Category Page", "route": "/mall-category/index" },
+        { "id": "mall-topic-manage", "label": "Mall Topic Manage", "route": "/mall-topic-management/index" }
+      ]
+    },
+    {
+      "id": "blog-management",
+      "label": "Blog Management",
+      "items": [
+        { "id": "blog", "label": "Blog", "route": "/blog/index" },
+        { "id": "blog-category", "label": "Blog Category", "route": "/blog/category/index" }
+      ]
+    },
+    {
+      "id": "event-management",
+      "label": "Event Management",
+      "items": [
+        { "id": "events", "label": "Event Management", "route": "/event/index" }
+      ]
+    },
+    {
+      "id": "promotion-management",
+      "label": "Promotion Management",
+      "items": [
+        { "id": "all-promotions", "label": "All Promotions", "route": "/promotion/index" },
+        { "id": "coupon-management", "label": "Coupon Management", "route": "/discount-coupon/coupon-list" },
+        { "id": "coupon-receive-management", "label": "Coupon Receive Management", "route": "/coupon-receive/receive-list" },
+        { "id": "coupon-send-management", "label": "Coupon Send Management", "route": "/coupon-send/send-list" },
+        { "id": "coupon-used-management", "label": "Coupon Used Management", "route": "/coupon-used/used-list" }
+      ]
+    },
+    {
+      "id": "product-page-management",
+      "label": "Product Page",
+      "items": [
+        { "id": "product-page", "label": "Product Page", "route": "/goods/index" },
+        { "id": "product-support", "label": "Product Support", "route": "/support/index" }
+      ]
+    },
+    {
+      "id": "account-management",
+      "label": "Account Management",
+      "items": [
+        { "id": "sub-account-management", "label": "Sub-Account Management", "route": "/subuser/index" },
+        { "id": "role-management", "label": "Role Management", "route": "/role/index" }
+      ]
+    }
+  ]
+}

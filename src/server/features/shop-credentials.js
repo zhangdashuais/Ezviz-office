@@ -5,10 +5,11 @@ const zlib = require("zlib");
 function createShopCredentials(options = {}) {
   const desktopRoot = options.desktopRoot;
   const backendRoot = options.backendRoot;
+  const additionalRoots = options.additionalRoots || [];
   const workbookNames = options.workbookNames || ["网站账号密码", "账号密码"];
 
   function findWorkbook() {
-    const roots = [desktopRoot, process.env.EZVIZ_CREDENTIAL_DIR, backendRoot]
+    const roots = [desktopRoot, process.env.EZVIZ_CREDENTIAL_DIR, backendRoot, ...additionalRoots]
       .filter((dir, index, list) => dir && list.indexOf(dir) === index && fs.existsSync(dir));
     const candidates = [];
     const ignored = new Set(["node_modules", ".git", "outputs", ".playwright", ".playwright-cli", "runtime_uploads"]);
@@ -84,21 +85,28 @@ function createShopCredentials(options = {}) {
     const archive = entries(fs.readFileSync(workbookPath));
     const data = rows(archive.get("xl/worksheets/sheet1.xml"), sharedStrings(archive.get("xl/sharedStrings.xml")));
     let group = "";
+    let inheritedDomain = "";
+    let matchedDomain = false;
     const expectedGroup = String(targetGroup || "Website").toLowerCase();
     for (const row of data) {
       const domain = row?.[0] || "";
-      if (!domain) continue;
       if (!domain.includes(".") && !/^domain$/i.test(domain) && !row[1] && !row[2]) {
-        group = domain;
+        if (domain) group = domain;
+        inheritedDomain = "";
         continue;
       }
+      if (domain) inheritedDomain = domain;
+      const effectiveDomain = domain || inheritedDomain;
+      if (!effectiveDomain) continue;
       const currentGroup = group.toLowerCase();
       const defaultWebsite = ["website", "main", "regular", "default"].includes(expectedGroup) && currentGroup === "";
-      if (domain === targetDomain && (currentGroup === expectedGroup || defaultWebsite)) {
-        if (!row[1] || !row[2]) throw new Error(`账号密码表中 ${targetDomain} 的账号或密码为空。`);
+      if (effectiveDomain === targetDomain && (currentGroup === expectedGroup || defaultWebsite)) {
+        matchedDomain = true;
+        if (!row[1] || !row[2]) continue;
         return { account: row[1], password: row[2], workbookPath };
       }
     }
+    if (matchedDomain) throw new Error(`账号密码表中 ${targetDomain} 的账号或密码为空。`);
     throw new Error(`账号密码表里没有找到 ${targetGroup || "Website"} / ${targetDomain}。`);
   }
 

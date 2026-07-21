@@ -22,6 +22,9 @@ const { createSpecificationTranslationFeature } = require("./src/server/features
 const { registerSpecificationTranslationRoutes } = require("./src/server/routes/specification-translation-routes");
 const { registerCampaignRoutes } = require("./src/server/routes/campaign-routes");
 const { registerAssetUploadRoutes } = require("./src/server/routes/asset-upload-routes");
+const { createTdkManagementFeature } = require("./src/server/features/tdk-management");
+const { registerTdkRoutes } = require("./src/server/routes/tdk-routes");
+const { createCampaignLinkInspector } = require("./src/server/features/campaign-link-inspector");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -43,6 +46,18 @@ const NEW_SHOP_POPUP_INDEX_URL = "https://new-shop.ezvizlife.com/popup/index";
 const NEW_SHOP_API_BASE = "https://sgpshop-api.ezvizlife.com";
 const FS_UPLOAD_URL = "https://fs.ezvizlife.com/upload.php";
 const SHOP_WTB_INDEX_URL = "https://shop.ezvizlife.com/whereToBuy/index";
+const DEFAULT_UTM_POLICIES = {
+  banner: {
+    sourceTemplate: "{siteCode}_banner",
+    mediumTemplate: "banner{position}",
+    campaignTemplate: "web_{siteCode}_banner"
+  },
+  popup: {
+    sourceTemplate: "{siteCode}_popup",
+    mediumTemplate: "popup",
+    campaignTemplate: "web_{siteCode}_popup"
+  }
+};
 
 const ezvizSiteAuditFeature = createEzvizSiteAuditFeature({ chromium });
 const ezvizSiteAuditScheduler = createEzvizSiteAuditScheduler({
@@ -55,6 +70,7 @@ const ezvizSiteAuditScheduler = createEzvizSiteAuditScheduler({
 const shopCredentials = createShopCredentials({
   desktopRoot: DESKTOP_ROOT,
   backendRoot: WEBSITE_BACKEND_ROOT,
+  additionalRoots: [path.resolve(ROOT, "..")],
   workbookNames: CREDENTIAL_WORKBOOK_NAMES
 });
 const zipEntries = shopCredentials.zipEntries;
@@ -123,6 +139,13 @@ const specificationTranslationFeature = createSpecificationTranslationFeature({
   logLine,
   shopCredentials
 });
+const tdkManagementFeature = createTdkManagementFeature({
+  logLine,
+  SHOP_DASHBOARD_URL,
+  browserAuth,
+  shopCredentials
+});
+const campaignLinkInspector = createCampaignLinkInspector({ chromium });
 
 function readCampaignConfig() {
   if (!fs.existsSync(CAMPAIGN_CONFIG_PATH)) {
@@ -136,6 +159,7 @@ function getCampaignSites(config) {
     name: site.name,
     url: site.url,
     siteCode: site.siteCode,
+    campaignCode: site.campaignCode || (site.siteCode === "inter" ? "hq" : site.siteCode),
     enabled: site.enabled !== false
   }));
 }
@@ -180,7 +204,10 @@ function buildCampaignUrl(rawUrl, options, config) {
   if (!value || !isInternalCampaignUrl(value, config)) return value;
 
   const placement = options.placement || "banner";
-  const policy = (config.utmPolicies && config.utmPolicies[placement]) || config.utmPolicy || {};
+  const policy = (config.utmPolicies && config.utmPolicies[placement])
+    || config.utmPolicy
+    || DEFAULT_UTM_POLICIES[placement]
+    || {};
   const parsed = new URL(value);
   const values = {
     siteCode: options.siteCode || "",
@@ -257,12 +284,12 @@ function buildBannerPlan(body, files) {
     },
     generatedUrls: Object.fromEntries(sites.map((site) => {
       const position = bannerManagement.targetPosition(site);
-      const options = { siteCode: site.siteCode, placement: "banner", position };
+      const options = { siteCode: site.campaignCode || site.siteCode, placement: "banner", position };
       return [site.siteCode, buildCampaignUrl(rawLink, options, config)];
     })),
     items: sites.map((site) => {
       const position = bannerManagement.targetPosition(site);
-      const options = { siteCode: site.siteCode, placement: "banner", position };
+      const options = { siteCode: site.campaignCode || site.siteCode, placement: "banner", position };
       const url = buildCampaignUrl(rawLink, options, config);
       const localizedUrl = localizedCampaignUrlSuggestion(rawLink, site, options, config);
       return {
@@ -313,11 +340,11 @@ function buildPopupPlan(body, files) {
       image: fileSummary(popupImage)
     },
     generatedUrls: Object.fromEntries(sites.map((site) => {
-      const options = { siteCode: site.siteCode, placement: "popup" };
+      const options = { siteCode: site.campaignCode || site.siteCode, placement: "popup" };
       return [site.siteCode, buildCampaignUrl(rawWebUrl, options, config)];
     })),
     items: sites.map((site) => {
-      const options = { siteCode: site.siteCode, placement: "popup" };
+      const options = { siteCode: site.campaignCode || site.siteCode, placement: "popup" };
       const webUrl = buildCampaignUrl(rawWebUrl, options, config);
       const mobileUrl = buildCampaignUrl(rawMobileUrl, options, config);
       const localizedWebUrl = localizedCampaignUrlSuggestion(rawWebUrl, site, options, config);
@@ -639,7 +666,7 @@ const ecadminPlatformFeature = createEcadminPlatformFeature({
 });
 
 registerCampaignRoutes(app, {
-  upload, logLine, normalizeBool, readCampaignConfig, getCampaignSites,
+  upload, logLine, normalizeBool, readCampaignConfig, getCampaignSites, parseSelectedSites,
   getShopContext: browserAuth.getShopContext,
   getOpenPage: browserAuth.getOpenPage,
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
@@ -654,7 +681,7 @@ registerCampaignRoutes(app, {
   },
   popup: popupManagement,
   wtbProbe: productManagement.probeWhereToBuySettings,
-  languagePackageFeature, buildBannerPlan, buildPopupPlan, runCampaignAudit,
+  languagePackageFeature, campaignLinkInspector, buildBannerPlan, buildPopupPlan, runCampaignAudit,
   campaignAuditIssues, startCampaignAuditJob, campaignAuditJobs
 });
 
@@ -669,6 +696,14 @@ registerSpecificationTranslationRoutes(app, {
   shopCredentials,
   readCampaignConfig,
   getCampaignSites
+});
+
+registerTdkRoutes(app, {
+  upload,
+  feature: tdkManagementFeature,
+  readCampaignConfig,
+  getCampaignSites,
+  logLine
 });
 
 registerEcadminPlatformRoutes(app, { upload, ecadminPlatformFeature, logLine });
