@@ -46,6 +46,7 @@
     auditPlacement: "campaignAuditPlacementSelect",
     auditPopupWait: "campaignPopupWaitInput",
     runAudit: "campaignRunAuditBtn",
+    inspectFirstLink: "campaignInspectFirstLinkBtn",
     fixBannerUtm: "campaignFixBannerUtmBtn"
   };
 
@@ -630,6 +631,71 @@
       el.runAudit.disabled = false;
     }
   }
+  function renderFirstLinkResult(result) {
+    const lines = [];
+    lines.push("首个活动跳转链接");
+    lines.push("站点：" + result.site.name + " (" + result.site.siteCode + ")");
+    lines.push("首页：" + result.renderedUrl);
+    lines.push("");
+    (result.results || []).forEach((item) => {
+      lines.push((item.placement === "banner" ? "Banner" : "Popup") + "：");
+      if (!item.found) {
+        lines.push("未找到当前可用的跳转链接。");
+        lines.push("");
+        return;
+      }
+      if (item.position) lines.push("位置：第 " + item.position + " 位");
+      if (item.text) lines.push("文案：" + item.text);
+      lines.push("跳转链接：" + item.href);
+      if (item.availability) {
+        lines.push("链接状态：" + (item.availability.ok ? "可用" : "不可用")
+          + (item.availability.status ? "（HTTP " + item.availability.status + "）" : ""));
+        if (item.availability.finalUrl && item.availability.finalUrl !== item.href) {
+          lines.push("最终地址：" + item.availability.finalUrl);
+        }
+        if (item.availability.error) lines.push("访问错误：" + item.availability.error);
+      }
+      if (item.utm) {
+        if (!item.utm.required) lines.push("UTM：外部链接，不要求配置 EZVIZ UTM");
+        else lines.push("UTM：" + (item.utm.valid ? "配置正确" : "配置错误"));
+        (item.utm.problems || []).forEach((problem) => lines.push("- " + problem));
+        if (item.utm.correctedUrl) lines.push("建议修正：" + item.utm.correctedUrl);
+      }
+      lines.push("");
+    });
+    return lines.join("\n");
+  }
+  async function inspectFirstLink() {
+    const selected = selectedSiteCodes();
+    if (selected.length !== 1) {
+      setStatus("读取首个活动链接时请只勾选一个站点。", "warn");
+      return;
+    }
+    el.inspectFirstLink.disabled = true;
+    setStatus("正在读取首页首个活动跳转链接...");
+    writeOutput("正在打开所选站点首页并检查链接，请稍候...");
+    revealOutput();
+    try {
+      const response = await fetch(serviceBase + "/api/campaign/first-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sites: selected,
+          placement: el.auditPlacement.value,
+          popupWaitMs: el.auditPopupWait.value || "5000"
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "读取首个活动链接失败");
+      writeOutput(renderFirstLinkResult(payload.result));
+      setStatus("首个活动跳转链接读取完成。", "ok");
+    } catch (error) {
+      setStatus("读取首个活动链接失败：" + (error.message || error), "warn");
+      writeOutput({ ok: false, error: error.message || String(error) });
+    } finally {
+      el.inspectFirstLink.disabled = false;
+    }
+  }
   async function fixBannerUtm() {
     const selected = selectedSiteCodes();
     if (selected.length !== 1) {
@@ -690,6 +756,7 @@
   el.wtbBuildPlan.addEventListener("click", buildWtbPlan);
   el.wtbSubmit.addEventListener("click", submitWtb);
   el.runAudit.addEventListener("click", runAudit);
+  el.inspectFirstLink.addEventListener("click", inspectFirstLink);
   el.fixBannerUtm.addEventListener("click", fixBannerUtm);
 
   loadSites();

@@ -1,8 +1,8 @@
 function registerCampaignRoutes(app, deps) {
   const {
-    upload, logLine, normalizeBool, readCampaignConfig, getCampaignSites,
+    upload, logLine, normalizeBool, readCampaignConfig, getCampaignSites, parseSelectedSites,
     getShopContext, getOpenPage, ensureShopLoggedIn, credentialDomainForSite,
-    banner, product, popup, wtbProbe, languagePackageFeature,
+    banner, product, popup, wtbProbe, languagePackageFeature, campaignLinkInspector,
     buildBannerPlan, buildPopupPlan, runCampaignAudit, campaignAuditIssues,
     startCampaignAuditJob, campaignAuditJobs
   } = deps;
@@ -12,6 +12,23 @@ function registerCampaignRoutes(app, deps) {
   app.get("/api/campaign/sites", (req, res) => {
     try { res.json({ ok: true, sites: getCampaignSites(readCampaignConfig()) }); }
     catch (error) { res.status(500).json({ ok: false, error: errorMessage(error) }); }
+  });
+
+  app.post("/api/campaign/first-link", async (req, res) => {
+    try {
+      const config = readCampaignConfig();
+      const selectedCodes = parseSelectedSites(req.body?.sites);
+      if (selectedCodes.length !== 1) throw new Error("读取首个活动链接时请只勾选一个站点。");
+      const site = getCampaignSites(config).find((item) => item.siteCode === selectedCodes[0]);
+      if (!site) throw new Error("未找到站点配置：" + selectedCodes[0]);
+      const result = await campaignLinkInspector.inspect(site, {
+        placement: String(req.body?.placement || "banner"),
+        popupWaitMs: req.body?.popupWaitMs
+      }, config);
+      res.json({ ok: true, result });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: errorMessage(error) });
+    }
   });
 
   app.post("/api/campaign/shop-login-check", async (req, res) => {
