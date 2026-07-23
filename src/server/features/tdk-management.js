@@ -81,6 +81,19 @@ function validateTdkRows(rows, headerIssues = []) {
   return issues;
 }
 
+function validateTdkSitePaths(rows, site) {
+  let sitePath = "";
+  try {
+    sitePath = new URL(site?.url || "").pathname.replace(/\/+$/, "");
+  } catch {
+    return [`站点 ${site?.siteCode || ""} 的 URL 配置无效。`];
+  }
+  if (!sitePath || sitePath === "/") return [];
+  return rows
+    .filter((row) => row.urlPath && row.urlPath !== sitePath && !row.urlPath.startsWith(sitePath + "/"))
+    .map((row) => `第 ${row.rowNumber} 行 Url Path 不属于所选站点 ${site.name || site.siteCode}：${row.urlPath}`);
+}
+
 function createTdkManagement(deps) {
   const {
     fs,
@@ -96,17 +109,23 @@ function createTdkManagement(deps) {
   } = deps;
 
   function buildPlan(body, files) {
+    const config = readCampaignConfig();
+    const site = requireSingleCampaignSite(config, body);
     const file = files?.tdkExcel?.[0];
     if (!file?.path || !fs.existsSync(file.path)) throw new Error("请先选择 TDK Excel 文件。");
     const parsed = parseTdkWorkbook(file.path);
-    const issues = validateTdkRows(parsed.rows, parsed.headerIssues);
+    const issues = [
+      ...validateTdkRows(parsed.rows, parsed.headerIssues),
+      ...validateTdkSitePaths(parsed.rows, site)
+    ];
     return {
       fileName: file.originalname || file.filename || "",
       sheetName: parsed.sheetName,
       headers: parsed.sourceHeaders,
       rowCount: parsed.rows.length,
       rows: parsed.rows,
-      issues
+      issues,
+      site
     };
   }
 
@@ -131,13 +150,8 @@ function createTdkManagement(deps) {
   }
 
   async function submit(body, files, logs) {
-    const config = readCampaignConfig();
-    const site = requireSingleCampaignSite(config, body);
-    if (String(site.siteCode || "").toLowerCase() !== "hq") {
-      throw new Error("TDK 快速配置当前仅开放国际站（hq）。");
-    }
-
     const plan = buildPlan(body, files);
+    const site = plan.site;
     if (plan.issues.length) {
       throw new Error("TDK Excel 校验未通过：" + plan.issues.slice(0, 8).join("；"));
     }
@@ -150,8 +164,17 @@ function createTdkManagement(deps) {
       credentialDomain: credentialDomainForSite(site),
       credentialGroup: "Website"
     }, logs);
+    const authenticatedIdentity = await page.evaluate(() =>
+      document.querySelector(".clearfix.login-bar")?.innerText
+      || document.querySelector(".login-bar")?.innerText
+      || ""
+    ).catch(() => "");
+    if (!authenticatedIdentity.trim()) {
+      throw new Error("商城后台登录后未能读取当前用户身份，已停止发送 TDK 请求。");
+    }
+    logLine(logs, "TDK 后台请求身份：" + authenticatedIdentity.replace(/\s+/g, " ").trim());
 
-    logLine(logs, "进入国际站 TDK 管理页以建立后台登录态。");
+    logLine(logs, `进入 ${site.name || site.siteCode} TDK 管理页以建立后台登录态。`);
     await page.goto(NEW_SHOP_TDK_INDEX_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(1500);
 
@@ -182,6 +205,7 @@ function createTdkManagement(deps) {
     return {
       mode: "direct-post",
       site,
+      authenticatedIdentity: authenticatedIdentity.replace(/\s+/g, " ").trim(),
       apiUrl: NEW_SHOP_API_BASE + "/seo-tdk/create",
       total: results.length,
       completed,
@@ -200,5 +224,6 @@ module.exports = {
   canonicalHeader,
   parseTdkWorkbook,
   validateTdkRows,
+  validateTdkSitePaths,
   createTdkManagement
 };

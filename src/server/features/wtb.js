@@ -1,13 +1,80 @@
 const XLSX = require("xlsx");
 
+function normalizeWtbHeader(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s_\-（）()：:]+/g, "");
+}
+
+function normalizeWtbPlatform(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function applyWtbLinksToMap(currentWhereToBuy, links) {
+  const nextWhereToBuy = JSON.parse(JSON.stringify(currentWhereToBuy || {}));
+  const platformKeys = Object.keys(nextWhereToBuy);
+  const applied = [];
+  const missing = [];
+
+  for (const link of links || []) {
+    const normalized = normalizeWtbPlatform(link.platform);
+    const key = platformKeys.find((candidate) => normalizeWtbPlatform(candidate) === normalized);
+    if (!key) {
+      missing.push(link.platform);
+      continue;
+    }
+    const current = nextWhereToBuy[key];
+    nextWhereToBuy[key] = {
+      ...(current && typeof current === "object" ? current : {}),
+      href_url: String(link.url || "").trim()
+    };
+    applied.push({ platform: key, url: nextWhereToBuy[key].href_url });
+  }
+
+  if (missing.length) {
+    throw new Error(
+      "后台未配置这些购买平台：" + missing.join(", ")
+      + (platformKeys.length ? "。当前可用平台：" + platformKeys.join(", ") : "。当前站点没有可用购买平台。")
+    );
+  }
+  return { whereToBuy: nextWhereToBuy, applied, availablePlatforms: platformKeys };
+}
+
+function parseWtbWorkbook(filePath) {
+  const workbook = XLSX.readFile(filePath, { cellDates: false });
+  const result = [];
+  workbook.SheetNames.forEach((sheetName, sheetIndex) => {
+    if (sheetName.trim() === "填写说明") return;
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      header: 1,
+      defval: "",
+      raw: false
+    }).filter((row) => row && row.some((cell) => String(cell || "").trim()));
+    if (!rows.length) return;
+    const headers = rows[0].map(normalizeWtbHeader);
+    const productIndex = headers.findIndex((item) => ["产品名称", "产品名", "productname", "product", "name"].includes(item));
+    const productPageIndex = headers.findIndex((item) => ["productpageurl", "producturl", "productpage", "pageurl"].includes(item));
+    const platformIndex = headers.findIndex((item) => ["购买平台", "平台", "platform", "channel", "shop", "store", "retailer"].includes(item));
+    const urlIndex = headers.findIndex((item) => ["购买链接", "链接", "purchasinglink", "purchaselink", "buyinglink", "link", "url", "buyurl", "href"].includes(item));
+    if (productIndex < 0 || platformIndex < 0 || urlIndex < 0) {
+      throw new Error(`WTB Excel 工作表“${sheetName}”的表头需要包含 Product、Channel、Purchasing Link。`);
+    }
+    result.push(...rows.slice(1).map((row, index) => ({
+      sheetNumber: sheetIndex + 1,
+      sheetName,
+      rowNumber: index + 2,
+      productName: String(row[productIndex] || "").trim(),
+      productPageUrl: productPageIndex < 0 ? "" : String(row[productPageIndex] || "").trim(),
+      platform: String(row[platformIndex] || "").trim(),
+      url: String(row[urlIndex] || "").trim()
+    })).filter((item) => item.productName || item.productPageUrl || item.platform || item.url));
+  });
+  return result;
+}
+
 function createWtbFeature(deps) {
   const {
     fs,
     path,
     logLine,
-    zipEntries,
-    sharedStrings,
-    readRows,
     readCampaignConfig,
     requireSingleCampaignSite,
     getShopContext,
@@ -18,39 +85,9 @@ function createWtbFeature(deps) {
     clickTextInProductEditor
   } = deps;
 
-function normalizeWtbHeader(value) {
-  return String(value || "").trim().toLowerCase().replace(/[\s_\-（）()：:]+/g, "");
-}
-
 function readWtbWorkbook(file) {
   if (!file?.path || !fs.existsSync(file.path)) return [];
-  const entries = zipEntries(fs.readFileSync(file.path));
-  const shared = sharedStrings(entries.get("xl/sharedStrings.xml"));
-  const sheets = [...entries.keys()]
-    .filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name))
-    .sort((a, b) => Number(a.match(/sheet(\d+)/i)?.[1]) - Number(b.match(/sheet(\d+)/i)?.[1]));
-  const result = [];
-  for (const [sheetIndex, sheetPath] of sheets.entries()) {
-    const rows = readRows(entries.get(sheetPath), shared).filter((row) => row && row.some((cell) => String(cell || "").trim()));
-    if (!rows.length) continue;
-    const headers = rows[0].map(normalizeWtbHeader);
-    const productIndex = headers.findIndex((item) => ["产品名称", "产品名", "productname", "product", "name"].includes(item));
-    const productPageIndex = headers.findIndex((item) => ["productpageurl", "producturl", "productpage", "pageurl"].includes(item));
-    const platformIndex = headers.findIndex((item) => ["购买平台", "平台", "platform", "channel", "shop", "store", "retailer"].includes(item));
-    const urlIndex = headers.findIndex((item) => ["购买链接", "链接", "purchasinglink", "purchaselink", "buyinglink", "link", "url", "buyurl", "href"].includes(item));
-    if (productIndex < 0 || platformIndex < 0 || urlIndex < 0) {
-      throw new Error(`WTB Excel 第 ${sheetIndex + 1} 个工作表的表头需要包含 Product、Channel、Purchasing Link。`);
-    }
-    result.push(...rows.slice(1).map((row, index) => ({
-      sheetNumber: sheetIndex + 1,
-      rowNumber: index + 2,
-      productName: String(row[productIndex] || "").trim(),
-      productPageUrl: productPageIndex < 0 ? "" : String(row[productPageIndex] || "").trim(),
-      platform: String(row[platformIndex] || "").trim(),
-      url: String(row[urlIndex] || "").trim()
-    })).filter((item) => item.platform || item.url));
-  }
-  return result;
+  return parseWtbWorkbook(file.path);
 }
 
 function buildWtbRows(body, files) {
@@ -352,6 +389,82 @@ async function saveCurrentProductAndCapture(page, logs) {
   return { requestUrl: saveRequest.url, responseStatus: saveResponse?.status || null };
 }
 
+async function readWtbEditorState(page) {
+  await page.waitForFunction(() => {
+    const element = document.querySelector("#replenish");
+    const scope = window.angular && element ? window.angular.element(element).scope() : null;
+    return Boolean(
+      scope?.goodsId
+      && scope?.vm?.others?.wheretobuy
+      && typeof scope?.md?.toModel === "function"
+    );
+  }, null, { timeout: 30000 });
+
+  return page.evaluate(() => {
+    const scope = window.angular.element(document.querySelector("#replenish")).scope();
+    return {
+      goodsId: String(scope.goodsId),
+      whereToBuy: JSON.parse(JSON.stringify(scope.vm.others.wheretobuy || {}))
+    };
+  });
+}
+
+async function buildWtbDirectPayload(page, links) {
+  const editorState = await readWtbEditorState(page);
+  const mapped = applyWtbLinksToMap(editorState.whereToBuy, links);
+  const payload = await page.evaluate((whereToBuy) => {
+    const scope = window.angular.element(document.querySelector("#replenish")).scope();
+    scope.vm.others.wheretobuy = whereToBuy;
+    const data = scope.md.toModel(scope.vm);
+    data.goods_id = scope.goodsId;
+    return data;
+  }, mapped.whereToBuy);
+  return { ...mapped, goodsId: editorState.goodsId, payload };
+}
+
+async function postWtbDirectUpdate(page, payload) {
+  const requestUrl = "https://shop.ezvizlife.com/goods/do-edit-goods";
+  const response = await page.request.post(requestUrl, {
+    data: { data: payload },
+    headers: { "x-requested-with": "XMLHttpRequest" },
+    timeout: 60000
+  });
+  const responseText = await response.text().catch(() => "");
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error("WTB 保存接口返回的不是 JSON：" + responseText.slice(0, 200));
+  }
+  if (!response.ok() || Number(data?.status) !== 1) {
+    throw new Error(data?.msg || data?.message || `WTB 保存接口返回异常（HTTP ${response.status()}）`);
+  }
+  return {
+    requestUrl,
+    responseStatus: response.status(),
+    backendStatus: Number(data.status),
+    redirect: data.redirect || ""
+  };
+}
+
+async function verifyWtbBackendState(page, editUrl, expectedLinks) {
+  await page.goto(editUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  const state = await readWtbEditorState(page);
+  const actualEntries = Object.entries(state.whereToBuy || {});
+  const missing = [];
+  for (const link of expectedLinks) {
+    const normalized = normalizeWtbPlatform(link.platform);
+    const match = actualEntries.find(([platform]) => normalizeWtbPlatform(platform) === normalized);
+    if (!match || String(match[1]?.href_url || "").trim() !== String(link.url || "").trim()) {
+      missing.push({ platform: link.platform, expectedUrl: link.url, actualUrl: match?.[1]?.href_url || "" });
+    }
+  }
+  if (missing.length) {
+    throw new Error("WTB 保存后回读校验失败：" + JSON.stringify(missing));
+  }
+  return { status: "passed", goodsId: state.goodsId, checkedCount: expectedLinks.length };
+}
+
 function normalizeWtbText(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -523,22 +636,34 @@ async function submitWtbToBackend(body, files, logs) {
     credentialDomain: credentialDomainForSite(site),
     credentialGroup: "Website"
   }, logs);
+  const authenticatedIdentity = await backendPage.evaluate(() =>
+    document.querySelector(".clearfix.login-bar")?.innerText
+    || document.querySelector(".login-bar")?.innerText
+    || ""
+  ).catch(() => "");
+  if (!authenticatedIdentity.trim()) {
+    throw new Error("商城后台登录后未能读取当前用户身份，已停止发送 WTB 请求。");
+  }
+  logLine(logs, "WTB 后台请求身份：" + authenticatedIdentity.replace(/\s+/g, " ").trim());
 
   const results = [];
   for (const product of products) {
     logLine(logs, "开始处理 WTB 产品：" + product.productName);
     try {
       const editInfo = await findAndOpenProductEdit(backendPage, product.productName, logs);
-      const applied = await fillProductWhereToBuyLinks(backendPage, product.links, logs);
-      const save = await saveCurrentProductAndCapture(backendPage, logs);
+      const directUpdate = await buildWtbDirectPayload(backendPage, product.links);
+      logLine(logs, "WTB 将使用已登录后台会话直接提交：" + JSON.stringify(directUpdate.applied));
+      const save = await postWtbDirectUpdate(backendPage, directUpdate.payload);
+      const backendCheck = await verifyWtbBackendState(backendPage, editInfo.editUrl, product.links);
       const frontendCheck = await verifyWtbFrontendDisplay(context, backendPage, site, product, editInfo, logs);
       results.push({
         status: "completed",
         productName: product.productName,
         editUrl: editInfo.editUrl,
         links: product.links,
-        applied: applied.applied,
+        applied: directUpdate.applied,
         save,
+        backendCheck,
         frontendCheck,
         error: null
       });
@@ -558,8 +683,9 @@ async function submitWtbToBackend(body, files, logs) {
   logLine(logs, "WTB 执行报告已生成：" + report.reportPath);
 
   return {
-    mode: "playwright-form-save",
+    mode: "authenticated-direct-post",
     site,
+    authenticatedIdentity: authenticatedIdentity.replace(/\s+/g, " ").trim(),
     siteSource: resolved.source,
     productCount: results.length,
     successCount: results.filter((item) => item.status === "completed").length,
@@ -582,4 +708,10 @@ async function submitWtbToBackend(body, files, logs) {
   };
 }
 
-module.exports = { createWtbFeature };
+module.exports = {
+  createWtbFeature,
+  normalizeWtbHeader,
+  normalizeWtbPlatform,
+  applyWtbLinksToMap,
+  parseWtbWorkbook
+};

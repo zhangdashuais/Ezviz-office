@@ -130,18 +130,16 @@ add_hyperlink(p, "http://localhost:3217/inline-packager.html", "http://localhost
 doc.add_paragraph("停止项目时，在运行窗口按 Ctrl + C。")
 
 doc.add_heading("五、账号密码文件", level=1)
-doc.add_paragraph("商城后台自动配置需要网站账号密码 Excel，该文件不会存入 GitHub。程序会优先在当前 Windows 用户桌面查找文件名中包含以下文字的 .xlsx 文件：")
+doc.add_paragraph("商城后台自动配置需要网站账号密码 Excel，该文件不会存入 GitHub。可以放在项目 credentials 目录或当前 Windows 用户桌面，文件名需包含以下文字：")
 bullet(doc, "网站账号密码")
 bullet(doc, "账号密码")
 doc.add_paragraph("也可以通过环境变量指定文件夹：")
 code(doc, '$env:EZVIZ_CREDENTIAL_DIR="D:\\账号文件目录"\nnpm start')
 
-doc.add_heading("六、外部巡查功能依赖", level=1)
-doc.add_paragraph("Banner / Popup 的部分巡查功能还依赖以下外部目录：")
-code(doc, "E:\\Website-backend\\backend-operations")
-doc.add_paragraph("主要需要：")
-code(doc, "E:\\Website-backend\\backend-operations\\website-audit\\config\\banner-check.json\nE:\\Website-backend\\backend-operations\\website-audit\\scripts\\check-homepage-campaign-rendered.mjs")
-doc.add_paragraph("如果只使用普通页面、WTB 或部分产品处理功能，可以先启动项目；使用 Banner / Popup 巡查时需准备上述目录。")
+doc.add_heading("六、项目内巡查配置", level=1)
+doc.add_paragraph("Banner / Popup 的站点清单、UTM 规则和巡查脚本已包含在项目中：")
+code(doc, "config\\banner-check.json\nscripts\\check-homepage-campaign-rendered.mjs\ndocs\\homepage-banner-config.md\ndocs\\popup-upload.md")
+doc.add_paragraph("项目不再依赖外部 Website-backend 目录。如需临时覆盖站点配置，可设置 EZVIZ_CAMPAIGN_CONFIG 环境变量。")
 
 doc.add_heading("七、常见问题", level=1)
 doc.add_heading("npm 无法识别", level=2)

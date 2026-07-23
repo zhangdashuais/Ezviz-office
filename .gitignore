@@ -14,4 +14,6 @@ outputs/
 
 网站账号密码*.xlsx
 *账号密码*.xlsx
+credentials/*.xls
+credentials/*.xlsx
 ~$*

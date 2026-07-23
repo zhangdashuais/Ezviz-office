@@ -7,7 +7,7 @@ import requests
 
 
 UPLOAD_URL = "https://fs.ezvizlife.com/upload.php"
-DEFAULT_IMAGE_PATH = Path(r"D:\自动图片上传\image\image.png")
+DEFAULT_IMAGE_PATH = Path(__file__).resolve().parent.parent / "image" / "image.png"
 
 
 def upload_image(image_path: Path) -> tuple[int, dict]:

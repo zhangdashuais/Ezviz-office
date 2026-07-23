@@ -1,0 +1,248 @@
+{
+    "internalDomains":  [
+                            "ezviz.com",
+                            "www.ezviz.com",
+                            "ezvizlife.com",
+                            "www.ezvizlife.com"
+                        ],
+    "utmPolicy":  {
+                      "mode":  "site-banner-position",
+                      "sourceTemplate":  "{siteCode}_banner",
+                      "mediumTemplate":  "banner{position}",
+                      "campaignTemplate":  "web_{siteCode}_banner"
+                  },
+    "utmPolicies":  {
+                        "banner":  {
+                                       "sourceTemplate":  "{siteCode}_banner",
+                                       "mediumTemplate":  "banner{position}",
+                                       "campaignTemplate":  "web_{siteCode}_banner"
+                                   },
+                        "popup":  {
+                                      "sourceTemplate":  "{siteCode}_popup",
+                                      "mediumTemplate":  "popup",
+                                      "campaignTemplate":  "web_{siteCode}_popup"
+                                  }
+                    },
+    "request":  {
+                    "timeoutMs":  35000,
+                    "userAgent":  "EZVIZ Website Audit/0.1"
+                },
+    "rendered":  {
+                     "viewportWidth":  1366,
+                     "viewportHeight":  900,
+                     "navigationTimeoutMs":  45000,
+                     "settleMs":  3000,
+                     "popupWaitMs":  5000,
+                     "resetStorageBeforeSite":  true
+                 },
+    "bannerHeuristics":  {
+                             "contextKeywords":  [
+                                                     "banner",
+                                                     "carousel",
+                                                     "hero",
+                                                     "kv",
+                                                     "slide",
+                                                     "slider",
+                                                     "slick",
+                                                     "swiper"
+                                                 ]
+                         },
+    "popupHeuristics":  {
+                            "contextKeywords":  [
+                                                    "popup",
+                                                    "pop-up",
+                                                    "modal",
+                                                    "dialog",
+                                                    "campaign-popup",
+                                                    "home-popup"
+                                                ]
+                        },
+    "sites":  [
+                  {
+                      "name":  "Global",
+                      "url":  "https://www.ezviz.com/inter",
+                      "enabled":  true,
+                      "siteCode":  "hq"
+                  },
+                  {
+                      "name":  "America Latina",
+                      "url":  "https://www.ezviz.com/la",
+                      "enabled":  true,
+                      "siteCode":  "la"
+                  },
+                  {
+                      "name":  "United States",
+                      "url":  "https://www.ezviz.com/us",
+                      "enabled":  true,
+                      "siteCode":  "us"
+                  },
+                  {
+                      "name":  "Brasil",
+                      "url":  "https://www.ezviz.com/br",
+                      "enabled":  true,
+                      "siteCode":  "br"
+                  },
+                  {
+                      "name":  "Canada",
+                      "url":  "https://www.ezviz.com/ca",
+                      "enabled":  true,
+                      "siteCode":  "ca"
+                  },
+                  {
+                      "name":  "Argentina",
+                      "url":  "https://www.ezviz.com/arg",
+                      "enabled":  true,
+                      "siteCode":  "arg"
+                  },
+                  {
+                      "name":  "Thailand",
+                      "url":  "https://www.ezviz.com/th",
+                      "enabled":  true,
+                      "siteCode":  "th"
+                  },
+                  {
+                      "name":  "Indonesia",
+                      "url":  "https://www.ezviz.com/id",
+                      "enabled":  true,
+                      "siteCode":  "id"
+                  },
+                  {
+                      "name":  "Viet Nam",
+                      "url":  "https://www.ezviz.com/vn",
+                      "enabled":  true,
+                      "siteCode":  "vn"
+                  },
+                  {
+                      "name":  "India",
+                      "url":  "https://www.ezviz.com/in",
+                      "enabled":  true,
+                      "siteCode":  "in"
+                  },
+                  {
+                      "name":  "Australia",
+                      "url":  "https://www.ezviz.com/au",
+                      "enabled":  true,
+                      "siteCode":  "au"
+                  },
+                  {
+                      "name":  "Malaysia",
+                      "url":  "https://www.ezviz.com/my",
+                      "enabled":  true,
+                      "siteCode":  "my"
+                  },
+                  {
+                      "name":  "Japan",
+                      "url":  "https://www.ezviz.com/jp",
+                      "enabled":  true,
+                      "siteCode":  "jp"
+                  },
+                  {
+                      "name":  "Korea",
+                      "url":  "https://www.ezviz.com/kr",
+                      "enabled":  true,
+                      "siteCode":  "kr"
+                  },
+                  {
+                      "name":  "China",
+                      "url":  "https://www.ezviz.com/cn",
+                      "enabled":  true,
+                      "siteCode":  "cn"
+                  },
+                  {
+                      "name":  "CIS",
+                      "url":  "https://www.ezviz.com/cis",
+                      "enabled":  true,
+                      "siteCode":  "cis"
+                  },
+                  {
+                      "name":  "Deutschland",
+                      "url":  "https://www.ezviz.com/de",
+                      "enabled":  true,
+                      "siteCode":  "de"
+                  },
+                  {
+                      "name":  "France",
+                      "url":  "https://www.ezviz.com/fr",
+                      "enabled":  true,
+                      "siteCode":  "fr"
+                  },
+                  {
+                      "name":  "Italia",
+                      "url":  "https://www.ezviz.com/it",
+                      "enabled":  true,
+                      "siteCode":  "it"
+                  },
+                  {
+                      "name":  "Espana",
+                      "url":  "https://www.ezviz.com/es",
+                      "enabled":  true,
+                      "siteCode":  "es"
+                  },
+                  {
+                      "name":  "Polska",
+                      "url":  "https://www.ezviz.com/pl",
+                      "enabled":  true,
+                      "siteCode":  "pl"
+                  },
+                  {
+                      "name":  "Cesko",
+                      "url":  "https://www.ezviz.com/cz",
+                      "enabled":  true,
+                      "siteCode":  "cz"
+                  },
+                  {
+                      "name":  "Belgium",
+                      "url":  "https://www.ezviz.com/be",
+                      "enabled":  true,
+                      "siteCode":  "be"
+                  },
+                  {
+                      "name":  "United Kingdom",
+                      "url":  "https://www.ezviz.com/uk",
+                      "enabled":  true,
+                      "siteCode":  "uk"
+                  },
+                  {
+                      "name":  "Europe",
+                      "url":  "https://www.ezviz.com/eu",
+                      "enabled":  true,
+                      "siteCode":  "eu"
+                  },
+                  {
+                      "name":  "Nederland",
+                      "url":  "https://www.ezviz.com/nl",
+                      "enabled":  true,
+                      "siteCode":  "nl"
+                  },
+                  {
+                      "name":  "Turkiye",
+                      "url":  "https://www.ezviz.com/tr",
+                      "enabled":  true,
+                      "siteCode":  "tr"
+                  },
+                  {
+                      "name":  "Romania",
+                      "url":  "https://www.ezviz.com/ro",
+                      "enabled":  true,
+                      "siteCode":  "ro"
+                  },
+                  {
+                      "name":  "Arabic States",
+                      "url":  "https://www.ezviz.com/ar",
+                      "enabled":  true,
+                      "siteCode":  "ar"
+                  },
+                  {
+                      "name":  "Africa",
+                      "url":  "https://www.ezviz.com/af",
+                      "enabled":  true,
+                      "siteCode":  "af"
+                  },
+                  {
+                      "name":  "Saudi Arabia",
+                      "url":  "https://www.ezviz.com/sa",
+                      "enabled":  true,
+                      "siteCode":  "sa"
+                  }
+              ]
+}

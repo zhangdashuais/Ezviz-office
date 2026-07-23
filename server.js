@@ -34,9 +34,11 @@ const WEB_ROOT = path.join(ROOT, "办公软件", "111");
 const UPLOAD_ROOT = path.join(ROOT, "runtime_uploads");
 const PROFILE_DIR = path.join(ROOT, ".pw-ecadmin-auto-profile");
 const SHOP_PROFILE_DIR = path.join(ROOT, ".pw-ezviz-shop-profile");
-const WEBSITE_BACKEND_ROOT = "E:\\Website-backend\\backend-operations";
-const CAMPAIGN_CONFIG_PATH = path.join(WEBSITE_BACKEND_ROOT, "website-audit", "config", "banner-check.json");
-const CAMPAIGN_AUDIT_SCRIPT = path.join(WEBSITE_BACKEND_ROOT, "website-audit", "scripts", "check-homepage-campaign-rendered.mjs");
+const CREDENTIAL_ROOT = path.join(ROOT, "credentials");
+const CAMPAIGN_CONFIG_PATH = path.resolve(process.env.EZVIZ_CAMPAIGN_CONFIG || path.join(ROOT, "config", "banner-check.json"));
+const CAMPAIGN_AUDIT_SCRIPT = path.join(ROOT, "scripts", "check-homepage-campaign-rendered.mjs");
+const BANNER_CONFIG_DOC = path.join(ROOT, "docs", "homepage-banner-config.md");
+const POPUP_CONFIG_DOC = path.join(ROOT, "docs", "popup-upload.md");
 const CREDENTIAL_WORKBOOK_NAMES = ["网站账号密码", "账号密码"];
 const SHOP_DASHBOARD_URL = "https://shop.ezvizlife.com/templates/index";
 const SHOP_LOGIN_URL = "https://usauth.ezvizlife.com/signIn?from=ezviz_mall_global_gateway&r=1726447618240890209&returnUrl=www.ezvizlife.com&host=";
@@ -70,13 +72,9 @@ const ezvizSiteAuditScheduler = createEzvizSiteAuditScheduler({
 });
 const shopCredentials = createShopCredentials({
   desktopRoot: DESKTOP_ROOT,
-  backendRoot: WEBSITE_BACKEND_ROOT,
-  additionalRoots: [path.resolve(ROOT, "..")],
+  additionalRoots: [CREDENTIAL_ROOT],
   workbookNames: CREDENTIAL_WORKBOOK_NAMES
 });
-const zipEntries = shopCredentials.zipEntries;
-const sharedStrings = shopCredentials.sharedStrings;
-const readRows = shopCredentials.readRows;
 const credentialDomainForSite = shopCredentials.domainForSite;
 
 fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
@@ -144,7 +142,7 @@ const campaignLinkInspector = createCampaignLinkInspector({ chromium });
 
 function readCampaignConfig() {
   if (!fs.existsSync(CAMPAIGN_CONFIG_PATH)) {
-    throw new Error("未找到 Website-backend 巡查配置：" + CAMPAIGN_CONFIG_PATH);
+    throw new Error("未找到项目内巡查配置：" + CAMPAIGN_CONFIG_PATH);
   }
   return JSON.parse(fs.readFileSync(CAMPAIGN_CONFIG_PATH, "utf8").replace(/^\uFEFF/, ""));
 }
@@ -269,7 +267,7 @@ function buildBannerPlan(body, files) {
     mode: "banner-plan",
     source: {
       config: CAMPAIGN_CONFIG_PATH,
-      doc: path.join(WEBSITE_BACKEND_ROOT, "ezviz-shop-automation", "banner-config", "homepage-banner-config.md")
+      doc: BANNER_CONFIG_DOC
     },
     note: "此接口仅生成 Banner 清单和 UTM 数据，不提交后台。需要实际保存到 shop 后台时，请使用 /api/campaign/banner-submit 或页面里的“执行 Banner 后台配置”。",
     selectedSites: sites,
@@ -327,7 +325,7 @@ function buildPopupPlan(body, files) {
     mode: "popup-plan",
     source: {
       config: CAMPAIGN_CONFIG_PATH,
-      doc: path.join(WEBSITE_BACKEND_ROOT, "ezviz-shop-automation", "popup-config", "popup-upload.md")
+      doc: POPUP_CONFIG_DOC
     },
     note: "此接口仅生成 Popup 清单和 UTM 数据，不提交后台。需要实际保存到 new-shop 后台时，请使用 /api/campaign/popup-submit 或页面里的“执行 Popup 后台配置”。",
     selectedSites: sites,
@@ -372,7 +370,7 @@ function createCampaignAuditInvocation(body) {
   const sites = selectedCampaignSites(config, selectedCodes);
   if (!sites.length) throw new Error("请至少勾选一个站点。");
   if (!fs.existsSync(CAMPAIGN_AUDIT_SCRIPT)) {
-    throw new Error("未找到 Website-backend 巡查脚本：" + CAMPAIGN_AUDIT_SCRIPT);
+    throw new Error("未找到项目内巡查脚本：" + CAMPAIGN_AUDIT_SCRIPT);
   }
 
   const tempDir = path.join(UPLOAD_ROOT, "campaign-audit");
@@ -398,7 +396,7 @@ function runCampaignAudit(body) {
   const invocation = createCampaignAuditInvocation(body);
   return new Promise((resolve) => {
     const child = spawn(process.execPath, invocation.args, {
-      cwd: path.join(WEBSITE_BACKEND_ROOT, "website-audit"),
+      cwd: ROOT,
       windowsHide: true
     });
     let stdout = "";
@@ -470,7 +468,7 @@ function startCampaignAuditJob(body) {
   });
 
   const child = spawn(process.execPath, invocation.args, {
-    cwd: path.join(WEBSITE_BACKEND_ROOT, "website-audit"),
+    cwd: ROOT,
     windowsHide: true
   });
   job.child = child;
@@ -619,9 +617,6 @@ const wtbFeature = createWtbFeature({
   fs,
   path,
   logLine,
-  zipEntries,
-  sharedStrings,
-  readRows,
   readCampaignConfig,
   requireSingleCampaignSite,
   getShopContext: browserAuth.getShopContext,

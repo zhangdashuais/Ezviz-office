@@ -31,7 +31,7 @@ function createShopCredentials(options = {}) {
       || candidates.find((item) => item.size === 23744 && item.full.startsWith(desktopRoot))?.full
       || candidates.find((item) => item.named)?.full
       || candidates.find((item) => item.size === 23744)?.full
-      || (() => { throw new Error("没有找到网站账号密码 Excel 表，请放在桌面，或设置 EZVIZ_CREDENTIAL_DIR 指向账号表所在文件夹。"); })();
+      || (() => { throw new Error("没有找到网站账号密码 Excel 表，请放在项目 credentials 目录或桌面，或设置 EZVIZ_CREDENTIAL_DIR 指向账号表所在文件夹。"); })();
   }
 
   function entries(buffer) {

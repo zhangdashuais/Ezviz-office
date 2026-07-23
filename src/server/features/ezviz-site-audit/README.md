@@ -36,4 +36,4 @@
 - 对每个产品只执行标语与 Detail 存在性、语种一致性巡查
 - 通过后台异步任务持续返回进度和问题清单
 
-现有巡查逻辑暂未迁移，仍由 `server.js` 中的 Campaign Audit 流程调用外部 `Website-backend/website-audit` 脚本。
+Campaign Audit 巡查逻辑已迁入本项目，由 `server.js` 调用 `scripts/check-homepage-campaign-rendered.mjs`，默认读取 `config/banner-check.json`。

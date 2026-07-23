@@ -399,7 +399,10 @@
 
         <div class="card">
           <h3>链接数据</h3>
-          <p class="desc">支持本模板字段 Product / Product Page URL / Channel / Purchasing Link，并兼容“产品名称 / 购买平台 / 购买链接”。Excel 中的全部工作表都会读取。</p>
+          <p class="desc">支持模板字段 Product / Product Page URL / Channel / Purchasing Link，并兼容“产品名称 / 购买平台 / 购买链接”。配置工作表都会读取，“填写说明”页会自动忽略。</p>
+          <div class="row">
+            <a class="button" id="wtbTemplateDownload" href="templates/WTB信息模板.xlsx" download>下载 WTB 信息模板</a>
+          </div>
           <div class="form-grid">
             <label>产品名称</label>
             <input id="wtbProductNameInput" type="text" placeholder="例如 H8c">
@@ -423,7 +426,7 @@
       <div id="tab-tdk-config" class="tab-content">
         <div class="card">
           <h3>TDK 配置通道</h3>
-          <p class="desc">用于批量配置国际站 Title、Keyword 和 Discription。校验通过后会复用商城后台登录态，直接调用 TDK 接口逐行新增配置。</p>
+          <p class="desc">用于批量配置所选国家站点的 Title、Keyword 和 Discription。校验通过后会复用对应商城后台登录态，直接调用 TDK 接口逐行新增配置。</p>
           <div class="row">
             <a class="button" id="tdkTemplateDownload" href="templates/TDK配置模板.xlsx" download>下载 TDK 信息模板</a>
           </div>
@@ -432,6 +435,10 @@
         <div class="card">
           <h3>配置数据</h3>
           <div class="form-grid">
+            <label for="tdkSiteSelect">国家站点</label>
+            <select id="tdkSiteSelect">
+              <option value="">正在加载站点...</option>
+            </select>
             <label for="tdkExcelInput">TDK Excel</label>
             <input id="tdkExcelInput" type="file" accept=".xlsx,.xls">
 
@@ -449,7 +456,7 @@
       <div id="tab-campaign-tools" class="tab-content">
         <div class="card">
           <h3>Banner / Popup / 巡查</h3>
-          <p class="desc">活动配置入口来自 Website-backend。Banner 执行后台配置后会自动放到目标位置，发布后会巡查链接，UTM 问题会自动修复，失效链接会返回结果。</p>
+          <p class="desc">活动配置、站点清单和巡查规则均来自本项目。Banner 执行后台配置后会自动放到目标位置，发布后会巡查链接，UTM 问题会自动修复，失效链接会返回结果。</p>
 
           <div class="row">
             <button id="campaignReloadSitesBtn" type="button">加载站点</button>

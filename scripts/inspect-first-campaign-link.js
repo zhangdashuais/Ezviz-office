@@ -11,7 +11,7 @@ function argument(name, fallback = "") {
 async function main() {
   const configPath = path.resolve(argument(
     "config",
-    process.env.EZVIZ_CAMPAIGN_CONFIG || "E:\\Website-backend\\backend-operations\\website-audit\\config\\banner-check.json"
+    process.env.EZVIZ_CAMPAIGN_CONFIG || path.join(__dirname, "..", "config", "banner-check.json")
   ));
   const siteCode = argument("site", "inter");
   const placement = argument("placement", "banner");
