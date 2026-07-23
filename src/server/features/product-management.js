@@ -1,5 +1,56 @@
 function createProductManagement({ logLine, normalizeBool }) {
 
+  async function openProductEditorByName(page, productName, logs) {
+    const targetName = String(productName || "").trim();
+    if (!targetName) throw new Error("请填写产品名称。");
+    await page.goto("https://shop.ezvizlife.com/goods/index", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
+    }).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    async function findAndClickEdit() {
+      return page.evaluate((name) => {
+        const normalized = name.toLowerCase();
+        const visible = (el) => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope")].filter(visible);
+        const exact = rows.find((row) => [...row.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name']")]
+          .some((cell) => (cell.innerText || cell.textContent || "").trim().toLowerCase() === normalized));
+        const fuzzy = rows.find((row) => (row.innerText || "").trim().toLowerCase().includes(normalized));
+        const row = exact || fuzzy;
+        if (!row) return { ok: false };
+        const controls = [...row.querySelectorAll("a, button")].filter(visible);
+        const edit = controls.find((el) => /^(edit|编辑)$/i.test((el.innerText || el.textContent || "").trim()))
+          || controls.find((el) => /\/goods\/add\?id=|\/goods\/edit/i.test(el.getAttribute("href") || ""));
+        if (!edit) return { ok: false, reason: "找到产品行，但没有找到 Edit 按钮。" };
+        const href = edit.href || edit.getAttribute("href") || "";
+        edit.click();
+        return { ok: true, href, rowText: (row.innerText || "").trim().slice(0, 500) };
+      }, targetName);
+    }
+
+    let found = await findAndClickEdit();
+    if (!found.ok) {
+      const searchInput = page.locator(
+        'input[type="search"]:visible, input[type="text"]:visible, input:not([type]):visible'
+      ).first();
+      if (await searchInput.count()) {
+        await searchInput.fill(targetName);
+        const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
+        if (await searchButton.count()) await searchButton.click();
+        else await searchInput.press("Enter");
+        await page.waitForTimeout(3500);
+        found = await findAndClickEdit();
+      }
+    }
+    if (!found.ok) {
+      throw new Error("没有在产品列表中找到产品：" + targetName + (found.reason ? "；" + found.reason : ""));
+    }
+    await page.waitForTimeout(4500);
+    logLine(logs, "已打开产品编辑页：" + targetName + " / " + page.url());
+    return { productName: targetName, editUrl: page.url(), rowText: found.rowText || "" };
+  }
+
   async function openFirstProductEditPage(page, logs) {
     await page.goto("https://shop.ezvizlife.com/goods/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(3000);
@@ -236,6 +287,7 @@ function createProductManagement({ logLine, normalizeBool }) {
 
   return {
     openFirstEdit: openFirstProductEditPage, inspectCopyPage: inspectIntGoodsCopyPage,
+    openByName: openProductEditorByName,
     copy: copyIntGoodsProduct, openAdditionalInformation: openProductAdditionalInformation,
     clickText: clickTextInProductEditor, probeWhereToBuySettings: probeProductWhereToBuySettings,
     keywordSnapshot: productEditorKeywordSnapshot,

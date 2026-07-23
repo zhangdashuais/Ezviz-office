@@ -24,6 +24,8 @@ const { registerCampaignRoutes } = require("./src/server/routes/campaign-routes"
 const { registerAssetUploadRoutes } = require("./src/server/routes/asset-upload-routes");
 const { createTdkManagement } = require("./src/server/features/tdk-management");
 const { registerTdkRoutes } = require("./src/server/routes/tdk-routes");
+const { createProductReplacementFeature } = require("./src/server/features/product-replacement");
+const { registerProductReplacementRoutes } = require("./src/server/routes/product-replacement-routes");
 const { createCampaignLinkInspector } = require("./src/server/features/campaign-link-inspector");
 
 const app = express();
@@ -688,8 +690,20 @@ const tdkManagement = createTdkManagement({
   credentialDomainForSite
 });
 
+const productReplacementFeature = createProductReplacementFeature({
+  logLine,
+  readCampaignConfig,
+  requireSingleCampaignSite,
+  getShopContext: browserAuth.getShopContext,
+  getOpenPage: browserAuth.getOpenPage,
+  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
+  credentialDomainForSite,
+  openProductEditorByName: productManagement.openByName
+});
+
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
 registerTdkRoutes(app, { upload, tdkManagement, logLine });
+registerProductReplacementRoutes(app, { feature: productReplacementFeature, logLine });
 registerAssetUploadRoutes(app, { upload });
 
 registerSpecificationTranslationRoutes(app, {

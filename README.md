@@ -8,6 +8,10 @@
 
 WTB 页面提供可下载的信息模板，字段为 `Product`、`Product Page URL`、`Channel`、`Purchasing Link`。
 
+## 产品 Detail 只读接口
+
+`POST /api/product-replacement/detail` 会按所选国家站点重新登录商城后台，根据产品名称定位商品，并且只返回 `Details` 标签下的 `Overview` 与 `Specifications` HTML。该接口不会发送产品保存请求。
+
 ## 使用
 
 ```powershell

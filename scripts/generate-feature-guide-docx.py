@@ -141,7 +141,7 @@ feature_table(doc, [
     ("EZVIZ 官网巡查", "随机抽取多站点产品并检查内容质量", "读取巡查"),
     ("Datasheet 生成 Spec 表", "从 PDF 或规格文本生成统一 Spec Excel", "本地生成"),
     ("Specification 翻译上架", "翻译并保存产品 Specifications 内容", "可提交后台"),
-    ("后台产品一键替换", "预留的产品替换入口", "开发中"),
+    ("后台产品替换", "只读 Details 下的 Overview 与 Specifications HTML", "已开放只读接口"),
 ])
 
 doc.add_heading("4. 内容制作与文件处理", level=1)
@@ -217,7 +217,7 @@ doc.add_heading("10. 操作安全与故障处理", level=1)
 bullets(doc, ["真实提交前先使用“生成清单”或“预览”检查数据。", "一次后台配置只处理一个目标站点，避免账号与站点不匹配。", "自动化浏览器运行时不要手动关闭或频繁切换页面。", "如提示登录失败，检查账号密码 Excel、站点域名及当前登录账号。", "如 Playwright 浏览器缺失，运行 npx playwright install chromium。", "如端口 3217 被占用，可设置 PORT 环境变量后重新启动。", "输出区日志应保留到问题定位完成，其中包含产品定位、保存状态和复查结果。"])
 
 doc.add_heading("11. 当前限制", level=1)
-bullets(doc, ["后台产品一键替换仍为开发中入口，暂不执行真实操作。", "Banner / Popup 巡查配置和脚本位于项目内，运行时仍需要全局可用的 Playwright CLI。", "SharePoint 资料处理目前以生成归档计划为主。", "后台页面结构或接口变化可能导致自动化控件无法匹配，需要根据日志更新规则。"])
+bullets(doc, ["后台产品替换当前只开放 Overview / Specifications 读取，不执行写入或替换保存。", "Banner / Popup 巡查配置和脚本位于项目内，运行时仍需要全局可用的 Playwright CLI。", "SharePoint 资料处理目前以生成归档计划为主。", "后台页面结构或接口变化可能导致自动化控件无法匹配，需要根据日志更新规则。"])
 
 footer = sec.footer.paragraphs[0]
 footer.alignment = WD_ALIGN_PARAGRAPH.CENTER

@@ -34,7 +34,7 @@
         <div class="nav-item" data-target="tab-language-package">语言包上传</div>
         <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
-        <div class="nav-item" data-target="tab-product-replace">后台产品一键替换（开发中）</div>
+        <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
       </div>
     </div>
 
@@ -248,8 +248,36 @@
 
       <div id="tab-product-replace" class="tab-content">
         <div class="card">
-          <h3>后台产品一键替换</h3>
-          <p class="desc">功能开发中... 敬请期待。</p>
+          <h3>后台产品替换 · Detail 读取</h3>
+          <p class="desc">复用 WTB 的站点账号登录和产品定位流程，只读商品编辑页 Details 标签下的 Overview 与 Specifications。不会点击 Complete，也不会发送产品保存请求。</p>
+          <div class="form-grid">
+            <label for="productReplaceSiteSelect">国家站点</label>
+            <select id="productReplaceSiteSelect">
+              <option value="">正在加载站点...</option>
+            </select>
+            <label for="productReplaceNameInput">产品名称</label>
+            <input id="productReplaceNameInput" type="text" placeholder="例如 CP8">
+            <label for="productReplaceUsernameInput">商城账号</label>
+            <input id="productReplaceUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
+            <label for="productReplacePasswordInput">商城密码</label>
+            <input id="productReplacePasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
+          </div>
+          <div class="row">
+            <button id="productReplaceReadDetailBtn" type="button">读取 Overview / Specifications</button>
+          </div>
+        </div>
+        <div id="productReplaceStatus" class="status">正在加载国家站点...</div>
+        <div class="card">
+          <h3>Overview HTML</h3>
+          <textarea id="productReplaceOverviewOutput" placeholder="读取到的 Overview HTML 会显示在这里..."></textarea>
+        </div>
+        <div class="card">
+          <h3>Specifications HTML</h3>
+          <textarea id="productReplaceSpecificationsOutput" placeholder="读取到的 Specifications HTML 会显示在这里..."></textarea>
+        </div>
+        <div class="card">
+          <h3>读取信息与日志</h3>
+          <textarea id="productReplaceLogsOutput" placeholder="登录身份、产品编号、编辑页和执行日志会显示在这里..."></textarea>
         </div>
       </div>
 
@@ -677,6 +705,7 @@
   <script src="src/module-text.js"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
+  <script src="src/module-product-replacement.js"></script>
   <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260702-2"></script>
   <script src="src/module-ezviz-site-audit.js"></script>
