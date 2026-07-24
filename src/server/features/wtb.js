@@ -5,7 +5,21 @@ function normalizeWtbHeader(value) {
 }
 
 function normalizeWtbPlatform(value) {
-  return String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  return String(value || "").trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function resolveWtbPlatformKey(platformKeys, platform) {
+  const normalized = normalizeWtbPlatform(platform);
+  if (!normalized) return { key: "", matches: [] };
+  const exact = platformKeys.find((candidate) => normalizeWtbPlatform(candidate) === normalized);
+  if (exact) return { key: exact, matches: [exact] };
+  if (normalized.length < 3) return { key: "", matches: [] };
+  const matches = platformKeys.filter((candidate) => {
+    const candidateKey = normalizeWtbPlatform(candidate);
+    return candidateKey.length >= 3
+      && (candidateKey.includes(normalized) || normalized.includes(candidateKey));
+  });
+  return { key: matches.length === 1 ? matches[0] : "", matches };
 }
 
 function applyWtbLinksToMap(currentWhereToBuy, links) {
@@ -13,12 +27,17 @@ function applyWtbLinksToMap(currentWhereToBuy, links) {
   const platformKeys = Object.keys(nextWhereToBuy);
   const applied = [];
   const missing = [];
+  const ambiguous = [];
 
   for (const link of links || []) {
-    const normalized = normalizeWtbPlatform(link.platform);
-    const key = platformKeys.find((candidate) => normalizeWtbPlatform(candidate) === normalized);
+    const resolved = resolveWtbPlatformKey(platformKeys, link.platform);
+    const key = resolved.key;
     if (!key) {
-      missing.push(link.platform);
+      if (resolved.matches.length > 1) {
+        ambiguous.push({ platform: link.platform, matches: resolved.matches });
+      } else {
+        missing.push(link.platform);
+      }
       continue;
     }
     const current = nextWhereToBuy[key];
@@ -29,6 +48,11 @@ function applyWtbLinksToMap(currentWhereToBuy, links) {
     applied.push({ platform: key, url: nextWhereToBuy[key].href_url });
   }
 
+  if (ambiguous.length) {
+    throw new Error("这些渠道简称匹配到多个后台平台："
+      + ambiguous.map((item) => `${item.platform}（${item.matches.join(", ")}）`).join("；")
+      + "。请填写更完整的渠道名称。");
+  }
   if (missing.length) {
     throw new Error(
       "后台未配置这些购买平台：" + missing.join(", ")
@@ -712,6 +736,7 @@ module.exports = {
   createWtbFeature,
   normalizeWtbHeader,
   normalizeWtbPlatform,
+  resolveWtbPlatformKey,
   applyWtbLinksToMap,
   parseWtbWorkbook
 };

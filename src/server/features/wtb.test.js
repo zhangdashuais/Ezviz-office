@@ -84,3 +84,27 @@ test("WTB 直接请求拒绝后台未配置的平台", () => {
     /后台未配置这些购买平台：Shopee.*当前可用平台：Amazon/
   );
 });
+
+test("WTB 渠道简称可以匹配带 Shop 或 Store 的后台平台", () => {
+  const result = applyWtbLinksToMap({
+    "TikTok Shop": { href_url: "", sort: "10" },
+    Amazon: { href_url: "", sort: "20" }
+  }, [
+    { platform: "TIKtok", url: "https://shop.tiktok.example/product" },
+    { platform: "Amazon Store", url: "https://amazon.example/product" }
+  ]);
+
+  assert.equal(result.whereToBuy["TikTok Shop"].href_url, "https://shop.tiktok.example/product");
+  assert.equal(result.whereToBuy.Amazon.href_url, "https://amazon.example/product");
+  assert.deepEqual(result.applied.map((item) => item.platform), ["TikTok Shop", "Amazon"]);
+});
+
+test("WTB 渠道简称命中多个后台平台时要求填写完整名称", () => {
+  assert.throws(
+    () => applyWtbLinksToMap({
+      "TikTok Shop": { href_url: "", sort: "" },
+      "TikTok Official Shop": { href_url: "", sort: "" }
+    }, [{ platform: "TikTok", url: "https://shop.tiktok.example/product" }]),
+    /TikTok（TikTok Shop, TikTok Official Shop）.*请填写更完整的渠道名称/
+  );
+});
