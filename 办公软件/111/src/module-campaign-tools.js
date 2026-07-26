@@ -57,10 +57,7 @@
 
   if (!el.sites || !el.output) return;
 
-  el.wtbSites = document.getElementById("wtbSites");
-  el.wtbReload = document.getElementById("wtbReloadSitesBtn");
-  el.wtbSelectAll = document.getElementById("wtbSelectAllBtn");
-  el.wtbClearSites = document.getElementById("wtbClearSitesBtn");
+  el.wtbSiteSelect = document.getElementById("wtbSiteSelect");
   el.wtbStatus = document.getElementById("wtbStatus");
   el.wtbOutput = document.getElementById("wtbOutput");
   el.wtbShopUsername = document.getElementById("wtbShopUsernameInput");
@@ -232,14 +229,24 @@
     lines.push("");
     if (result.site) lines.push("站点：" + result.site.name + " (" + result.site.siteCode + ")");
     lines.push("产品数：" + (result.productCount || 0));
-    lines.push("成功：" + (result.successCount || 0));
-    lines.push("失败/跳过：" + (result.failedCount || 0));
+    lines.push("前台完整验证成功：" + (result.successCount || 0));
+    lines.push("后台已配置但前台未通过：" + (result.verificationFailedCount || 0));
+    lines.push("配置失败：" + (result.failedCount || 0));
+    lines.push("输入/产品问题已跳过：" + (result.skippedCount || 0));
     lines.push("链接数：" + (result.linkCount || 0));
     if (result.report && result.report.reportUrl) lines.push("执行报告：" + location.origin + result.report.reportUrl);
     lines.push("");
     (result.results || []).forEach((item, index) => {
       lines.push((index + 1) + ". " + item.productName);
-      lines.push("   状态：" + (item.status === "completed" ? "成功" : "失败/已跳过"));
+      const statusLabels = {
+        completed: "成功（Buy、零售商弹窗和平台跳转均通过）",
+        configured_unverified: "后台已配置，前台验证未通过",
+        skipped: "已跳过",
+        failed: "配置失败"
+      };
+      lines.push("   状态：" + (statusLabels[item.status] || item.status || "未知"));
+      if (item.phase) lines.push("   停止阶段：" + item.phase);
+      if (item.errorCode) lines.push("   错误分类：" + item.errorCode);
       if (item.error) lines.push("   错误：" + item.error);
       if (item.editUrl) lines.push("   后台编辑页：" + item.editUrl);
       (item.links || []).forEach((link) => lines.push("   " + link.platform + "：" + link.url));
@@ -251,6 +258,12 @@
         const check = item.frontendCheck;
         const label = check.status === "passed" ? "通过" : check.status === "failed" ? "未通过" : "未执行";
         lines.push("   前台复查：" + label);
+        lines.push("   Buy 按钮：" + (check.buyButtonFound ? "已出现" : "未确认"));
+        lines.push("   零售商弹窗：" + (check.modalFound ? "已打开" : "未确认"));
+        if (check.checkedPlatformCount != null) {
+          lines.push("   已验证平台数：" + check.checkedPlatformCount);
+        }
+        if (check.stage) lines.push("   验证停止阶段：" + check.stage);
         if (check.productUrl) lines.push("   前台页面：" + check.productUrl);
         if (check.reason) lines.push("   复查说明：" + check.reason);
         (check.checkedUrls || []).slice(0, 3).forEach((checked) => {
@@ -258,6 +271,15 @@
           if (checked.missing && checked.missing.length) {
             lines.push("   缺失：" + checked.missing.map((link) => link.platform).join(", "));
           }
+          (checked.retailers || []).forEach((retailer) => {
+            const click = retailer.click;
+            lines.push("   平台卡片 " + retailer.platform + "："
+              + (retailer.found ? "已找到" : "未找到"));
+            if (click) {
+              lines.push("   点击跳转：" + (click.targetMatched ? "通过" : "不匹配")
+                + " / " + (click.targetUrl || click.declaredUrl || "无目标地址"));
+            }
+          });
         });
       }
       lines.push("");
@@ -293,10 +315,8 @@
       .map((input) => input.value);
   }
 
-  function selectedWtbSiteCodes() {
-    if (!el.wtbSites) return [];
-    return Array.from(el.wtbSites.querySelectorAll("input[type='checkbox']:checked"))
-      .map((input) => input.value);
+  function selectedWtbSiteCode() {
+    return el.wtbSiteSelect ? el.wtbSiteSelect.value : "";
   }
 
   function renderSites() {
@@ -331,34 +351,20 @@
   }
 
   function renderWtbSites() {
-    if (!el.wtbSites) return;
+    if (!el.wtbSiteSelect) return;
     if (!sites.length) {
-      el.wtbSites.textContent = "没有读取到站点。";
+      el.wtbSiteSelect.innerHTML = '<option value="">没有读取到站点</option>';
       return;
     }
-    el.wtbSites.innerHTML = "";
-    sites.forEach((site) => {
-      const label = document.createElement("label");
-      label.className = "site-option";
-
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.value = site.siteCode;
-      input.checked = !!site.enabled;
-
-      const name = document.createElement("span");
-      name.className = "site-name";
-      name.textContent = site.name + " (" + site.siteCode + ")";
-
-      const url = document.createElement("span");
-      url.className = "site-url";
-      url.textContent = site.url;
-
-      label.appendChild(input);
-      label.appendChild(name);
-      label.appendChild(url);
-      el.wtbSites.appendChild(label);
+    const enabledSites = sites.filter((site) => site.enabled !== false);
+    el.wtbSiteSelect.innerHTML = "";
+    enabledSites.forEach((site) => {
+      const option = document.createElement("option");
+      option.value = site.siteCode;
+      option.textContent = site.name + " (" + site.siteCode + ")";
+      el.wtbSiteSelect.appendChild(option);
     });
+    if (enabledSites.some((site) => site.siteCode === "hq")) el.wtbSiteSelect.value = "hq";
   }
 
   async function loadSites() {
@@ -403,8 +409,9 @@
   }
 
   function appendWtbSites(formData) {
-    const selected = selectedWtbSiteCodes();
-    formData.append("sites", JSON.stringify(selected));
+    const siteCode = selectedWtbSiteCode();
+    if (!siteCode) throw new Error("请选择一个国家站点。");
+    formData.append("sites", JSON.stringify([siteCode]));
   }
 
   function appendWtbShopLogin(formData) {
@@ -558,8 +565,8 @@
   }
   async function submitWtb() {
     el.wtbSubmit.disabled = true;
-    setWtbStatus("正在执行 WTB 后台配置。保存后会自动打开前台页面复查，请不要关闭浏览器...");
-    writeWtbOutput("WTB 后台配置执行中。系统会按产品名称找到编辑页，填写购买平台链接并保存；保存后会自动二次检查前台是否能看到对应平台或链接。");
+    setWtbStatus("正在执行 WTB 后台配置。保存后会返回所选站点验证 Buy 按钮、零售商弹窗和平台跳转...");
+    writeWtbOutput("WTB 后台配置执行中。每个产品会依次完成后台保存与回读、前台 Buy 按钮检查、零售商弹窗检查、平台点击跳转检查；单个产品异常会记录后跳过，不会阻塞后续产品。");
     revealWtbOutput();
     try {
       const payload = await postForm("/api/campaign/wtb-submit", wtbFormData());
@@ -573,15 +580,18 @@
         link.click();
         link.remove();
       }
-      const checks = (((payload || {}).result || {}).results || []).map((item) => item.frontendCheck?.status).filter(Boolean);
-      if (result.failedCount > 0) {
-        setWtbStatus(`WTB 批量配置完成：成功 ${result.successCount || 0} 个，失败/跳过 ${result.failedCount} 个；执行报告已下载。`, "warn");
-      } else if (checks.includes("failed")) {
-        setWtbStatus("WTB 已保存，但前台复查有未通过项，请查看结果。", "warn");
-      } else if (checks.includes("skipped")) {
-        setWtbStatus("WTB 已保存，但有产品未能定位前台页复查，请查看结果。", "warn");
+      if ((result.failedCount || 0) > 0
+        || (result.skippedCount || 0) > 0
+        || (result.verificationFailedCount || 0) > 0) {
+        setWtbStatus(
+          `WTB 批量完成：完整成功 ${result.successCount || 0}，`
+          + `前台未通过 ${result.verificationFailedCount || 0}，`
+          + `失败 ${result.failedCount || 0}，跳过 ${result.skippedCount || 0}；`
+          + "请查看报告。",
+          "warn"
+        );
       } else {
-        setWtbStatus("WTB 后台配置完成，前台复查通过。", "ok");
+        setWtbStatus("WTB 配置完成，Buy 按钮、零售商弹窗和平台点击跳转均验证通过。", "ok");
       }
       revealWtbOutput();
     } catch (error) {
@@ -738,16 +748,9 @@
       input.checked = false;
     });
   });
-  if (el.wtbReload) el.wtbReload.addEventListener("click", loadSites);
-  if (el.wtbSelectAll) el.wtbSelectAll.addEventListener("click", () => {
-    el.wtbSites.querySelectorAll("input[type='checkbox']").forEach((input) => {
-      input.checked = true;
-    });
-  });
-  if (el.wtbClearSites) el.wtbClearSites.addEventListener("click", () => {
-    el.wtbSites.querySelectorAll("input[type='checkbox']").forEach((input) => {
-      input.checked = false;
-    });
+  if (el.wtbSiteSelect) el.wtbSiteSelect.addEventListener("change", () => {
+    const label = el.wtbSiteSelect.selectedOptions?.[0]?.textContent || "";
+    setWtbStatus(label ? "已选择目标站点：" + label : "请选择一个国家站点。", label ? "ok" : "warn");
   });
   el.bannerBuildPlan.addEventListener("click", buildBannerPlan);
   el.bannerSubmit.addEventListener("click", submitBanner);

@@ -19,6 +19,21 @@ function readDetailFieldsFromModel(viewModel) {
   };
 }
 
+function parseProductNames(value) {
+  const source = Array.isArray(value) ? value : [value];
+  const names = source
+    .flatMap((item) => String(item || "").split(/[\r\n,，;；]+/))
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const seen = new Set();
+  return names.filter((name) => {
+    const key = name.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function createProductReplacementFeature(deps) {
   const {
     logLine,
@@ -31,12 +46,14 @@ function createProductReplacementFeature(deps) {
     openProductEditorByName
   } = deps;
 
-  async function readDetail(body, logs) {
-    const productName = String(body?.productName || "").trim();
-    if (!productName) throw new Error("请填写产品名称。");
-    const requestBody = body?.sites || !body?.siteCode
+  function requestBodyForSite(body) {
+    return body?.sites || !body?.siteCode
       ? (body || {})
       : { ...(body || {}), sites: [String(body.siteCode).trim()] };
+  }
+
+  async function prepareAuthenticatedPage(body, logs) {
+    const requestBody = requestBodyForSite(body);
     const site = requireSingleCampaignSite(readCampaignConfig(), requestBody);
     const context = await getShopContext();
     let page = await getOpenPage(context);
@@ -56,8 +73,12 @@ function createProductReplacementFeature(deps) {
     if (!authenticatedIdentity.trim()) {
       throw new Error("商城后台登录后未能读取当前用户身份，已停止读取产品 Detail。");
     }
-    logLine(logs, "产品 Detail 读取身份：" + authenticatedIdentity.replace(/\s+/g, " ").trim());
+    const normalizedIdentity = authenticatedIdentity.replace(/\s+/g, " ").trim();
+    logLine(logs, "产品 Detail 读取身份：" + normalizedIdentity);
+    return { page, site, authenticatedIdentity: normalizedIdentity };
+  }
 
+  async function readProductDetail(page, site, authenticatedIdentity, productName, logs) {
     const editInfo = await openProductEditorByName(page, productName, logs);
     await page.waitForFunction(() => {
       const element = document.querySelector("#replenish");
@@ -85,12 +106,12 @@ function createProductReplacementFeature(deps) {
     if (!detail.specificationsFound) {
       throw new Error("Detail 中没有找到名称为 Specifications 的字段。");
     }
-    logLine(logs, `Detail 字段读取完成：Overview ${detail.overview.length} 字符，Specifications ${detail.specifications.length} 字符。`);
+    logLine(logs, `Detail 字段读取完成：${productName}，Overview ${detail.overview.length} 字符，Specifications ${detail.specifications.length} 字符。`);
 
     return {
       mode: "authenticated-read-only",
       site,
-      authenticatedIdentity: authenticatedIdentity.replace(/\s+/g, " ").trim(),
+      authenticatedIdentity,
       productName,
       goodsId: modelSnapshot.goodsId,
       editUrl: editInfo.editUrl,
@@ -101,11 +122,62 @@ function createProductReplacementFeature(deps) {
     };
   }
 
-  return { readDetail };
+  async function readDetail(body, logs) {
+    const productName = parseProductNames(body?.productName)[0] || "";
+    if (!productName) throw new Error("请填写产品名称。");
+    const session = await prepareAuthenticatedPage(body, logs);
+    return readProductDetail(
+      session.page,
+      session.site,
+      session.authenticatedIdentity,
+      productName,
+      logs
+    );
+  }
+
+  async function readDetails(body, logs) {
+    const productNames = parseProductNames(body?.productNames ?? body?.productName);
+    if (!productNames.length) throw new Error("请填写至少一个产品名称。");
+    if (productNames.length > 50) throw new Error("一次最多读取 50 个产品。");
+
+    const session = await prepareAuthenticatedPage(body, logs);
+    const results = [];
+    for (const productName of productNames) {
+      logLine(logs, "开始读取产品 Detail：" + productName);
+      try {
+        const result = await readProductDetail(
+          session.page,
+          session.site,
+          session.authenticatedIdentity,
+          productName,
+          logs
+        );
+        results.push({ status: "completed", ...result });
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        logLine(logs, `产品 Detail 读取失败，继续下一个：${productName} / ${message}`);
+        results.push({ status: "failed", productName, error: message });
+      }
+    }
+
+    const successCount = results.filter((item) => item.status === "completed").length;
+    return {
+      mode: "authenticated-read-only-batch",
+      site: session.site,
+      authenticatedIdentity: session.authenticatedIdentity,
+      requestedCount: productNames.length,
+      successCount,
+      failedCount: results.length - successCount,
+      results
+    };
+  }
+
+  return { readDetail, readDetails };
 }
 
 module.exports = {
   normalizeDetailFieldName,
   readDetailFieldsFromModel,
+  parseProductNames,
   createProductReplacementFeature
 };

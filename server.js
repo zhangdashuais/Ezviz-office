@@ -26,6 +26,10 @@ const { createTdkManagement } = require("./src/server/features/tdk-management");
 const { registerTdkRoutes } = require("./src/server/routes/tdk-routes");
 const { createProductReplacementFeature } = require("./src/server/features/product-replacement");
 const { registerProductReplacementRoutes } = require("./src/server/routes/product-replacement-routes");
+const { createDetailAddressReplacementFeature } = require("./src/server/features/detail-address-replacement");
+const { registerDetailAddressReplacementRoutes } = require("./src/server/routes/detail-address-replacement-routes");
+const { createProductRevisionSyncFeature } = require("./src/server/features/product-revision-sync");
+const { registerProductRevisionSyncRoutes } = require("./src/server/routes/product-revision-sync-routes");
 const { createCampaignLinkInspector } = require("./src/server/features/campaign-link-inspector");
 
 const app = express();
@@ -701,9 +705,42 @@ const productReplacementFeature = createProductReplacementFeature({
   openProductEditorByName: productManagement.openByName
 });
 
+const detailAddressReplacementFeature = createDetailAddressReplacementFeature({
+  logLine,
+  readCampaignConfig,
+  requireSingleCampaignSite,
+  getShopContext: browserAuth.getShopContext,
+  getOpenPage: browserAuth.getOpenPage,
+  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
+  credentialDomainForSite,
+  openProductEditorByName: productManagement.openByName
+});
+
+const productRevisionSyncFeature = createProductRevisionSyncFeature({
+  logLine,
+  readCampaignConfig,
+  getCampaignSites,
+  getShopContext: browserAuth.getShopContext,
+  getOpenPage: browserAuth.getOpenPage,
+  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
+  credentialDomainForSite,
+  openProductEditorByName: productManagement.openByName,
+  languagePackageFeature
+});
+
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
+registerLanguagePackageRoutes(app, { upload, languagePackageFeature, logLine });
 registerTdkRoutes(app, { upload, tdkManagement, logLine });
 registerProductReplacementRoutes(app, { feature: productReplacementFeature, logLine });
+registerDetailAddressReplacementRoutes(app, {
+  feature: detailAddressReplacementFeature,
+  logLine
+});
+registerProductRevisionSyncRoutes(app, {
+  upload,
+  feature: productRevisionSyncFeature,
+  logLine
+});
 registerAssetUploadRoutes(app, { upload });
 
 registerSpecificationTranslationRoutes(app, {

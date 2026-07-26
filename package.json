@@ -8,7 +8,7 @@
     "ecadmin": "node server.js",
     "audit:ezviz-sites": "node scripts/run-ezviz-site-audit.js --sample-size 5",
     "inspect:campaign-link": "node scripts/inspect-first-campaign-link.js",
-    "test": "node --test src/server/features/*.test.js src/server/features/ezviz-site-audit/*.test.js"
+    "test": "node --test src/server/features/*.test.js src/server/features/ezviz-site-audit/*.test.js src/server/routes/*.test.js"
   },
   "keywords": [],
   "author": "",

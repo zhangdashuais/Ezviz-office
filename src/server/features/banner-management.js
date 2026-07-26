@@ -675,7 +675,7 @@ function createBannerManagement(deps) {
   function requireSingleCampaignSite(config, body) {
     const sites = selectedCampaignSites(config, parseSelectedSites(body.sites));
     if (sites.length !== 1) {
-      throw new Error("实际提交后台一次只能选择一个站点，请只勾选当前登录账号对应的站点。");
+      throw new Error("实际提交后台一次只能选择一个站点，请在页面选择当前登录账号对应的单个站点。");
     }
     return sites[0];
   }

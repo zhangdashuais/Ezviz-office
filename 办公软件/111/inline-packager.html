@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Akiitu 一键内联工具</title>
-  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/style.css?v=20260724-2">
 </head>
 <body>
   <div class="sidebar">
@@ -35,6 +35,14 @@
         <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
         <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
+        <div class="nav-item" data-target="tab-product-revision-sync">产品修订同步</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">临时功能</div>
+      <div class="nav-items-wrapper">
+        <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换/删除</div>
       </div>
     </div>
 
@@ -249,21 +257,21 @@
       <div id="tab-product-replace" class="tab-content">
         <div class="card">
           <h3>后台产品替换 · Detail 读取</h3>
-          <p class="desc">复用 WTB 的站点账号登录和产品定位流程，只读商品编辑页 Details 标签下的 Overview 与 Specifications。不会点击 Complete，也不会发送产品保存请求。</p>
+          <p class="desc">复用 WTB 的站点账号登录和产品定位流程，支持一次读取多个商品 Details 标签下的 Overview 与 Specifications。不会点击 Complete，也不会发送产品保存请求。</p>
           <div class="form-grid">
             <label for="productReplaceSiteSelect">国家站点</label>
             <select id="productReplaceSiteSelect">
               <option value="">正在加载站点...</option>
             </select>
-            <label for="productReplaceNameInput">产品名称</label>
-            <input id="productReplaceNameInput" type="text" placeholder="例如 CP8">
+            <label for="productReplaceNameInput">产品名称（可多个）</label>
+            <textarea id="productReplaceNameInput" rows="5" placeholder="每行一个产品，也支持逗号或分号分隔，例如：&#10;CP8&#10;H8c&#10;EB3"></textarea>
             <label for="productReplaceUsernameInput">商城账号</label>
             <input id="productReplaceUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
             <label for="productReplacePasswordInput">商城密码</label>
             <input id="productReplacePasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
           </div>
           <div class="row">
-            <button id="productReplaceReadDetailBtn" type="button">读取 Overview / Specifications</button>
+            <button id="productReplaceReadDetailBtn" type="button">批量读取 Overview / Specifications</button>
           </div>
         </div>
         <div id="productReplaceStatus" class="status">正在加载国家站点...</div>
@@ -278,6 +286,88 @@
         <div class="card">
           <h3>读取信息与日志</h3>
           <textarea id="productReplaceLogsOutput" placeholder="登录身份、产品编号、编辑页和执行日志会显示在这里..."></textarea>
+        </div>
+      </div>
+
+      <div id="tab-product-revision-sync" class="tab-content">
+        <div class="card">
+          <h3>产品修订同步</h3>
+          <p class="desc">以国际站修订后的产品为源，复制 Overview Detail；从国际站 Specification 自动读取图片地址和 alt，再根据上传 Excel 的目标语言列重新生成 Specification。同时下载各目标站语言包，按 Datasheet 的“字段名 + 原文”校验后写入译文并直接上传。预览不会保存，确认执行后会逐站点保存并回读验证。</p>
+          <div class="form-grid">
+            <label for="revisionSyncSourceSite">源站点</label>
+            <select id="revisionSyncSourceSite">
+              <option value="">正在加载站点...</option>
+            </select>
+            <label for="revisionSyncProductName">产品名称</label>
+            <input id="revisionSyncProductName" type="text" placeholder="例如 CP8">
+            <label for="revisionSyncExcel">Specification 翻译 Excel</label>
+            <input id="revisionSyncExcel" type="file" accept=".xlsx,.xls">
+            <label for="revisionSyncLanguageDatasheet">语言包 Datasheet</label>
+            <input id="revisionSyncLanguageDatasheet" type="file" accept=".xlsx,.xls">
+          </div>
+          <div class="row">
+            <button id="revisionSyncSelectMatched" type="button">勾选可自动匹配站点</button>
+            <button id="revisionSyncClearTargets" type="button">清空目标站点</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>目标站点与两份 Excel 的语言列</h3>
+          <p class="desc">勾选要同步的站点，并分别核对 Specification 和语言包 Datasheet 的译文列。对于比利时、欧洲等可能共用语言的站点，请以实际页面语言为准手工调整。</p>
+          <div id="revisionSyncTargets" class="revision-targets">
+            上传两份 Excel 后显示站点与语言列。
+          </div>
+          <div class="row">
+            <button id="revisionSyncPreview" type="button">预览同步（不保存）</button>
+            <button id="revisionSyncSubmit" type="button" disabled>确认并执行同步</button>
+          </div>
+        </div>
+        <div id="revisionSyncStatus" class="status">正在加载站点...</div>
+        <div class="card">
+          <h3>预览与执行结果</h3>
+          <textarea id="revisionSyncOutput" placeholder="源站点图片信息、Detail / Specification / 语言包变更项和回读结果会显示在这里..."></textarea>
+        </div>
+      </div>
+
+      <div id="tab-detail-address-replace" class="tab-content">
+        <div class="card">
+          <h3>Detail 临时批量替换/删除</h3>
+          <p class="desc">优先使用信息模板：每个产品最多配置两组地址替换，并可同时删除一个完整代码块。系统逐产品预览全部命中，一次保存并回读验证。</p>
+          <div class="form-grid">
+            <label for="detailAddressOperationSelect">操作类型</label>
+            <select id="detailAddressOperationSelect">
+              <option value="delete" selected>删除指定代码块</option>
+              <option value="replace">替换完整地址</option>
+            </select>
+            <label for="detailAddressSiteSelect">国家站点</label>
+            <select id="detailAddressSiteSelect">
+              <option value="">正在加载站点...</option>
+            </select>
+            <label for="detailAddressProductNamesInput">产品名称（可多个）</label>
+            <textarea id="detailAddressProductNamesInput" class="detail-temporary-field" rows="4" placeholder="每行一个产品，也支持逗号或分号分隔，例如：&#10;CP8&#10;H8c&#10;EB3"></textarea>
+            <label for="detailAddressExcelInput">临时功能信息 Excel</label>
+            <div>
+              <input id="detailAddressExcelInput" type="file" accept=".xlsx,.xls">
+              <a class="button" id="detailAddressTemplateDownload" href="/api/detail-address-replacement/template" download="Detail临时功能信息模板.xlsx">下载信息模板</a>
+              <div class="desc">表头：<code>Product_Name</code>、<code>Old_Address_1</code>、<code>New_Address_1</code>、<code>Old_Address_2</code>、<code>New_Address_2</code>、<code>Delete_Code_Block</code>。每行至少填写一项操作。</div>
+            </div>
+            <label id="detailAddressTargetLabel" for="detailAddressOldUrlInput">被替换的完整地址</label>
+            <textarea id="detailAddressOldUrlInput" class="detail-temporary-field" rows="3" placeholder="https://mfs.ezvizlife.com/old-image.jpg"></textarea>
+            <label id="detailAddressReplacementLabel" for="detailAddressNewUrlInput">替换后的完整地址</label>
+            <textarea id="detailAddressNewUrlInput" class="detail-temporary-field" rows="3" placeholder="https://mfs.ezvizlife.com/new-image.jpg"></textarea>
+            <label for="detailAddressUsernameInput">商城账号</label>
+            <input id="detailAddressUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
+            <label for="detailAddressPasswordInput">商城密码</label>
+            <input id="detailAddressPasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
+          </div>
+          <div class="row">
+            <button id="detailAddressPreviewBtn" type="button">预览操作（不保存）</button>
+            <button id="detailAddressSubmitBtn" type="button" disabled>确认并执行</button>
+          </div>
+        </div>
+        <div id="detailAddressStatus" class="status">正在加载国家站点...</div>
+        <div class="card">
+          <h3>操作预览与执行结果</h3>
+          <textarea id="detailAddressOutput" placeholder="每个产品的命中字段、次数、保存状态和回读结果会显示在这里..."></textarea>
         </div>
       </div>
 
@@ -410,19 +500,17 @@
       <div id="tab-wtb-tools" class="tab-content">
         <div class="card">
           <h3>WTB 产品购买链接</h3>
-          <p class="desc">上传 Excel 后优先根据 Product Page URL 自动识别站点；URL 无法识别时，使用手动勾选的单个站点。系统按 Product 找到产品，再按 Channel 填写 Purchasing Link；渠道支持通用简称，例如 TikTok 可匹配 TikTok Shop。</p>
-          <div class="row">
-            <button id="wtbReloadSitesBtn" type="button">加载站点</button>
-            <button id="wtbSelectAllBtn" type="button">全选站点</button>
-            <button id="wtbClearSitesBtn" type="button">清空站点</button>
-          </div>
+          <p class="desc">一次只配置一个国家站点。请先从下拉框选择目标站点；Excel 中的 Product Page URL 如果属于其他站点，系统会停止提交。系统按 Product 找到产品，再按 Channel 填写 Purchasing Link；保存并回读后，会返回对应站点检查 Buy 按钮、零售商弹窗和各平台跳转。单个产品超时、未找到或平台不匹配时会记录并继续后续产品。</p>
           <div class="form-grid">
+            <label for="wtbSiteSelect">国家站点</label>
+            <select id="wtbSiteSelect">
+              <option value="">正在加载站点...</option>
+            </select>
             <label>商城账号</label>
             <input id="wtbShopUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
             <label>商城密码</label>
             <input id="wtbShopPasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
           </div>
-          <div id="wtbSites" class="site-grid">站点尚未加载。</div>
         </div>
 
         <div class="card">
@@ -706,8 +794,10 @@
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
   <script src="src/module-product-replacement.js"></script>
+  <script src="src/module-product-revision-sync.js?v=20260726-1"></script>
+  <script src="src/module-detail-address-replacement.js?v=20260724-3"></script>
   <script src="src/module-tdk-config.js"></script>
-  <script src="src/module-campaign-tools.js?v=20260702-2"></script>
+  <script src="src/module-campaign-tools.js?v=20260724-4"></script>
   <script src="src/module-ezviz-site-audit.js"></script>
   <script src="src/module-specification-translation.js"></script>
 </body>

@@ -2,8 +2,17 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   normalizeDetailFieldName,
-  readDetailFieldsFromModel
+  readDetailFieldsFromModel,
+  parseProductNames
 } = require("./product-replacement");
+
+test("批量产品名称支持换行和中英文分隔符，并忽略重复项", () => {
+  assert.deepEqual(
+    parseProductNames("CP8\nH8c，EB3; cp8；DL05"),
+    ["CP8", "H8c", "EB3", "DL05"]
+  );
+  assert.deepEqual(parseProductNames(["CP8", "H8c\nEB3"]), ["CP8", "H8c", "EB3"]);
+});
 
 test("Detail 字段名匹配忽略大小写、空格和连接符", () => {
   assert.equal(normalizeDetailFieldName("  Specifi-cations "), "specifications");

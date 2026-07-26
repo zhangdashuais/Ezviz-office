@@ -1,4 +1,4 @@
-/** 后台产品替换：当前阶段只读 Details 下的 Overview 与 Specifications。 */
+/** 后台产品替换：批量只读 Details 下的 Overview 与 Specifications。 */
 (function () {
   const serviceBase = window.location.origin;
   const siteSelect = document.getElementById("productReplaceSiteSelect");
@@ -34,7 +34,7 @@
         siteSelect.appendChild(option);
       });
       if (sites.some((site) => site.siteCode === "hq")) siteSelect.value = "hq";
-      setStatus(`已加载 ${sites.length} 个站点。请选择站点并填写产品名称。`, "ok");
+      setStatus(`已加载 ${sites.length} 个站点。请选择站点并填写一个或多个产品名称。`, "ok");
     } catch (error) {
       siteSelect.innerHTML = '<option value="">站点加载失败</option>';
       setStatus("站点加载失败：" + (error.message || error), "warn");
@@ -45,28 +45,28 @@
 
   readButton.addEventListener("click", async () => {
     const siteCode = siteSelect.value;
-    const productName = productInput.value.trim();
+    const productNames = productInput.value.trim();
     if (!siteCode) {
       setStatus("请选择国家站点。", "warn");
       return;
     }
-    if (!productName) {
-      setStatus("请填写产品名称。", "warn");
+    if (!productNames) {
+      setStatus("请填写至少一个产品名称。", "warn");
       return;
     }
     overviewOutput.value = "";
     specificationsOutput.value = "";
     logsOutput.value = "";
     readButton.disabled = true;
-    setStatus(`正在登录 ${siteSelect.selectedOptions?.[0]?.textContent || siteCode} 后台并读取 ${productName}，不会保存产品...`);
+    setStatus(`正在登录 ${siteSelect.selectedOptions?.[0]?.textContent || siteCode} 后台并批量读取产品，不会保存产品...`);
     try {
       const payload = {
         sites: [siteCode],
-        productName,
+        productNames,
         shopUsername: usernameInput?.value.trim() || "",
         shopPassword: passwordInput?.value || ""
       };
-      const response = await fetch(serviceBase + "/api/product-replacement/detail", {
+      const response = await fetch(serviceBase + "/api/product-replacement/details", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)
@@ -74,22 +74,31 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || `读取失败（HTTP ${response.status}）`);
       const result = data.result;
-      overviewOutput.value = result.detail.overview || "";
-      specificationsOutput.value = result.detail.specifications || "";
+      const completed = (result.results || []).filter((item) => item.status === "completed");
+      const failed = (result.results || []).filter((item) => item.status === "failed");
+      overviewOutput.value = completed.map((item) =>
+        `===== ${item.productName} | Goods ID ${item.goodsId} =====\n${item.detail.overview || ""}`
+      ).join("\n\n");
+      specificationsOutput.value = completed.map((item) =>
+        `===== ${item.productName} | Goods ID ${item.goodsId} =====\n${item.detail.specifications || ""}`
+      ).join("\n\n");
       logsOutput.value = [
         `站点：${result.site.name} (${result.site.siteCode})`,
         `后台身份：${result.authenticatedIdentity}`,
-        `产品：${result.productName}`,
-        `Goods ID：${result.goodsId}`,
-        `编辑页：${result.editUrl}`,
         `模式：${result.mode}`,
+        `请求：${result.requestedCount}，成功：${result.successCount}，失败：${result.failedCount}`,
+        "",
+        "产品结果：",
+        ...(result.results || []).map((item) => item.status === "completed"
+          ? `- 成功 | ${item.productName} | Goods ID ${item.goodsId} | ${item.editUrl}`
+          : `- 失败 | ${item.productName} | ${item.error}`),
         "",
         "执行日志：",
         ...(data.logs || []).map((line) => "- " + line)
       ].join("\n");
       setStatus(
-        `读取成功：Overview ${result.detail.overview.length} 字符，Specifications ${result.detail.specifications.length} 字符。`,
-        "ok"
+        `批量读取完成：成功 ${completed.length} 个，失败 ${failed.length} 个。`,
+        failed.length ? "warn" : "ok"
       );
     } catch (error) {
       setStatus("读取失败：" + (error.message || error), "warn");

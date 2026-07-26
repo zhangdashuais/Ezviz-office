@@ -183,15 +183,15 @@ add_text(doc, "WTB 模块用于配置产品编辑页 Additional Information 中�
 doc.add_heading("7.1 Excel 模板", level=2)
 feature_table(doc, [
     ("Product", "后台产品名称，例如 RS20 Pro", "必填"),
-    ("Product Page URL", "产品前台页面，用于自动识别站点和保存后复查", "建议填写"),
+    ("Product Page URL", "产品前台页面，用于校验下拉框所选站点和保存后复查", "建议填写"),
     ("Channel", "购买渠道，例如 Shopee、Lazada", "必填"),
     ("Purchasing Link", "对应渠道的购买链接", "必填"),
 ])
 add_text(doc, "程序读取 Excel 中全部工作表，只处理已填写 Channel 或 Purchasing Link 的行。")
-doc.add_heading("7.2 站点识别规则", level=2)
-bullets(doc, ["优先解析 Product Page URL 的站点路径，例如 /id/ 自动识别为 Indonesia。", "URL 无法识别时，使用页面手动勾选的单个站点。", "如果同一文件包含多个站点，系统停止并要求按站点拆分。"])
+doc.add_heading("7.2 站点选择规则", level=2)
+bullets(doc, ["像 TDK 一样，从下拉框选择一个目标国家站点。", "一次计划或提交只允许一个站点。", "如果填写 Product Page URL，系统会校验它属于下拉框所选站点；不一致时停止执行。", "如果同一文件包含多个站点，系统停止并要求按站点拆分。"])
 doc.add_heading("7.3 执行流程", level=2)
-steps(doc, ["上传 Excel 或填写单条测试数据。", "点击“生成 WTB 清单”检查产品、站点、渠道和链接，不提交后台。", "点击“执行 WTB 后台配置”。", "系统登录商城、搜索产品并打开编辑页。", "进入 Additional Information，匹配渠道链接字段并填写。", "点击 Complete，由后台页面发送保存请求。", "打开 Product Page URL，检查前台渠道或链接是否出现。"])
+steps(doc, ["从下拉框选择一个国家站点。", "上传 Excel 或填写单条测试数据。", "点击“生成 WTB 清单”检查产品、站点、渠道和链接，不提交后台。", "点击“执行 WTB 后台配置”。", "系统登录商城、搜索产品并打开编辑页。", "系统读取 Additional Information 的完整产品模型，匹配渠道后直接调用后台保存接口。", "重新读取产品模型核对链接，再打开 Product Page URL 检查前台渠道或链接是否出现。"])
 info_box(doc, "安全提示", "测试链接也会保存到真实后台。提交前应检查 Purchasing Link；如仅验证识别结果，请使用“生成 WTB 清单”。", "FCE4D6")
 
 doc.add_heading("8. Banner / Popup 与活动巡查", level=1)
