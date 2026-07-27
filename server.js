@@ -2,7 +2,9 @@ const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+
 const { spawn } = require("child_process");
+const { AsyncLocalStorage } = require("async_hooks");
 const { chromium } = require("playwright");
 const { createWtbFeature } = require("./src/server/features/wtb");
 const { registerWtbRoutes } = require("./src/server/routes/wtb-routes");
@@ -107,13 +109,97 @@ const SHAREPOINT_DEFAULTS = {
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
+
+const taskProgressContext = new AsyncLocalStorage();
+const taskProgressJobs = new Map();
+const TASK_PROGRESS_TTL_MS = 30 * 60 * 1000;
+
+app.use((req, res, next) => {
+  const taskId = String(req.get("x-task-progress-id") || "").trim();
+  if (!taskId || req.method === "GET") return next();
+  const now = Date.now();
+  const job = {
+    id: taskId,
+    status: "running",
+    current: "请求已接收，正在准备执行环境...",
+    step: 0,
+    logs: [],
+    startedAt: now,
+    updatedAt: now,
+    finishedAt: null,
+    httpStatus: null,
+    cancelRequested: false
+  };
+  taskProgressJobs.set(taskId, job);
+  res.on("finish", () => {
+    job.httpStatus = res.statusCode;
+    if (job.cancelRequested) {
+      job.status = "cancelled";
+      job.current = "任务已由用户停止。";
+    } else {
+      job.status = res.statusCode >= 400 ? "failed" : "completed";
+      job.current = res.statusCode >= 400
+        ? (job.current || "任务执行失败，请查看错误信息。")
+        : "服务器处理完成，正在整理结果...";
+    }
+    job.updatedAt = Date.now();
+    job.finishedAt = job.updatedAt;
+  });
+  taskProgressContext.run(job, next);
+});
+
+app.post("/api/task-progress/:id/cancel", (req, res) => {
+  const job = taskProgressJobs.get(String(req.params.id || ""));
+  if (!job) return res.status(404).json({ ok: false, error: "任务进度不存在或已过期。" });
+  if (["completed", "failed", "cancelled"].includes(job.status)) {
+    return res.json({ ok: true, job, alreadyFinished: true });
+  }
+  job.cancelRequested = true;
+  job.status = "cancelling";
+  job.current = "已收到停止请求，等待当前安全步骤结束...";
+  job.step += 1;
+  job.logs.push({ step: job.step, message: job.current, at: new Date().toISOString() });
+  job.updatedAt = Date.now();
+  res.json({ ok: true, job });
+});
+
+app.get("/api/task-progress/:id", (req, res) => {
+  const job = taskProgressJobs.get(String(req.params.id || ""));
+  if (!job) return res.status(404).json({ ok: false, error: "任务进度不存在或已过期。" });
+  res.json({ ok: true, job });
+});
+
+const taskProgressCleanup = setInterval(() => {
+  const cutoff = Date.now() - TASK_PROGRESS_TTL_MS;
+  for (const [id, job] of taskProgressJobs) {
+    if ((job.finishedAt || job.updatedAt) < cutoff) taskProgressJobs.delete(id);
+  }
+}, 5 * 60 * 1000);
+taskProgressCleanup.unref?.();
+
 app.get("/", (req, res) => {
   res.redirect("/inline-packager.html");
 });
 app.use(express.static(WEB_ROOT));
 
 function logLine(logs, message) {
-  logs.push(message);
+  const job = taskProgressContext.getStore();
+  if (job?.cancelRequested) {
+    job.status = "cancelling";
+    job.current = "停止请求已生效，正在终止任务...";
+    job.updatedAt = Date.now();
+    const error = new Error("任务已由用户停止。");
+    error.code = "TASK_CANCELLED";
+    throw error;
+  }
+  const text = String(message ?? "");
+  logs.push(text);
+  if (!job) return;
+  job.step += 1;
+  job.current = text;
+  job.logs.push({ step: job.step, message: text, at: new Date().toISOString() });
+  if (job.logs.length > 100) job.logs.splice(0, job.logs.length - 100);
+  job.updatedAt = Date.now();
 }
 
 function normalizeBool(value) {
@@ -755,6 +841,12 @@ registerSpecificationTranslationRoutes(app, {
 
 registerEcadminPlatformRoutes(app, { upload, ecadminPlatformFeature, logLine });
 registerEzvizSiteAuditRoutes(app, { feature: ezvizSiteAuditFeature, scheduler: ezvizSiteAuditScheduler });
+
+app.use((error, _req, res, next) => {
+  if (error?.code !== "TASK_CANCELLED") return next(error);
+  if (res.headersSent) return next(error);
+  res.status(499).json({ ok: false, cancelled: true, error: "任务已由用户停止。" });
+});
 
 app.listen(PORT, () => {
   console.log(`Office software platform is running at http://localhost:${PORT}/inline-packager.html`);

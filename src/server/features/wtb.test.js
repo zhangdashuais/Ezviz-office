@@ -223,3 +223,39 @@ test("WTB 错误分类区分产品缺失、平台缺失、超时和保存错误"
   assert.equal(classifyWtbProductError("Timeout 30000ms exceeded"), "timeout");
   assert.equal(classifyWtbProductError("产品保存接口返回异常"), "save-error");
 });
+
+test("WTB 前台复查地址只接受后台返回且属于所选站点的产品页", () => {
+  const { selectBackendFrontendCandidates } = createPlanFeature()._test;
+  const site = { name: "Viet Nam", siteCode: "vn", url: "https://www.ezviz.com/vn" };
+  const candidates = selectBackendFrontendCandidates(site, "H8c Pro", [
+    {
+      source: "backend-product-list-primary",
+      key: "productPageUrl",
+      value: "https://www.ezviz.com/vn/product/h8c-pro/12345"
+    },
+    {
+      source: "backend-product-model",
+      key: "vm.request_path",
+      value: "/vn/product/h8c-pro/12345"
+    },
+    {
+      source: "backend-product-list-link",
+      key: "rowLink",
+      value: "https://www.ezviz.com/id/product/h8c-pro/12345"
+    },
+    {
+      source: "backend-product-list-link",
+      key: "rowLink",
+      value: "https://shop.ezvizlife.com/goods/add?id=12345"
+    },
+    {
+      source: "backend-product-model",
+      key: "vm.home_url",
+      value: "https://www.ezviz.com/vn"
+    }
+  ]);
+  assert.deepEqual(candidates.map((item) => item.url), [
+    "https://www.ezviz.com/vn/product/h8c-pro/12345"
+  ]);
+  assert.equal(candidates[0].source, "backend-product-list-primary");
+});

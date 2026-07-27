@@ -309,7 +309,7 @@ async function findAndOpenProductEdit(page, productName, logs) {
   await page.waitForTimeout(3000);
 
   async function clickMatchingRow() {
-    return page.evaluate((targetName) => {
+    const match = await page.evaluate((targetName) => {
       const normalizedTarget = targetName.trim().toLowerCase();
       function visible(el) {
         return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
@@ -341,15 +341,25 @@ async function findAndOpenProductEdit(page, productName, logs) {
       const candidateUrls = [...row.querySelectorAll("a[href]")]
         .map((link) => link.href || link.getAttribute("href") || "")
         .filter(Boolean);
-      edit.click();
+      const marker = `wtb-edit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      edit.setAttribute("data-wtb-edit-marker", marker);
       return {
         ok: true,
+        marker,
         href,
         rowText: row.innerText,
         productPageUrl: preferredProductUrls[0] || "",
         candidateUrls: [...new Set([...preferredProductUrls, ...candidateUrls])]
       };
     }, productName);
+    if (!match.ok) return match;
+
+    const editControl = page.locator(`[data-wtb-edit-marker="${match.marker}"]`).first();
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 }),
+      editControl.click()
+    ]);
+    return match;
   }
 
   let clicked = await clickMatchingRow();
@@ -371,10 +381,15 @@ async function findAndOpenProductEdit(page, productName, logs) {
       const buttons = [...document.querySelectorAll("button, a, input[type='button'], input[type='submit']")].filter(visible);
       const search = buttons.find((el) => /search|查询|搜索/i.test((el.innerText || el.value || el.textContent || "").trim())) || buttons[0];
       if (!search) return { ok: false, reason: "没有找到搜索按钮。" };
-      search.click();
-      return { ok: true };
+      const marker = `wtb-search-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      search.setAttribute("data-wtb-search-marker", marker);
+      return { ok: true, marker };
     }, productName);
     logLine(logs, "产品搜索：" + JSON.stringify(searched));
+    if (searched.ok) {
+      await page.locator(`[data-wtb-search-marker="${searched.marker}"]`).first().click();
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
+    }
     await page.waitForTimeout(3500);
     clicked = await clickMatchingRow();
   }
@@ -387,7 +402,8 @@ async function findAndOpenProductEdit(page, productName, logs) {
     productPageUrl: clicked.productPageUrl || "",
     rowText: clicked.rowText?.slice(0, 240)
   }));
-  await page.waitForTimeout(5000);
+  await page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(1500);
   return {
     editUrl: page.url(),
     rowText: clicked.rowText || "",
@@ -598,60 +614,102 @@ function sameSiteHost(site, rawUrl) {
   }
 }
 
-function productSlugCandidates(productName) {
-  const original = String(productName || "").trim();
-  const simple = original
+function selectBackendFrontendCandidates(site, productName, rawSources) {
+  const siteUrl = new URL(site.url);
+  const siteBasePath = siteUrl.pathname.replace(/\/+$/, "") || "/";
+  const productTokens = String(productName || "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return [...new Set([original, simple].filter(Boolean))];
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 2);
+  const seen = new Map();
+
+  for (const item of rawSources || []) {
+    const url = absoluteSiteUrl(site, item?.value);
+    if (!url || !sameSiteHost(site, url)) continue;
+    const parsed = new URL(url);
+    const pathName = parsed.pathname.replace(/\/+$/, "") || "/";
+    if (siteBasePath !== "/"
+      && pathName !== siteBasePath
+      && !pathName.startsWith(siteBasePath + "/")) continue;
+    if (pathName === siteBasePath || pathName === "/") continue;
+    if (/\/(goods|templates|pages|whereToBuy|login|admin|account|checkout|cart)\b/i.test(pathName)) continue;
+    if (/\.(?:js|css|png|jpe?g|gif|svg|webp|pdf|xlsx?)(?:$|\?)/i.test(url)) continue;
+
+    const sourceName = String(item?.source || "backend-model");
+    const key = String(item?.key || "");
+    let score = sourceName === "backend-product-list-primary" ? 120
+      : sourceName === "backend-product-list-link" ? 100
+        : 80;
+    if (/front.*url|product.*url|page.*url|request.*path|url.*key/i.test(key)) score += 25;
+    const lowerUrl = url.toLowerCase();
+    if (productTokens.length && productTokens.every((token) => lowerUrl.includes(token))) score += 20;
+    if (/\/product\//i.test(pathName)) score += 10;
+
+    const current = seen.get(url);
+    if (!current || score > current.score) {
+      seen.set(url, { url, source: sourceName, key, score });
+    }
+  }
+
+  return [...seen.values()]
+    .sort((a, b) => b.score - a.score || a.url.length - b.url.length)
+    .slice(0, 3);
 }
 
 async function collectProductFrontendCandidates(page, site, product, editInfo, logs) {
-  const rawCandidates = [];
-  rawCandidates.push(product.productPageUrl);
-  rawCandidates.push(editInfo?.productPageUrl);
-  rawCandidates.push(...(editInfo?.candidateUrls || []));
-  rawCandidates.push(page.url());
+  const rawSources = [];
+  if (editInfo?.productPageUrl) {
+    rawSources.push({
+      value: editInfo.productPageUrl,
+      source: "backend-product-list-primary",
+      key: "productPageUrl"
+    });
+  }
+  for (const value of editInfo?.candidateUrls || []) {
+    rawSources.push({ value, source: "backend-product-list-link", key: "rowLink" });
+  }
 
-  const domCandidates = await page.evaluate(() => {
-    const urls = [];
-    const attrs = ["href", "value", "data-url", "data-href"];
-    for (const el of document.querySelectorAll("a, input, textarea, button")) {
-      for (const attr of attrs) {
-        const value = el.getAttribute?.(attr);
-        if (value) urls.push(value);
+  const modelCandidates = await page.evaluate(() => {
+    const root = document.querySelector("#replenish");
+    const scope = window.angular && root ? window.angular.element(root).scope() : null;
+    const values = [];
+    const visited = new WeakSet();
+    const walk = (value, path, depth) => {
+      if (depth > 7 || value == null) return;
+      if (typeof value === "string") {
+        const key = path.at(-1) || "";
+        const text = value.trim();
+        if (/url|uri|href|link|path|slug|key/i.test(key)
+          && (/^https?:\/\//i.test(text) || /^\//.test(text))) {
+          values.push({ key: path.join("."), value: text });
+        }
+        return;
       }
-      const text = (el.innerText || el.textContent || "").trim();
-      if (/^https?:\/\//i.test(text)) urls.push(text);
-    }
-    return urls;
+      if (typeof value !== "object" || visited.has(value)) return;
+      visited.add(value);
+      if (Array.isArray(value)) {
+        value.slice(0, 100).forEach((item, index) => walk(item, [...path, String(index)], depth + 1));
+        return;
+      }
+      Object.entries(value).slice(0, 300).forEach(([key, item]) => {
+        walk(item, [...path, key], depth + 1);
+      });
+    };
+    walk(scope?.vm, ["vm"], 0);
+    return values;
   }).catch(() => []);
-  rawCandidates.push(...domCandidates);
-
-  for (const slug of productSlugCandidates(product.productName)) {
-    rawCandidates.push("/product/" + slug);
-    rawCandidates.push("/" + slug);
+  for (const item of modelCandidates) {
+    rawSources.push({
+      value: item.value,
+      source: "backend-product-model",
+      key: item.key
+    });
   }
 
-  const seen = new Set();
-  const candidates = [];
-  for (const raw of rawCandidates) {
-    const url = absoluteSiteUrl(site, raw);
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    if (!sameSiteHost(site, url)) continue;
-    if (/\/(goods|templates|pages|whereToBuy|login|admin)\b/i.test(new URL(url).pathname)) continue;
-    const score = /\/product\//i.test(url) ? 3 : /product|goods|detail/i.test(url) ? 2 : 1;
-    candidates.push({ url, score });
-  }
-
-  candidates.sort((a, b) => b.score - a.score || a.url.length - b.url.length);
-  const finalCandidates = candidates.slice(0, 3).map((item) => item.url);
-  logLine(logs, "WTB 前台 Buy 验证候选页：" + JSON.stringify(finalCandidates));
-  return finalCandidates;
+  const candidates = selectBackendFrontendCandidates(site, product.productName, rawSources);
+  logLine(logs, "WTB 从后台商品数据获取的前台验证地址：" + JSON.stringify(candidates));
+  return candidates.map((item) => item.url);
 }
-
 function comparableUrl(rawUrl) {
   try {
     const url = new URL(String(rawUrl || "").trim());
@@ -855,6 +913,7 @@ async function verifyWtbFrontendDisplay(context, backendPage, site, product, edi
   const checkedUrls = [];
   const startedAt = Date.now();
   for (const url of candidates) {
+    logLine(logs, "WTB 保存后正在打开后台取得的前台商品页：" + product.productName + " / " + url);
     if (Date.now() - startedAt > 90000) {
       checkedUrls.push({
         url,
@@ -942,6 +1001,7 @@ async function verifyWtbFrontendDisplay(context, backendPage, site, product, edi
       };
     } catch (error) {
       checked.error = error?.message || String(error);
+      logLine(logs, "WTB 前台商品页复查未通过：" + url + " / " + checked.error);
     } finally {
       await page.close().catch(() => {});
     }
@@ -1301,6 +1361,7 @@ async function restoreWtbLink(body, logs) {
     restoreWtbLink,
     _test: {
       retailerTargetMatches,
+      selectBackendFrontendCandidates,
       groupWtbRows,
       classifyWtbProductError,
       openWtbBuyModal,
