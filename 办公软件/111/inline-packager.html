@@ -22,6 +22,7 @@
       <div class="nav-label">产品资料处理</div>
       <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-pdf-upload">PDF 上传转地址</div>
+        <div class="nav-item" data-target="tab-text-comparison">PDF / HTML 文字对比</div>
         <div class="nav-item" data-target="tab-spec-upload">Spec 参数解析</div>
         <div class="nav-item" data-target="tab-spec-excel-build">Datasheet 生成 Spec 表</div>
       </div>
@@ -145,6 +146,67 @@
 
         <div id="pdfUploadStatus" class="status">请选择一个或多个 PDF 文件。</div>
         <textarea id="pdfUploadOutput" placeholder="上传成功后的地址会显示在这里..."></textarea>
+      </div>
+
+      <div id="tab-text-comparison" class="tab-content">
+        <div class="card">
+          <h3>PDF / HTML 文字对比</h3>
+          <p class="desc">上传电子版 PDF 与 HTML 后，由服务器直接提取可见文字并完成核验，不读取或对比图片。系统会忽略大小写、空格、换行、连字符、乘号和常见 PDF 连字差异，并针对缺失、修改以及数值或单位问题提出处理建议。</p>
+          <div class="form-grid">
+            <label for="textComparePdfInput">PDF 文件</label>
+            <input id="textComparePdfInput" type="file" accept=".pdf,application/pdf">
+            <label for="textCompareHtmlInput">HTML 文件</label>
+            <input id="textCompareHtmlInput" type="file" accept=".html,.htm,text/html">
+          </div>
+          <div class="row">
+            <button id="textCompareRunBtn" type="button">上传并检验</button>
+            <button id="textCompareDownloadBtn" type="button" disabled>下载 JSON 报告</button>
+            <button id="textCompareClearBtn" type="button">清空</button>
+          </div>
+        </div>
+
+        <div id="textCompareStatus" class="status">请选择需要对比的 PDF 和 HTML 文件。</div>
+
+        <div id="textCompareSummary" class="text-compare-summary" hidden></div>
+
+        <div id="textCompareRecommendations" class="card text-compare-recommendations" hidden>
+          <h3>核验结论与建议</h3>
+          <div id="textCompareRecommendationList"></div>
+        </div>
+
+        <div id="textCompareFilters" class="card text-compare-results" hidden>
+          <div class="row text-compare-toolbar">
+            <h3>文字差异明细</h3>
+            <label for="textCompareTypeFilter">显示</label>
+            <select id="textCompareTypeFilter">
+              <option value="differences" selected>仅差异</option>
+              <option value="critical">仅数值/单位风险</option>
+              <option value="changed">文字有修改</option>
+              <option value="missing">HTML 缺少</option>
+              <option value="extra">HTML 多出</option>
+              <option value="match">一致</option>
+              <option value="all">全部</option>
+            </select>
+            <label for="textCompareSearchInput">搜索</label>
+            <input id="textCompareSearchInput" type="text" placeholder="输入型号、参数或文案">
+          </div>
+          <div class="text-compare-table-wrap">
+            <table class="text-compare-table">
+              <thead>
+                <tr>
+                  <th>结果</th>
+                  <th>PDF 位置</th>
+                  <th>PDF 文字</th>
+                  <th>HTML 文字</th>
+                  <th>相似度</th>
+                  <th>处理建议</th>
+                </tr>
+              </thead>
+              <tbody id="textCompareTableBody"></tbody>
+            </table>
+            <div id="textCompareEmpty" class="text-compare-empty" hidden>当前筛选条件下没有结果。</div>
+          </div>
+        </div>
       </div>
 
       <div id="tab-spec-upload" class="tab-content">
@@ -789,6 +851,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="src/module-text-comparison.js?v=20260729-2"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
   <script src="src/module-text.js"></script>

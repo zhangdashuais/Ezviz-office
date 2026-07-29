@@ -33,6 +33,9 @@ const { registerDetailAddressReplacementRoutes } = require("./src/server/routes/
 const { createProductRevisionSyncFeature } = require("./src/server/features/product-revision-sync");
 const { registerProductRevisionSyncRoutes } = require("./src/server/routes/product-revision-sync-routes");
 const { createCampaignLinkInspector } = require("./src/server/features/campaign-link-inspector");
+const textComparisonFeature = require("./src/server/features/text-comparison");
+const textComparisonFileFeature = require("./src/server/features/text-comparison-files");
+const { registerTextComparisonRoutes } = require("./src/server/routes/text-comparison-routes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -826,6 +829,11 @@ registerProductRevisionSyncRoutes(app, {
   upload,
   feature: productRevisionSyncFeature,
   logLine
+});
+registerTextComparisonRoutes(app, {
+  feature: textComparisonFeature,
+  fileFeature: textComparisonFileFeature,
+  upload
 });
 registerAssetUploadRoutes(app, { upload });
 
