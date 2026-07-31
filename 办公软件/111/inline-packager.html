@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Akiitu 一键内联工具</title>
-  <link rel="stylesheet" href="assets/style.css?v=20260724-2">
+  <link rel="stylesheet" href="assets/style.css?v=20260730-1">
 </head>
 <body>
   <div class="sidebar">
@@ -37,12 +37,6 @@
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
         <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
         <div class="nav-item" data-target="tab-product-revision-sync">产品修订同步</div>
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">临时功能</div>
-      <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换/删除</div>
       </div>
     </div>
@@ -266,8 +260,8 @@
           <div class="row">
             <label>上传源码</label>
             <input type="file" id="textFileInput" accept=".html">
-            <label>变量前缀</label>
-            <input id="langPrefixInput" type="text" value="goods.Alarm_light">
+            <label>产品变量前缀（无需 goods.）</label>
+            <input id="langPrefixInput" type="text" value="Alarm_light">
             <button id="textProcessBtn">解析并提取</button>
             <button id="textDownloadBtn" disabled>导出 i18n 文件</button>
           </div>
@@ -854,7 +848,7 @@
   <script src="src/module-text-comparison.js?v=20260729-2"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
-  <script src="src/module-text.js"></script>
+  <script src="src/module-text.js?v=20260731-2"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
   <script src="src/module-product-replacement.js"></script>

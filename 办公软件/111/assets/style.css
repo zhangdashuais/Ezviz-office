@@ -31,6 +31,8 @@ body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
   z-index: 10;
 }
 

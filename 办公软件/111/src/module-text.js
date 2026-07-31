@@ -29,14 +29,13 @@
       return;
     }
 
-    const prefix = langPrefixInput.value.trim() ? langPrefixInput.value.trim() + '_' : '';
+    const prefix = buildProductPrefix(langPrefixInput.value);
     updateStatus('正在处理中...');
 
     const htmlText = await readFileAsText(file);
     const existingKeys = extractExistingI18nKeys(htmlText);
     const doc = new DOMParser().parseFromString(htmlText, 'text/html');
     
-    let counter = 1;
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
     const textNodes = [];
     let node;
@@ -62,7 +61,7 @@
     }
 
     reusedExistingKeys = new Set();
-    renderTable(textNodes, prefix);
+    const conversion = renderTable(textNodes, prefix, existingKeys);
     renderExistingTable([...new Set([...existingKeys, ...reusedExistingKeys])]);
     updateTableVisibility();
     
@@ -72,7 +71,14 @@
     textOutput.value = currentProcessedHtml;
     textPreviewFrame.srcdoc = currentProcessedHtml;
     textDownloadBtn.disabled = false;
-    updateStatus('处理成功！可在下方预览并下载。', 'ok');
+    updateStatus(
+      conversion.existingProduct
+        ? `处理成功：已有产品 ${conversion.existingProduct} 命中 ${conversion.matchCount} 个字段，已复用该产品字段。`
+        : existingTextKeyMap.size
+          ? `处理成功：没有已有产品达到 10 个匹配字段，已使用新产品 ${conversion.newProduct}。`
+          : `处理成功：已使用新产品 ${conversion.newProduct}。`,
+      'ok'
+    );
   });
 
   textDownloadBtn.addEventListener('click', () => {
@@ -107,6 +113,9 @@
           renderExistingTable([...new Set([...existingKeys, ...reusedExistingKeys])]);
           updateTableVisibility();
         }
+        if (textFileInput?.files?.[0]) {
+          textProcessBtn.click();
+        }
       } catch (err) {
         updateStatus(`表格解析失败：${err.message || err}。`, 'warn');
       }
@@ -126,25 +135,34 @@
     });
   }
 
-  function renderTable(nodes, prefix) {
+  function renderTable(nodes, prefix, existingKeys = []) {
     const tbody = document.querySelector('#langTable tbody');
     tbody.innerHTML = '';
     
     const textKeyMap = new Map();
+    const reusePlan = selectExistingProduct(nodes);
+    const effectivePrefix = reusePlan ? reusePlan.prefix : prefix;
+    const reservedKeys = new Set();
+    existingKeys.forEach(key => reserveLanguageKey(reservedKeys, key));
+    existingValueMap.forEach((_value, key) => reserveLanguageKey(reservedKeys, key));
     let uniqueIndex = 0;
 
     nodes.forEach((item) => {
       const normalizedText = normalizeTextForKeyReuse(item.originalText);
-      let key = resolveExistingKeyByValue(normalizedText) || textKeyMap.get(normalizedText);
+      let key = resolveExistingKeyByValue(normalizedText, reusePlan?.product)
+        || textKeyMap.get(normalizedText);
 
       if (!key) {
-        uniqueIndex += 1;
-        key = `${prefix}${uniqueIndex}`;
+        do {
+          uniqueIndex += 1;
+          key = `${effectivePrefix}${uniqueIndex}`;
+        } while (isReservedLanguageKey(reservedKeys, key));
         textKeyMap.set(normalizedText, key);
+        reserveLanguageKey(reservedKeys, key);
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td style="padding:6px 10px; border-bottom:1px solid #ccc;">${key}</td>
+          <td style="padding:6px 10px; border-bottom:1px solid #ccc;">${displayLanguageKey(key)}</td>
           <td style="padding:6px 10px; border-bottom:1px solid #ccc;">${item.originalText}</td>
         `;
         tbody.appendChild(tr);
@@ -158,17 +176,90 @@
     });
 
     convertedCount = textKeyMap.size;
+    return {
+      existingProduct: reusePlan?.product || '',
+      matchCount: reusePlan?.matchCount || 0,
+      newProduct: productNameFromPrefix(effectivePrefix)
+    };
+  }
+
+  function buildProductPrefix(rawPrefix) {
+    const short = String(rawPrefix || '')
+      .trim()
+      .replace(/^goods\./i, '')
+      .replace(/[_.]+$/, '');
+    return `goods.${short || 'new_product'}_`;
+  }
+
+  function productNameFromPrefix(prefix) {
+    return String(prefix || '')
+      .replace(/^goods\./, '')
+      .replace(/[_.]+$/, '');
   }
 
   function normalizeTextForKeyReuse(text) {
     return String(text || '')
+      .normalize('NFC')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\u00a0/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
-  function resolveExistingKeyByValue(text) {
+  function reserveLanguageKey(reservedKeys, key) {
+    const normalized = normalizeLangKey(key);
+    if (!normalized) return;
+    reservedKeys.add(normalized.full);
+    reservedKeys.add(normalized.short);
+  }
+
+  function isReservedLanguageKey(reservedKeys, key) {
+    const normalized = normalizeLangKey(key);
+    return !!normalized
+      && (reservedKeys.has(normalized.full) || reservedKeys.has(normalized.short));
+  }
+
+  function describeProductKey(key) {
+    const normalized = normalizeLangKey(key);
+    if (!normalized) return null;
+    const short = normalized.short;
+    if (short.includes('.')) {
+      const product = short.split('.')[0];
+      return { product, prefix: `goods.${product}.` };
+    }
+    const numbered = short.match(/^(.*)_\d+$/);
+    if (!numbered?.[1]) return null;
+    return { product: numbered[1], prefix: `goods.${numbered[1]}_` };
+  }
+
+  function selectExistingProduct(nodes) {
+    const matchesByProduct = new Map();
+    const uniqueTexts = new Set(
+      nodes.map(item => normalizeTextForKeyReuse(item.originalText)).filter(Boolean)
+    );
+    uniqueTexts.forEach(text => {
+      (existingTextKeyMap.get(text) || []).forEach(key => {
+        const descriptor = describeProductKey(key);
+        if (!descriptor) return;
+        const current = matchesByProduct.get(descriptor.product)
+          || { ...descriptor, keys: new Set() };
+        current.keys.add(normalizeLangKey(key).full);
+        matchesByProduct.set(descriptor.product, current);
+      });
+    });
+    const best = [...matchesByProduct.values()]
+      .sort((left, right) => right.keys.size - left.keys.size
+        || left.product.localeCompare(right.product))[0];
+    return best && best.keys.size >= 10
+      ? { product: best.product, prefix: best.prefix, matchCount: best.keys.size }
+      : null;
+  }
+
+  function resolveExistingKeyByValue(text, product) {
+    if (!product) return '';
     const normalized = normalizeTextForKeyReuse(text);
-    return existingTextKeyMap.get(normalized) || '';
+    return (existingTextKeyMap.get(normalized) || []).find(key =>
+      describeProductKey(key)?.product === product) || '';
   }
 
   function isExistingLanguageKey(key) {
@@ -185,7 +276,7 @@
       const value = resolveExistingValue(key);
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td style="padding:6px 10px; border-bottom:1px solid #ccc;">${key}</td>
+          <td style="padding:6px 10px; border-bottom:1px solid #ccc;">${displayLanguageKey(key)}</td>
         <td style="padding:6px 10px; border-bottom:1px solid #ccc;">${value || ''}</td>
       `;
       tbody.appendChild(tr);
@@ -245,28 +336,61 @@
   async function parseLanguageTable(file) {
     const data = await readFileAsArrayBuffer(file);
     const workbook = window.XLSX.read(data, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[firstSheetName];
-    const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
     existingValueMap.clear();
     existingTextKeyMap.clear();
 
-    rows.forEach(row => {
-      const rawKey = (row[0] || '').toString().trim();
-      const value = (row[1] || '').toString().trim();
-      if (!rawKey) return;
+    let parsedCount = 0;
+    workbook.SheetNames.forEach(sheetName => {
+      const sheet = workbook.Sheets[sheetName];
+      const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const layout = detectLanguageTableLayout(rows);
+      rows.slice(layout.firstDataRow).forEach(row => {
+        const rawKey = String(row[layout.keyColumn] || '').trim();
+        const value = String(row[layout.sourceColumn] || '').trim();
+        if (!rawKey || !value) return;
 
-      const normalized = normalizeLangKey(rawKey);
-      if (!normalized) return;
+        const normalized = normalizeLangKey(rawKey);
+        if (!normalized) return;
 
-      existingValueMap.set(normalized.full, value);
-      existingValueMap.set(normalized.short, value);
-      const normalizedValue = normalizeTextForKeyReuse(value);
-      if (normalizedValue && !existingTextKeyMap.has(normalizedValue)) {
-        existingTextKeyMap.set(normalizedValue, normalized.full);
-      }
+        if (!existingValueMap.has(normalized.full)) {
+          existingValueMap.set(normalized.full, value);
+          existingValueMap.set(normalized.short, value);
+          parsedCount += 1;
+        }
+        const normalizedValue = normalizeTextForKeyReuse(value);
+        const storedValue = normalizeTextForKeyReuse(existingValueMap.get(normalized.full));
+        if (normalizedValue === storedValue) {
+          const keys = existingTextKeyMap.get(normalizedValue) || [];
+          if (!keys.includes(normalized.full)) keys.push(normalized.full);
+          existingTextKeyMap.set(normalizedValue, keys);
+        }
+      });
     });
+    if (!parsedCount) {
+      throw new Error('没有识别到字段名和原文列');
+    }
+  }
+
+  function detectLanguageTableLayout(rows) {
+    const headerLimit = Math.min(rows.length, 12);
+    for (let rowIndex = 0; rowIndex < headerLimit; rowIndex += 1) {
+      const row = rows[rowIndex] || [];
+      let keyColumn = -1;
+      let sourceColumn = -1;
+      row.forEach((cell, columnIndex) => {
+        const header = normalizeTextForKeyReuse(cell).toLowerCase();
+        if (/^(?:key|field)$|single\s*word|field\s*(?:name|key)|i18n\s*key|variable\s*name|变量名|字段名/.test(header)) {
+          keyColumn = columnIndex;
+        }
+        if (/^(?:value|source|original)$|^en-us\b|source\s*(?:text|value)|original\s*(?:text|value)|原文(?:内容)?/.test(header)) {
+          sourceColumn = columnIndex;
+        }
+      });
+      if (keyColumn >= 0 && sourceColumn >= 0) {
+        return { keyColumn, sourceColumn, firstDataRow: rowIndex + 1 };
+      }
+    }
+    return { keyColumn: 0, sourceColumn: 1, firstDataRow: 0 };
   }
 
   function normalizeLangKey(rawKey) {
@@ -280,6 +404,10 @@
     const full = key.startsWith('goods.') ? key : `goods.${key}`;
     const short = key.replace(/^goods\./, '');
     return { full, short };
+  }
+
+  function displayLanguageKey(key) {
+    return normalizeLangKey(key)?.short || String(key || '');
   }
 
   function resolveExistingValue(fullKey) {
