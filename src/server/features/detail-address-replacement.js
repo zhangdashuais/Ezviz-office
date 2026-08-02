@@ -255,7 +255,6 @@ function createDetailAddressReplacementFeature(deps) {
     page.setDefaultTimeout(30000);
     page = await ensureShopLoggedIn(page, {
       ...requestBody,
-      forceShopRelogin: true,
       credentialDomain: credentialDomainForSite(site),
       credentialGroup: "Website"
     }, logs);

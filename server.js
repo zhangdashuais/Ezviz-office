@@ -231,7 +231,8 @@ const popupManagement = createPopupManagement({
 });
 const specificationTranslationFeature = createSpecificationTranslationFeature({
   logLine,
-  shopCredentials
+  shopCredentials,
+  openProductEditorByName: productManagement.openByName
 });
 const campaignLinkInspector = createCampaignLinkInspector({ chromium });
 
@@ -718,6 +719,7 @@ const wtbFeature = createWtbFeature({
   getOpenPage: browserAuth.getOpenPage,
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
   credentialDomainForSite,
+  openProductEditorByName: productManagement.openByName,
   openProductAdditionalInformation: productManagement.openAdditionalInformation,
   clickTextInProductEditor: productManagement.clickText
 });

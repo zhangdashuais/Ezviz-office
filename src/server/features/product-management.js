@@ -1,13 +1,65 @@
+const INT_GOODS_COPY_URL = "https://shop.ezvizlife.com/goods/save-cite";
+const INT_GOODS_CATEGORY_PRIORITY = ["WiFi Cameras", "For Home"];
+
+function orderedIntGoodsCategories(options = []) {
+  const usable = options
+    .map((option) => ({ value: String(option.value), text: String(option.text || "").trim() }))
+    .filter((option) => option.value && option.value !== "0" && !/^\u25c6/.test(option.text));
+  const byName = new Map(usable.map((option) => [option.text.toLowerCase(), option]));
+  const preferred = INT_GOODS_CATEGORY_PRIORITY
+    .map((name) => byName.get(name.toLowerCase()))
+    .filter(Boolean);
+  const preferredValues = new Set(preferred.map((option) => option.value));
+  return [...preferred, ...usable.filter((option) => !preferredValues.has(option.value))];
+}
+
 function createProductManagement({ logLine, normalizeBool }) {
+  const productEditCache = new Map();
+  const PRODUCT_EDIT_CACHE_TTL_MS = 15 * 60 * 1000;
+
+  async function productCacheScope(page) {
+    return page.evaluate(() => (
+      document.querySelector(".clearfix.login-bar")?.innerText
+      || document.querySelector(".login-bar")?.innerText
+      || ""
+    )).catch(() => "").then((value) => value.replace(/\s+/g, " ").trim().toLowerCase());
+  }
+
+  function pruneProductEditCache(now = Date.now()) {
+    for (const [key, entry] of productEditCache.entries()) {
+      if (now - entry.cachedAt > PRODUCT_EDIT_CACHE_TTL_MS) productEditCache.delete(key);
+    }
+    while (productEditCache.size > 200) productEditCache.delete(productEditCache.keys().next().value);
+  }
 
   async function openProductEditorByName(page, productName, logs) {
     const targetName = String(productName || "").trim();
     if (!targetName) throw new Error("请填写产品名称。");
-    await page.goto("https://shop.ezvizlife.com/goods/index", {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
-    }).catch(() => {});
-    await page.waitForTimeout(3000);
+    pruneProductEditCache();
+    const initialScope = await productCacheScope(page);
+    const cacheKey = initialScope + "\n" + targetName.toLowerCase();
+    const cached = initialScope ? productEditCache.get(cacheKey) : null;
+    if (cached) {
+      // Always reload the cached edit URL so callers that perform save -> readback
+      // validate backend state instead of re-reading the mutated in-page Angular model.
+      await page.goto(cached.editUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+      await page.waitForTimeout(1200);
+      if (/shop\.ezvizlife\.com/i.test(page.url()) && !/signin|login/i.test(page.url())) {
+        logLine(logs, "已复用产品编辑地址缓存：" + targetName);
+        return { ...cached, cacheHit: true };
+      }
+      productEditCache.delete(cacheKey);
+    }
+
+    let currentPath = "";
+    try { currentPath = new URL(page.url()).pathname; } catch {}
+    if (currentPath !== "/goods/index") {
+      await page.goto("https://shop.ezvizlife.com/goods/index", {
+        waitUntil: "domcontentloaded",
+        timeout: 60000
+      }).catch(() => {});
+      await page.waitForTimeout(1800);
+    }
 
     async function findAndClickEdit() {
       return page.evaluate((name) => {
@@ -24,8 +76,17 @@ function createProductManagement({ logLine, normalizeBool }) {
           || controls.find((el) => /\/goods\/add\?id=|\/goods\/edit/i.test(el.getAttribute("href") || ""));
         if (!edit) return { ok: false, reason: "找到产品行，但没有找到 Edit 按钮。" };
         const href = edit.href || edit.getAttribute("href") || "";
+        const candidateUrls = [...row.querySelectorAll("a[href]")]
+          .map((link) => link.href || link.getAttribute("href") || "")
+          .filter((value) => value && !/\/goods\/(?:add|edit)|javascript:/i.test(value));
         edit.click();
-        return { ok: true, href, rowText: (row.innerText || "").trim().slice(0, 500) };
+        return {
+          ok: true,
+          href,
+          productPageUrl: candidateUrls[0] || "",
+          candidateUrls: [...new Set(candidateUrls)],
+          rowText: (row.innerText || "").trim().slice(0, 500)
+        };
       }, targetName);
     }
 
@@ -46,9 +107,22 @@ function createProductManagement({ logLine, normalizeBool }) {
     if (!found.ok) {
       throw new Error("没有在产品列表中找到产品：" + targetName + (found.reason ? "；" + found.reason : ""));
     }
-    await page.waitForTimeout(4500);
+    await page.waitForTimeout(2500);
     logLine(logs, "已打开产品编辑页：" + targetName + " / " + page.url());
-    return { productName: targetName, editUrl: page.url(), rowText: found.rowText || "" };
+    const result = {
+      productName: targetName,
+      editUrl: page.url(),
+      productPageUrl: found.productPageUrl || "",
+      candidateUrls: found.candidateUrls || [],
+      rowText: found.rowText || "",
+      cacheHit: false,
+      cachedAt: Date.now()
+    };
+    const resolvedScope = await productCacheScope(page);
+    if (resolvedScope) {
+      productEditCache.set(resolvedScope + "\n" + targetName.toLowerCase(), result);
+    }
+    return result;
   }
 
   async function openFirstProductEditPage(page, logs) {
@@ -81,7 +155,11 @@ function createProductManagement({ logLine, normalizeBool }) {
   }
 
   async function inspectIntGoodsCopyPage(page) {
-    return page.evaluate(() => ({
+    return page.evaluate(() => {
+      const complete = document.querySelector("a.new.link-btn, button.new.link-btn");
+      const firstCopy = document.querySelector(".pro-list-ul .pro-list-li .link-btn.pro-list-link");
+      const productItems = [...document.querySelectorAll(".pro-list-ul .pro-list-li")];
+      return {
       url: location.href,
       selects: [...document.querySelectorAll("select")].map((el, index) => ({
         index,
@@ -98,8 +176,31 @@ function createProductManagement({ logLine, normalizeBool }) {
       cp8Text: [...document.querySelectorAll("body *")]
         .filter((el) => /\bCP8\b/i.test((el.innerText || el.textContent || "").trim()) && el.children.length < 8)
         .slice(0, 20)
-        .map((el) => ({ tag: el.tagName, text: (el.innerText || el.textContent || "").trim().slice(0, 500), className: el.className }))
-    }));
+        .map((el) => ({ tag: el.tagName, text: (el.innerText || el.textContent || "").trim().slice(0, 500), className: el.className })),
+      products: productItems.map((item) => {
+        const title = item.querySelector("p.pro-list-title");
+        const copy = item.querySelector(".link-btn.pro-list-link");
+        return {
+          name: (title?.innerText || title?.textContent || "").trim(),
+          itemNgRepeat: item.getAttribute("ng-repeat") || "",
+          copyNgClick: copy?.getAttribute("ng-click") || "",
+          copyHref: copy?.getAttribute("href") || ""
+        };
+      }),
+      actionBindings: {
+        complete: complete ? {
+          text: (complete.innerText || complete.textContent || "").trim(),
+          ngClick: complete.getAttribute("ng-click") || "",
+          href: complete.getAttribute("href") || ""
+        } : null,
+        firstCopy: firstCopy ? {
+          text: (firstCopy.innerText || firstCopy.textContent || "").trim(),
+          ngClick: firstCopy.getAttribute("ng-click") || "",
+          href: firstCopy.getAttribute("href") || ""
+        } : null
+      }
+    };
+    });
   }
 
   async function copyIntGoodsProduct(page, productName, logs) {
@@ -134,6 +235,79 @@ function createProductManagement({ logLine, normalizeBool }) {
     }
     logLine(logs, "Completed product copy: " + title);
     return { productName: title, url: page.url(), requests: captured };
+  }
+
+  async function findIntGoodsProduct(page, productName, logs) {
+    const normalized = String(productName || "").trim();
+    if (!normalized) throw new Error("Product name is required.");
+    const categorySelect = page.locator("select.form-control").nth(1);
+    if (!(await categorySelect.count())) throw new Error("Product category selector was not found.");
+    const options = await categorySelect.locator("option").evaluateAll((items) => items.map((option) => ({
+      value: option.value,
+      text: (option.textContent || "").trim()
+    })));
+    const categories = orderedIntGoodsCategories(options);
+
+    for (const category of categories) {
+      await categorySelect.selectOption(category.value);
+      await page.waitForTimeout(900);
+      const matches = page.locator(".pro-list-ul li.pro-list-li").filter({
+        has: page.locator("p.pro-list-title", { hasText: normalized })
+      });
+      const count = await matches.count();
+      for (let index = 0; index < count; index += 1) {
+        const item = matches.nth(index);
+        const title = (await item.locator("p.pro-list-title").first().innerText()).trim();
+        if (title.toLowerCase() !== normalized.toLowerCase()) continue;
+        const product = await item.evaluate((element) => {
+          const scope = window.angular && window.angular.element(element).scope();
+          const good = scope?.good || null;
+          return {
+            goodsId: good?.goods_id == null ? "" : String(good.goods_id),
+            modelKeys: good ? Object.keys(good) : []
+          };
+        });
+        if (!product.goodsId) {
+          throw new Error("Product was found but goods_id is missing: " + title);
+        }
+        logLine(logs, `Found ${title} in ${category.text}, goods_id=${product.goodsId}.`);
+        return { productName: title, category, goodsId: product.goodsId };
+      }
+    }
+    throw new Error(
+      `Product not found after checking ${categories.length} categories: ${normalized}`
+    );
+  }
+
+  async function copyIntGoodsProductDirect(page, productName, logs) {
+    const product = await findIntGoodsProduct(page, productName, logs);
+    const response = await page.request.post(INT_GOODS_COPY_URL, {
+      form: { cite: "", copy: product.goodsId + "," },
+      headers: { "x-requested-with": "XMLHttpRequest" },
+      timeout: 60000
+    });
+    const responseText = await response.text();
+    let result = null;
+    try { result = JSON.parse(responseText); } catch {}
+    if (!response.ok() || !result?.status) {
+      throw new Error(
+        `Direct product copy failed (${response.status()}): `
+        + (result?.msg || responseText.slice(0, 500) || "empty response")
+      );
+    }
+    logLine(logs, `Direct product copy completed: ${product.productName} / ${product.category.text}.`);
+    return {
+      strategy: "direct-request",
+      productName: product.productName,
+      goodsId: product.goodsId,
+      category: product.category,
+      request: { method: "POST", url: INT_GOODS_COPY_URL, status: response.status() },
+      result: {
+        status: result.status,
+        msg: result.msg || "",
+        redirect: result.redirect || ""
+      }
+    };
   }
 
   async function openProductAdditionalInformation(page, logs) {
@@ -288,11 +462,17 @@ function createProductManagement({ logLine, normalizeBool }) {
   return {
     openFirstEdit: openFirstProductEditPage, inspectCopyPage: inspectIntGoodsCopyPage,
     openByName: openProductEditorByName,
-    copy: copyIntGoodsProduct, openAdditionalInformation: openProductAdditionalInformation,
+    copy: copyIntGoodsProductDirect, copyViaUi: copyIntGoodsProduct,
+    findIntGoodsProduct, openAdditionalInformation: openProductAdditionalInformation,
     clickText: clickTextInProductEditor, probeWhereToBuySettings: probeProductWhereToBuySettings,
     keywordSnapshot: productEditorKeywordSnapshot,
     visibleText: visibleTextSafe
   };
 }
 
-module.exports = { createProductManagement };
+module.exports = {
+  INT_GOODS_COPY_URL,
+  INT_GOODS_CATEGORY_PRIORITY,
+  orderedIntGoodsCategories,
+  createProductManagement
+};

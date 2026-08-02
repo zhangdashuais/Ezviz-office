@@ -323,7 +323,6 @@ function createProductRevisionSyncFeature(deps) {
     page = await ensureShopLoggedIn(page, {
       ...(body || {}),
       sites: [site.siteCode],
-      forceShopRelogin: true,
       credentialDomain: credentialDomainForSite(site),
       credentialGroup: "Website"
     }, logs);

@@ -128,8 +128,11 @@ function createBrowserAuth(deps) {
   }
 
   async function getOpenPage(context) {
-    const existingPage = context.pages().find((page) => !page.isClosed());
-    return existingPage || await context.newPage();
+    const pages = context.pages().filter((page) => !page.isClosed());
+    const backendPage = pages.find((page) => {
+      try { return new URL(page.url()).hostname === "shop.ezvizlife.com"; } catch { return false; }
+    });
+    return backendPage || pages[0] || await context.newPage();
   }
 
   async function logoutShopByUi(page, logs) {
@@ -182,8 +185,12 @@ function createBrowserAuth(deps) {
   }
 
   async function currentShopBackendAccount(page) {
-    await page.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(2500);
+    let currentIsBackend = false;
+    try { currentIsBackend = new URL(page.url()).hostname === "shop.ezvizlife.com"; } catch {}
+    if (!currentIsBackend) {
+      await page.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+      await page.waitForTimeout(1800);
+    }
     const hasPassword = await page.locator('input[type="password"]').first().isVisible().catch(() => false);
     if (/usauth\.ezvizlife\.com|signin|login/i.test(page.url()) || hasPassword) return null;
     const accountText = await page.evaluate(() =>
@@ -217,19 +224,6 @@ function createBrowserAuth(deps) {
       }
     }
 
-    let username = payload.shopUsername || payload.username || process.env.EZVIZ_SHOP_USER;
-    let password = payload.shopPassword || payload.password || process.env.EZVIZ_SHOP_PASSWORD;
-    if ((!username || !password) && payload.credentialDomain) {
-      const credential = shopCredentials.read(payload.credentialGroup || "Website", payload.credentialDomain);
-      username = credential.account;
-      password = credential.password;
-      logLine(logs, "已从网站账号密码表读取账号：" + payload.credentialDomain + " / " + username);
-    }
-    if (!username || !password) {
-      logLine(logs, "商城后台需要登录，但没有找到账号密码。");
-      throw new Error("商城后台未登录，且未找到可用账号密码。");
-    }
-
     const currentAccount = normalizeBool(payload.forceShopRelogin) ? null : await currentShopBackendAccount(page);
     if (currentAccount && shopAccountLooksCompatible(currentAccount, payload)) {
       logLine(logs, "检测到商城后台已登录，复用当前账号：" + currentAccount);
@@ -237,6 +231,19 @@ function createBrowserAuth(deps) {
     }
     if (currentAccount) {
       logLine(logs, "当前后台账号与目标站点不匹配，需要切换账号。当前账号：" + currentAccount);
+    }
+
+    let username = payload.shopUsername || payload.username || process.env.EZVIZ_SHOP_USER;
+    let password = payload.shopPassword || payload.password || process.env.EZVIZ_SHOP_PASSWORD;
+    if ((!username || !password) && payload.credentialDomain) {
+      const credential = shopCredentials.read(payload.credentialGroup || "Website", payload.credentialDomain);
+      username = credential.account;
+      password = credential.password;
+      logLine(logs, "已从网站账号密码表读取目标站点账号：" + payload.credentialDomain);
+    }
+    if (!username || !password) {
+      logLine(logs, "商城后台需要登录，但没有找到账号密码。");
+      throw new Error("商城后台未登录，且未找到可用账号密码。");
     }
 
     if (!currentAccount || !shopAccountLooksCompatible(currentAccount, payload)) {
@@ -332,6 +339,7 @@ function createBrowserAuth(deps) {
     }
 
     logLine(logs, "已进入商城后台首页：" + backendPage.url());
+    if (page !== backendPage && !page.isClosed()) await page.close().catch(() => {});
     return backendPage;
   }
 

@@ -1,7 +1,10 @@
 const fs = require("fs");
 
 function createSpecificationTranslationFeature(deps) {
-  const { logLine, shopCredentials } = deps;
+  const { logLine, shopCredentials, openProductEditorByName } = deps;
+  if (typeof openProductEditorByName !== "function") {
+    throw new Error("Specification 翻译缺少共用产品查询能力。");
+  }
 
   function normalize(value) {
     return String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
@@ -51,70 +54,30 @@ function createSpecificationTranslationFeature(deps) {
     };
   }
 
-  async function openProductEditor(page, productName, logs) {
-    await page.goto("https://shop.ezvizlife.com/goods/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(3000);
-    const result = await page.evaluate((name) => {
-      const exact = [...document.querySelectorAll("body *")].filter((el) => {
-        const text = (el.innerText || el.textContent || "").trim();
-        return text.toLowerCase() === name.toLowerCase() && el.children.length < 4;
-      });
-      for (const title of exact) {
-        let root = title;
-        for (let depth = 0; root && depth < 7; depth += 1, root = root.parentElement) {
-          const edit = [...root.querySelectorAll("a,button")].find((el) => /^edit$/i.test((el.innerText || el.textContent || "").trim()));
-          if (edit) { edit.click(); return { ok: true, title: (title.innerText || title.textContent || "").trim() }; }
-        }
-      }
-      return { ok: false };
-    }, productName);
-    if (!result.ok) throw new Error("商品列表中没有找到 " + productName + " 的 Edit 入口。");
-    logLine(logs, "已打开商品编辑：" + result.title);
-    await page.waitForTimeout(4000);
-  }
-
-  async function prepareDetailEditor(page, logs) {
-    const basic = page.locator('[ng-model="vm.basic.isSearchable"]').first();
-    if (await basic.count()) {
-      const checked = await basic.isChecked().catch(() => false);
-      if (checked) await basic.uncheck({ force: true }).catch(() => basic.click({ force: true }));
-      logLine(logs, "vm.basic.isSearchable 已取消勾选。");
-    } else {
-      throw new Error("没有找到 vm.basic.isSearchable 复选框。");
-    }
-    const detail = page.getByText(/^Detail(?:s)?$/i).first();
-    if (!(await detail.count())) {
-      const candidates = await page.evaluate(() => [...document.querySelectorAll("a,button,li,span")]
-        .filter((el) => el.offsetWidth || el.offsetHeight || el.getClientRects().length)
-        .map((el) => (el.innerText || el.textContent || "").trim())
-        .filter((text) => /detail|basic|information|spec/i.test(text))
-        .slice(0, 30));
-      throw new Error("没有找到 Detail 入口。候选项：" + JSON.stringify(candidates));
-    }
-    await detail.click();
-    await page.waitForTimeout(1800);
-    const editor = await page.evaluate(() => {
-      const holders = [...document.querySelectorAll(".edui-editor-iframeholder.edui-default")];
-      const candidates = holders.map((holder, index) => {
-        const iframe = holder.querySelector("iframe");
-        const body = iframe?.contentDocument?.body;
-        const row = holder.closest(".row.toggle-item.ng-scope") || holder.closest(".toggle-item") || holder.parentElement;
-        return { index, html: body?.innerHTML || "", rowText: (row?.innerText || "").trim().slice(0, 300) };
-      });
-      return candidates.find((item) => /specification/i.test(item.rowText) || /specification/i.test(item.html)) || candidates[0] || null;
+  async function readSpecificationModel(page) {
+    await page.waitForFunction(() => {
+      const element = document.querySelector("#replenish");
+      const scope = window.angular && element ? window.angular.element(element).scope() : null;
+      return Boolean(scope?.goodsId && scope?.vm?.pcView && typeof scope?.md?.toModel === "function");
+    }, null, { timeout: 30000 });
+    return page.evaluate(() => {
+      const normalizeField = (value) => String(value || "")
+        .trim().toLowerCase().replace(/[\s_-]+/g, "");
+      const scope = window.angular.element(document.querySelector("#replenish")).scope();
+      const field = (scope.vm.pcView?.customs || []).find(
+        (item) => normalizeField(item?.name) === "specifications"
+      );
+      if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
+      return {
+        goodsId: String(scope.goodsId),
+        html: String(field.value || ""),
+        isSearchable: Boolean(scope.vm.basic?.isSearchable)
+      };
     });
-    if (!editor) throw new Error("没有找到 Specification 的 UEditor iframe。");
-    logLine(logs, "已定位 Specification 编辑器，索引：" + editor.index);
-    return editor;
   }
 
-  async function translateEditor(page, editorIndex, entries, apply) {
-    return page.evaluate(({ editorIndex, entries, apply }) => {
-      const holder = document.querySelectorAll(".edui-editor-iframeholder.edui-default")[editorIndex];
-      const iframe = holder?.querySelector("iframe");
-      const body = iframe?.contentDocument?.body;
-      if (!body) throw new Error("Specification iframe body is unavailable.");
-      const originalHtml = body.innerHTML;
+  async function translateSpecificationHtml(page, originalHtml, entries) {
+    return page.evaluate(({ originalHtml, entries }) => {
       const doc = new DOMParser().parseFromString(`<body>${originalHtml}</body>`, "text/html");
       const normalize = (value) => String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
       const translations = new Map(entries.map((item) => [normalize(item.source), item.target]));
@@ -131,37 +94,103 @@ function createSpecificationTranslationFeature(deps) {
         replaced += 1;
       }
       const generatedHtml = doc.body.innerHTML;
-      const originalImages = [...body.querySelectorAll("img")].map((img) => ({ src: img.getAttribute("src") || "", alt: img.getAttribute("alt") || "" }));
+      const originalImages = [...doc.body.querySelectorAll("img")].map((img) => ({ src: img.getAttribute("src") || "", alt: img.getAttribute("alt") || "" }));
       const generatedDoc = new DOMParser().parseFromString(`<body>${generatedHtml}</body>`, "text/html");
       const generatedImages = [...generatedDoc.body.querySelectorAll("img")].map((img) => ({ src: img.getAttribute("src") || "", alt: img.getAttribute("alt") || "" }));
       if (JSON.stringify(originalImages) !== JSON.stringify(generatedImages)) throw new Error("Image src/alt preservation check failed.");
-      if (apply) {
-        body.innerHTML = generatedHtml;
-        body.dispatchEvent(new Event("input", { bubbles: true }));
-        body.dispatchEvent(new Event("change", { bubbles: true }));
-      }
       return { originalHtml, generatedHtml, replaced, images: originalImages };
-    }, { editorIndex, entries, apply });
+    }, { originalHtml, entries });
+  }
+
+  async function buildDirectSavePayload(page, specifications) {
+    return page.evaluate((nextSpecifications) => {
+      const normalizeField = (value) => String(value || "")
+        .trim().toLowerCase().replace(/[\s_-]+/g, "");
+      const scope = window.angular.element(document.querySelector("#replenish")).scope();
+      const field = (scope.vm.pcView?.customs || []).find(
+        (item) => normalizeField(item?.name) === "specifications"
+      );
+      if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
+      scope.vm.basic = scope.vm.basic || {};
+      scope.vm.basic.isSearchable = false;
+      field.value = nextSpecifications;
+      (scope.$root || scope).$applyAsync?.();
+      const data = scope.md.toModel(scope.vm);
+      data.goods_id = scope.goodsId;
+      return data;
+    }, specifications);
+  }
+
+  async function postProductUpdate(page, payload) {
+    const requestUrl = "https://shop.ezvizlife.com/goods/do-edit-goods";
+    const response = await page.request.post(requestUrl, {
+      data: { data: payload },
+      headers: { "x-requested-with": "XMLHttpRequest" },
+      timeout: 60000
+    });
+    const text = await response.text().catch(() => "");
+    let result;
+    try { result = JSON.parse(text); } catch {
+      throw new Error("产品保存接口返回的不是 JSON：" + text.slice(0, 200));
+    }
+    if (!response.ok() || Number(result?.status) !== 1) {
+      throw new Error(result?.msg || result?.message || `产品保存失败（HTTP ${response.status()}）`);
+    }
+    return {
+      requestUrl,
+      responseStatus: response.status(),
+      backendStatus: Number(result.status),
+      redirect: result.redirect || ""
+    };
   }
 
   async function run(page, options, excelFile, logs) {
     const translation = Array.isArray(options.translations) && options.translations.length
       ? { localeHeader: options.localeHeader || options.locale || options.siteCode, entries: options.translations }
       : buildTranslationMap(excelFile.path, options.locale || options.siteCode);
-    await openProductEditor(page, options.productName || "CP8", logs);
-    const editor = await prepareDetailEditor(page, logs);
-    const result = await translateEditor(page, editor.index, translation.entries, options.submit === true);
+    const productName = options.productName || "CP8";
+    const editInfo = await openProductEditorByName(page, productName, logs);
+    const before = await readSpecificationModel(page);
+    const result = await translateSpecificationHtml(page, before.html, translation.entries);
+    let save = null;
+    let verification = null;
     if (options.submit === true) {
-      const complete = page.locator(".next-row.col-xs-12.button-fixed").getByText(/^Complete$/i).first();
-      if (!(await complete.count())) throw new Error("没有找到 next-row col-xs-12 button-fixed 中的 Complete。");
-      await complete.click();
-      await page.waitForTimeout(3000);
-      logLine(logs, "Specification 翻译已保存。");
+      const payload = await buildDirectSavePayload(page, result.generatedHtml);
+      save = await postProductUpdate(page, payload);
+      await openProductEditorByName(page, productName, logs);
+      const after = await readSpecificationModel(page);
+      const htmlMatches = after.html === result.generatedHtml;
+      const searchableDisabled = after.isSearchable === false;
+      verification = { htmlMatches, searchableDisabled, goodsId: after.goodsId };
+      if (!htmlMatches || !searchableDisabled) {
+        throw new Error(
+          `Specification 直接保存回读失败：HTML ${htmlMatches ? "通过" : "不一致"}，`
+          + `isSearchable ${searchableDisabled ? "已关闭" : "未关闭"}。`
+        );
+      }
+      logLine(logs, "Specification 翻译已通过直接请求保存并回读验证。");
     }
-    return { productName: options.productName || "CP8", localeHeader: translation.localeHeader, ...result, submitted: options.submit === true };
+    return {
+      productName,
+      localeHeader: translation.localeHeader,
+      editUrl: editInfo.editUrl,
+      goodsId: before.goodsId,
+      ...result,
+      submitted: options.submit === true,
+      strategy: options.submit === true ? "direct-request" : "preview-only",
+      save,
+      verification
+    };
   }
 
-  return { buildTranslationMap, run };
+  return {
+    buildTranslationMap,
+    readSpecificationModel,
+    translateSpecificationHtml,
+    buildDirectSavePayload,
+    postProductUpdate,
+    run
+  };
 }
 
 module.exports = { createSpecificationTranslationFeature };

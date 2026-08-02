@@ -105,6 +105,7 @@ function createWtbFeature(deps) {
     getOpenPage,
     ensureShopLoggedIn,
     credentialDomainForSite,
+    openProductEditorByName,
     openProductAdditionalInformation,
     clickTextInProductEditor
   } = deps;
@@ -305,6 +306,9 @@ function resolveWtbSite(config, body, rows) {
 }
 
 async function findAndOpenProductEdit(page, productName, logs) {
+  if (typeof openProductEditorByName === "function") {
+    return openProductEditorByName(page, productName, logs);
+  }
   await page.goto("https://shop.ezvizlife.com/goods/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(3000);
 
@@ -1322,7 +1326,6 @@ async function restoreWtbLink(body, logs) {
   page.setDefaultTimeout(30000);
   page = await ensureShopLoggedIn(page, {
     ...body,
-    forceShopRelogin: true,
     credentialDomain: credentialDomainForSite(site),
     credentialGroup: "Website"
   }, logs);
