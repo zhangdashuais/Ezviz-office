@@ -8,7 +8,9 @@
     { pattern: /^\/api\/campaign\/wtb-(plan|submit|roundtrip-test|restore)$/, statusId: "wtbStatus", label: "WTB 产品购买链接" },
     { pattern: /^\/api\/tdk\/(plan|submit)$/, statusId: "tdkStatus", label: "TDK 配置" },
     { pattern: /^\/api\/product-replacement\/(detail|details)$/, statusId: "productReplaceStatus", label: "后台产品读取" },
-    { pattern: /^\/api\/product-revision-sync\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品修订同步" }
+    { pattern: /^\/api\/product-revision-sync\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品修订同步" },
+    { pattern: /^\/api\/product-publishing\/(preview|submit|batch-preview|batch-submit)$/, statusId: "revisionSyncStatus", label: "产品上架" },
+    { pattern: /^\/api\/product-delisting\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品下架" }
   ];
 
   function requestPath(input) {

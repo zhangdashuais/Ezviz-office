@@ -36,7 +36,7 @@
         <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
         <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
-        <div class="nav-item" data-target="tab-product-revision-sync">产品修订同步</div>
+        <div class="nav-item" data-target="tab-product-revision-sync">产品上架 / 修订 / 下架</div>
         <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换/删除</div>
       </div>
     </div>
@@ -347,34 +347,49 @@
 
       <div id="tab-product-revision-sync" class="tab-content">
         <div class="card">
-          <h3>产品修订同步</h3>
-          <p class="desc">以国际站修订后的产品为源，复制 Overview Detail；从国际站 Specification 自动读取图片地址和 alt，再根据上传 Excel 的目标语言列重新生成 Specification。同时下载各目标站语言包，按 Datasheet 的“字段名 + 原文”校验后写入译文并直接上传。预览不会保存，确认执行后会逐站点保存并回读验证。</p>
+          <h3>产品上架 / 修订 / 下架</h3>
+          <p class="desc">批量上架从本地文件夹识别多个产品，逐站执行国际站复制、Product Description 翻译、Overview/Specification 和语言包更新；修订模式只更新已有产品；下架模式只关闭 Searchable 并将 Type of listing 设为 No Set Uptime。所有写操作都必须先预览。</p>
           <div class="form-grid">
-            <label for="revisionSyncSourceSite">源站点</label>
+            <label for="revisionSyncOperation">操作流程</label>
+            <select id="revisionSyncOperation">
+              <option value="publish-batch" selected>产品上架（文件夹批量）</option>
+              <option value="revision">产品修订（仅修改已有产品）</option>
+              <option value="delist">产品下架（关闭搜索与上架时间）</option>
+            </select>
+            <label id="revisionSyncSourceSiteLabel" for="revisionSyncSourceSite">源站点</label>
             <select id="revisionSyncSourceSite">
               <option value="">正在加载站点...</option>
             </select>
-            <label for="revisionSyncProductName">产品名称</label>
+            <label id="revisionSyncProductNameLabel" for="revisionSyncProductName">产品名称</label>
             <input id="revisionSyncProductName" type="text" placeholder="例如 CP8">
-            <label for="revisionSyncExcel">Specification 翻译 Excel</label>
+            <label id="revisionSyncExcelLabel" for="revisionSyncExcel">Specification 翻译 Excel</label>
             <input id="revisionSyncExcel" type="file" accept=".xlsx,.xls">
-            <label for="revisionSyncLanguageDatasheet">语言包 Datasheet</label>
+            <label id="revisionSyncLanguageDatasheetLabel" for="revisionSyncLanguageDatasheet">语言包 Datasheet</label>
             <input id="revisionSyncLanguageDatasheet" type="file" accept=".xlsx,.xls">
+            <label id="revisionSyncFolderLabel" for="revisionSyncFolder">待上架产品文件夹</label>
+            <div id="revisionSyncFolderGroup">
+              <input id="revisionSyncFolder" type="file" webkitdirectory directory multiple>
+              <div class="desc">每个产品需要一份 <code>Datasheet.xls/xlsx</code> 和一份 <code>Specifications.xls/xlsx</code>。支持“每个产品一个子文件夹”，或在同一文件夹使用“产品名 Datasheet.xlsx / 产品名 Specifications.xlsx”。Datasheet 必须包含 <code>Product Description</code> 行及各站点译文。</div>
+            </div>
+            <label id="revisionSyncDelistLabel" for="revisionSyncDelistProducts" hidden>下架产品名称</label>
+            <textarea id="revisionSyncDelistProducts" rows="5" hidden placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
           </div>
+          <p id="revisionSyncLanguageHelp" class="desc">语言包操作顺序：先按目标站点确定 Datasheet 语种列（例如法国站取 French、德国站取 German）→ 下载该站当前语言包 → 用语言包第 3 列字段名匹配 Datasheet → 保留第 4 列原文，并用本站对应语种覆盖第 5 列译文 → 上传新语言包 → 再次下载回读验证。</p>
           <div class="row">
-            <button id="revisionSyncSelectMatched" type="button">勾选可自动匹配站点</button>
+            <button id="revisionSyncSelectMatched" type="button">一键选择全部可执行站点</button>
             <button id="revisionSyncClearTargets" type="button">清空目标站点</button>
+            <span id="revisionSyncSelectedCount" class="revision-selected-count">已选择 0 个站点</span>
           </div>
         </div>
         <div class="card">
-          <h3>目标站点与两份 Excel 的语言列</h3>
-          <p class="desc">勾选要同步的站点，并分别核对 Specification 和语言包 Datasheet 的译文列。对于比利时、欧洲等可能共用语言的站点，请以实际页面语言为准手工调整。</p>
+          <h3 id="revisionSyncTargetsHeading">目标站点与两份 Excel 的语言列</h3>
+          <p id="revisionSyncTargetsHelp" class="desc">每一行都是独立映射：目标站点 → Specification 语言列 → 本站使用的 Datasheet 译文列。系统会自动匹配，执行前可逐站核对；一次预览、一次确认后连续处理全部已选站点。</p>
           <div id="revisionSyncTargets" class="revision-targets">
             上传两份 Excel 后显示站点与语言列。
           </div>
           <div class="row">
-            <button id="revisionSyncPreview" type="button">预览同步（不保存）</button>
-            <button id="revisionSyncSubmit" type="button" disabled>确认并执行同步</button>
+            <button id="revisionSyncPreview" type="button">预览批量上架（不复制）</button>
+            <button id="revisionSyncSubmit" type="button" disabled>确认并批量上架</button>
           </div>
         </div>
         <div id="revisionSyncStatus" class="status">正在加载站点...</div>
@@ -852,7 +867,7 @@
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
   <script src="src/module-product-replacement.js"></script>
-  <script src="src/module-product-revision-sync.js?v=20260726-1"></script>
+  <script src="src/module-product-revision-sync.js?v=20260802-7"></script>
   <script src="src/module-detail-address-replacement.js?v=20260724-3"></script>
   <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260724-4"></script>

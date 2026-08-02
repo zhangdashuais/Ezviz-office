@@ -125,6 +125,49 @@ function createProductManagement({ logLine, normalizeBool }) {
     return result;
   }
 
+  async function productExistsInCurrentSite(page, productName, logs) {
+    const targetName = String(productName || "").trim();
+    if (!targetName) throw new Error("请填写产品名称。");
+    await page.goto("https://shop.ezvizlife.com/goods/index", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
+    }).catch(() => {});
+    await page.waitForTimeout(1800);
+
+    async function findExactProduct() {
+      return page.evaluate((name) => {
+        const normalized = name.toLowerCase();
+        const visible = (el) => Boolean(
+          el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)
+        );
+        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope")].filter(visible);
+        const row = rows.find((candidate) =>
+          [...candidate.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name']")]
+            .some((cell) => (cell.innerText || cell.textContent || "")
+              .trim().toLowerCase() === normalized)
+        );
+        return row ? { exists: true, rowText: (row.innerText || "").trim().slice(0, 500) } : { exists: false };
+      }, targetName);
+    }
+
+    let result = await findExactProduct();
+    if (!result.exists) {
+      const searchInput = page.locator(
+        'input[type="search"]:visible, input[type="text"]:visible, input:not([type]):visible'
+      ).first();
+      if (await searchInput.count()) {
+        await searchInput.fill(targetName);
+        const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
+        if (await searchButton.count()) await searchButton.click();
+        else await searchInput.press("Enter");
+        await page.waitForTimeout(3500);
+        result = await findExactProduct();
+      }
+    }
+    logLine(logs, `${targetName} 在当前站点${result.exists ? "已存在" : "不存在"}。`);
+    return { ...result, productName: targetName };
+  }
+
   async function openFirstProductEditPage(page, logs) {
     await page.goto("https://shop.ezvizlife.com/goods/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(3000);
@@ -463,7 +506,8 @@ function createProductManagement({ logLine, normalizeBool }) {
     openFirstEdit: openFirstProductEditPage, inspectCopyPage: inspectIntGoodsCopyPage,
     openByName: openProductEditorByName,
     copy: copyIntGoodsProductDirect, copyViaUi: copyIntGoodsProduct,
-    findIntGoodsProduct, openAdditionalInformation: openProductAdditionalInformation,
+    findIntGoodsProduct, existsInCurrentSite: productExistsInCurrentSite,
+    openAdditionalInformation: openProductAdditionalInformation,
     clickText: clickTextInProductEditor, probeWhereToBuySettings: probeProductWhereToBuySettings,
     keywordSnapshot: productEditorKeywordSnapshot,
     visibleText: visibleTextSafe

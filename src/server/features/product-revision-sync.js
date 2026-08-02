@@ -273,7 +273,7 @@ function validateRevisionRequest(body, allSites) {
   const targets = parseTargets(body?.targetsJson ?? body?.targets ?? body?.targetSites);
   if (!productName) throw new Error("请填写产品名称。");
   if (!targets.length) throw new Error("请至少选择一个目标站点。");
-  if (targets.length > 20) throw new Error("一次最多同步 20 个目标站点。");
+  if (targets.length > 50) throw new Error("一次最多同步 50 个目标站点。");
   const byCode = new Map(allSites.map((site) => [site.siteCode, site]));
   const sourceSite = byCode.get(sourceSiteCode);
   if (!sourceSite) throw new Error(`没有找到源站点：${sourceSiteCode}。`);
@@ -299,6 +299,45 @@ function readDetailFromPcView(pcView) {
   };
 }
 
+function normalizeDatasheetKey(value) {
+  return normalize(value).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
+}
+
+function resolveProductDescription(parsedDatasheet, target) {
+  const translationHeader = resolveDatasheetLanguage(
+    parsedDatasheet,
+    target,
+    SITE_LANGUAGE_NEEDLES
+  );
+  const acceptedKeys = new Set([
+    "productdescription",
+    "description",
+    "productsummary",
+    "summary",
+    "产品描述"
+  ]);
+  const candidates = parsedDatasheet.rows.filter((row) =>
+    acceptedKeys.has(normalizeDatasheetKey(row.key))
+  );
+  if (candidates.length !== 1) {
+    throw new Error(
+      candidates.length
+        ? "Datasheet 中存在多个 Product Description 字段，请只保留一个。"
+        : "Datasheet 中缺少 Product Description 字段。"
+    );
+  }
+  const description = normalize(candidates[0].translations[translationHeader]);
+  if (!description) {
+    throw new Error(`${translationHeader} 的 Product Description 译文为空。`);
+  }
+  return {
+    description,
+    translationHeader,
+    key: candidates[0].key,
+    rowNumber: candidates[0].rowNumber
+  };
+}
+
 function createProductRevisionSyncFeature(deps) {
   const {
     logLine,
@@ -309,6 +348,9 @@ function createProductRevisionSyncFeature(deps) {
     ensureShopLoggedIn,
     credentialDomainForSite,
     openProductEditorByName,
+    productExistsInCurrentSite,
+    findInternationalProduct,
+    copyInternationalProduct,
     languagePackageFeature
   } = deps;
   if (!languagePackageFeature?.downloadCurrentLanguagePackageForPage
@@ -359,18 +401,26 @@ function createProductRevisionSyncFeature(deps) {
       (scope.$root || scope).$applyAsync?.();
       return {
         goodsId: String(scope.goodsId),
-        pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {}))
+        pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {})),
+        basic: JSON.parse(JSON.stringify(scope.vm.basic || {}))
       };
     });
     const detail = readDetailFromPcView(snapshot.pcView);
     if (!detail.specificationsFound) {
       throw new Error(`${productName} 的 Detail 中没有找到 Specifications 字段。`);
     }
-    return { ...snapshot, editUrl: editInfo.editUrl, detail };
+    return {
+      ...snapshot,
+      editUrl: editInfo.editUrl,
+      detail,
+      productDescription: normalize(snapshot.basic?.summary),
+      isSearchable: Boolean(snapshot.basic?.isSearchable),
+      whenType: Number(snapshot.basic?.whenType ?? 0)
+    };
   }
 
-  async function buildSavePayload(page, overview, specifications) {
-    return page.evaluate(({ overview, specifications }) => {
+  async function buildSavePayload(page, overview, specifications, productDescription) {
+    return page.evaluate(({ overview, specifications, productDescription }) => {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
@@ -380,11 +430,12 @@ function createProductRevisionSyncFeature(deps) {
       if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
       scope.vm.pcView.summary = overview;
       field.value = specifications;
+      scope.vm.basic.summary = productDescription;
       (scope.$root || scope).$applyAsync?.();
       const data = scope.md.toModel(scope.vm);
       data.goods_id = scope.goodsId;
       return data;
-    }, { overview, specifications });
+    }, { overview, specifications, productDescription });
   }
 
   async function postProductUpdate(page, payload) {
@@ -422,7 +473,8 @@ function createProductRevisionSyncFeature(deps) {
       productName: request.productName,
       goodsId: snapshot.goodsId,
       overview: snapshot.detail.overview,
-      specifications: snapshot.detail.specifications
+      specifications: snapshot.detail.specifications,
+      productDescription: snapshot.productDescription
     }));
     return {
       session,
@@ -432,10 +484,11 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
-  function buildTargetRevision(parsedWorkbook, target, source) {
+  function buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source) {
     const language = resolveWorkbookLanguage(parsedWorkbook, target);
     const specifications = buildPcSpecificationHtml(language, source.image);
-    return { language, specifications };
+    const productDescription = resolveProductDescription(parsedDatasheet, target);
+    return { language, specifications, productDescription };
   }
 
   function summarizeLanguagePackagePlan(plan) {
@@ -493,6 +546,12 @@ function createProductRevisionSyncFeature(deps) {
         parsedDatasheet,
         translationHeader
       );
+      logLine(
+        logs,
+        `${target.site.name} 使用 Datasheet 译文列“${translationHeader}”：`
+        + `语言包第 3 列字段名匹配 `
+        + `${plan.matchedFieldCount} 个，第 5 列待覆盖 ${plan.changedCellCount} 个。`
+      );
       return { downloaded, packageInfo, plan, translationHeader };
     } catch (error) {
       removeTemporaryFile(downloaded.filePath);
@@ -500,22 +559,51 @@ function createProductRevisionSyncFeature(deps) {
     }
   }
 
-  async function preview(body, excelFile, languageDatasheetFile, logs) {
+  async function preview(body, excelFile, languageDatasheetFile, logs, options = {}) {
+    const publishing = options.publishing === true;
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
     const request = validateRevisionRequest(body, sites);
     const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
     const parsedDatasheet = parseLanguageDatasheet(languageDatasheetFile.path);
     const source = await readSource(request, body, logs);
     const results = [];
+    logLine(logs, `开始批量预览 ${request.targets.length} 个目标站点。`);
 
     for (const target of request.targets) {
       let languagePackage = null;
       try {
-        const desired = buildTargetRevision(parsedWorkbook, target, source);
+        const desired = buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source);
         const session = await prepareSiteSession(target.site, body, logs);
-        const current = await readProductSnapshot(session.page, request.productName, logs);
-        const detailChanged = current.detail.overview !== source.snapshot.detail.overview;
-        const specificationChanged = current.detail.specifications !== desired.specifications;
+        let current = null;
+        let copySource = null;
+        let detailChanged = true;
+        let specificationChanged = true;
+        let descriptionChanged = true;
+        if (publishing) {
+          const existing = await productExistsInCurrentSite(
+            session.page,
+            request.productName,
+            logs
+          );
+          if (existing.exists) {
+            throw new Error("目标站点已经存在该产品；请使用产品修订同步，避免重复复制。");
+          }
+          await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+            waitUntil: "domcontentloaded",
+            timeout: 60000
+          });
+          await session.page.waitForTimeout(1200);
+          copySource = await findInternationalProduct(
+            session.page,
+            request.productName,
+            logs
+          );
+        } else {
+          current = await readProductSnapshot(session.page, request.productName, logs);
+          detailChanged = current.detail.overview !== source.snapshot.detail.overview;
+          specificationChanged = current.detail.specifications !== desired.specifications;
+          descriptionChanged = current.productDescription !== desired.productDescription.description;
+        }
         languagePackage = await prepareLanguagePackage(
           session,
           target,
@@ -528,11 +616,14 @@ function createProductRevisionSyncFeature(deps) {
             status: "failed",
             site: target.site,
             authenticatedIdentity: session.authenticatedIdentity,
-            goodsId: current.goodsId,
-            editUrl: current.editUrl,
+            goodsId: current?.goodsId || "",
+            editUrl: current?.editUrl || "",
+            copyRequired: publishing,
+            copySource,
             localeHeader: desired.language.header,
             detailChanged,
             specificationChanged,
+            descriptionChanged,
             languagePackage: {
               ...languagePackageSummary,
               langCode: languagePackage.downloaded.langCode,
@@ -544,19 +635,25 @@ function createProductRevisionSyncFeature(deps) {
         }
         const languagePackageChanged = languagePackage.plan.changedCellCount > 0;
         results.push({
-          status: detailChanged || specificationChanged || languagePackageChanged
+          status: detailChanged || specificationChanged || descriptionChanged || languagePackageChanged
             ? "ready"
             : "no-change",
           site: target.site,
           authenticatedIdentity: session.authenticatedIdentity,
-          goodsId: current.goodsId,
-          editUrl: current.editUrl,
+          goodsId: current?.goodsId || "",
+          editUrl: current?.editUrl || "",
+          copyRequired: publishing,
+          copySource,
           localeHeader: desired.language.header,
           detailChanged,
           specificationChanged,
-          currentOverviewLength: current.detail.overview.length,
+          descriptionChanged,
+          currentProductDescription: current?.productDescription || "",
+          desiredProductDescription: desired.productDescription.description,
+          productDescriptionHeader: desired.productDescription.translationHeader,
+          currentOverviewLength: current?.detail.overview.length || 0,
           desiredOverviewLength: source.snapshot.detail.overview.length,
-          currentSpecificationLength: current.detail.specifications.length,
+          currentSpecificationLength: current?.detail.specifications.length || 0,
           desiredSpecificationLength: desired.specifications.length,
           languagePackage: {
             ...languagePackageSummary,
@@ -577,7 +674,7 @@ function createProductRevisionSyncFeature(deps) {
     }
 
     return {
-      mode: "product-revision-sync-preview",
+      mode: publishing ? "product-publishing-preview" : "product-revision-sync-preview",
       productName: request.productName,
       source: {
         site: request.sourceSite,
@@ -586,6 +683,7 @@ function createProductRevisionSyncFeature(deps) {
         authenticatedIdentity: source.session.authenticatedIdentity,
         overviewLength: source.snapshot.detail.overview.length,
         specificationLength: source.snapshot.detail.specifications.length,
+        productDescription: source.snapshot.productDescription,
         image: source.image,
         fingerprint: source.fingerprint
       },
@@ -608,7 +706,8 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
-  async function submit(body, excelFile, languageDatasheetFile, logs) {
+  async function submit(body, excelFile, languageDatasheetFile, logs, options = {}) {
+    const publishing = options.publishing === true;
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
     const request = validateRevisionRequest(body, sites);
     const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
@@ -636,21 +735,44 @@ function createProductRevisionSyncFeature(deps) {
     }
 
     const results = [];
+    logLine(logs, `开始批量执行 ${request.targets.length} 个目标站点。`);
     for (const target of request.targets) {
       logLine(logs, `同步目标站点：${target.site.name} (${target.site.siteCode})`);
       let languagePackage = null;
       let generatedPackage = null;
       const components = {
+        copy: publishing ? "pending" : "not-required",
         detail: "pending",
         specification: "pending",
+        description: "pending",
         languagePackage: "pending"
       };
       try {
-        const desired = buildTargetRevision(parsedWorkbook, target, source);
+        const desired = buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source);
         const session = await prepareSiteSession(target.site, body, logs);
+        let copy = null;
+        if (publishing) {
+          const existing = await productExistsInCurrentSite(
+            session.page,
+            request.productName,
+            logs
+          );
+          if (existing.exists) {
+            throw new Error("目标站点已经存在该产品；已阻止重复复制，请改用产品修订同步。");
+          }
+          await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+            waitUntil: "domcontentloaded",
+            timeout: 60000
+          });
+          await session.page.waitForTimeout(1200);
+          copy = await copyInternationalProduct(session.page, request.productName, logs);
+          components.copy = "passed";
+        }
         const before = await readProductSnapshot(session.page, request.productName, logs);
         const detailChanged = before.detail.overview !== source.snapshot.detail.overview;
         const specificationChanged = before.detail.specifications !== desired.specifications;
+        const descriptionChanged = before.productDescription
+          !== desired.productDescription.description;
         languagePackage = await prepareLanguagePackage(
           session,
           target,
@@ -669,9 +791,11 @@ function createProductRevisionSyncFeature(deps) {
         }
         assertSafePlan(languagePackage.plan);
         const languagePackageChanged = languagePackage.plan.changedCellCount > 0;
-        if (!detailChanged && !specificationChanged && !languagePackageChanged) {
+        if (!publishing && !detailChanged && !specificationChanged
+          && !descriptionChanged && !languagePackageChanged) {
           components.detail = "no-change";
           components.specification = "no-change";
+          components.description = "no-change";
           components.languagePackage = "no-change";
           results.push({
             status: "no-change",
@@ -699,36 +823,49 @@ function createProductRevisionSyncFeature(deps) {
             languagePackage.plan,
             outputPath
           );
+          logLine(
+            logs,
+            `${target.site.name} 新语言包已生成并回读通过：第 5 列覆盖 `
+            + `${generatedPackage.verifiedCellCount} 个单元格。`
+          );
         }
 
         let save = null;
         let after = before;
-        if (detailChanged || specificationChanged) {
+        if (detailChanged || specificationChanged || descriptionChanged) {
           await readProductSnapshot(session.page, request.productName, logs);
           const payload = await buildSavePayload(
             session.page,
             source.snapshot.detail.overview,
-            desired.specifications
+            desired.specifications,
+            desired.productDescription.description
           );
           save = await postProductUpdate(session.page, payload);
           after = await readProductSnapshot(session.page, request.productName, logs);
           const detailVerified = after.detail.overview === source.snapshot.detail.overview;
           const specificationVerified = after.detail.specifications === desired.specifications;
+          const descriptionVerified = after.productDescription
+            === desired.productDescription.description;
           components.detail = detailChanged
             ? (detailVerified ? "passed" : "failed")
             : "no-change";
           components.specification = specificationChanged
             ? (specificationVerified ? "passed" : "failed")
             : "no-change";
-          if (!detailVerified || !specificationVerified) {
+          components.description = descriptionChanged
+            ? (descriptionVerified ? "passed" : "failed")
+            : "no-change";
+          if (!detailVerified || !specificationVerified || !descriptionVerified) {
             throw new Error(
               `保存后回读不一致：Detail ${detailVerified ? "通过" : "失败"}，`
-              + `Specification ${specificationVerified ? "通过" : "失败"}。`
+              + `Specification ${specificationVerified ? "通过" : "失败"}，`
+              + `Product Description ${descriptionVerified ? "通过" : "失败"}。`
             );
           }
         } else {
           components.detail = "no-change";
           components.specification = "no-change";
+          components.description = "no-change";
         }
 
         let languagePackageUpload = null;
@@ -768,6 +905,10 @@ function createProductRevisionSyncFeature(deps) {
             removeTemporaryFile(verification.filePath);
           }
           components.languagePackage = "passed";
+          logLine(
+            logs,
+            `${target.site.name} 语言包重新上传并再次下载核验通过。`
+          );
         } else {
           components.languagePackage = "no-change";
         }
@@ -780,7 +921,10 @@ function createProductRevisionSyncFeature(deps) {
           languagePackageHeader: languagePackage.translationHeader,
           detailChanged,
           specificationChanged,
+          descriptionChanged,
+          productDescriptionHeader: desired.productDescription.translationHeader,
           languagePackageChanged,
+          copy,
           save,
           languagePackageUpload,
           languagePackage: summarizeLanguagePackagePlan(languagePackage.plan),
@@ -805,8 +949,14 @@ function createProductRevisionSyncFeature(deps) {
       }
     }
 
+    logLine(
+      logs,
+      `批量执行结束：成功 ${results.filter((result) => result.status === "completed").length}，`
+      + `无需更新 ${results.filter((result) => result.status === "no-change").length}，`
+      + `失败 ${results.filter((result) => result.status === "failed").length}。`
+    );
     return {
-      mode: "product-revision-sync-submit",
+      mode: publishing ? "product-publishing-submit" : "product-revision-sync-submit",
       productName: request.productName,
       sourceSite: request.sourceSite,
       targetCount: results.length,
@@ -817,7 +967,12 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
-  return { preview, submit };
+  const previewPublishing = (body, excelFile, languageDatasheetFile, logs) =>
+    preview(body, excelFile, languageDatasheetFile, logs, { publishing: true });
+  const submitPublishing = (body, excelFile, languageDatasheetFile, logs) =>
+    submit(body, excelFile, languageDatasheetFile, logs, { publishing: true });
+
+  return { preview, submit, previewPublishing, submitPublishing };
 }
 
 module.exports = {
@@ -830,5 +985,6 @@ module.exports = {
   parseTargets,
   validateRevisionRequest,
   readDetailFromPcView,
+  resolveProductDescription,
   createProductRevisionSyncFeature
 };

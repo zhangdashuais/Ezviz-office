@@ -31,6 +31,8 @@ const { registerProductReplacementRoutes } = require("./src/server/routes/produc
 const { createDetailAddressReplacementFeature } = require("./src/server/features/detail-address-replacement");
 const { registerDetailAddressReplacementRoutes } = require("./src/server/routes/detail-address-replacement-routes");
 const { createProductRevisionSyncFeature } = require("./src/server/features/product-revision-sync");
+const { createProductPublishingBatchFeature } = require("./src/server/features/product-publishing-batch");
+const { createProductDelistingFeature } = require("./src/server/features/product-delisting");
 const { registerProductRevisionSyncRoutes } = require("./src/server/routes/product-revision-sync-routes");
 const { createCampaignLinkInspector } = require("./src/server/features/campaign-link-inspector");
 const textComparisonFeature = require("./src/server/features/text-comparison");
@@ -816,7 +818,25 @@ const productRevisionSyncFeature = createProductRevisionSyncFeature({
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
   credentialDomainForSite,
   openProductEditorByName: productManagement.openByName,
+  productExistsInCurrentSite: productManagement.existsInCurrentSite,
+  findInternationalProduct: productManagement.findIntGoodsProduct,
+  copyInternationalProduct: productManagement.copy,
   languagePackageFeature
+});
+
+const productPublishingBatchFeature = createProductPublishingBatchFeature({
+  revisionFeature: productRevisionSyncFeature,
+  logLine
+});
+const productDelistingFeature = createProductDelistingFeature({
+  logLine,
+  readCampaignConfig,
+  getCampaignSites,
+  getShopContext: browserAuth.getShopContext,
+  getOpenPage: browserAuth.getOpenPage,
+  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
+  credentialDomainForSite,
+  openProductEditorByName: productManagement.openByName
 });
 
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
@@ -830,6 +850,8 @@ registerDetailAddressReplacementRoutes(app, {
 registerProductRevisionSyncRoutes(app, {
   upload,
   feature: productRevisionSyncFeature,
+  batchFeature: productPublishingBatchFeature,
+  delistingFeature: productDelistingFeature,
   logLine
 });
 registerTextComparisonRoutes(app, {

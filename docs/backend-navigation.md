@@ -63,6 +63,10 @@ TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife
 
 从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。
 
+本地完整上架流程提供 `POST /api/product-publishing/preview` 和 `POST /api/product-publishing/submit`。执行顺序为：目标站同名产品查重 → 国际站产品复制 → Overview/Specification 同步 → 语言包上传 → 后台回读。预览接口不写入后台。
+
+多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications，并将目标语言的 Product Description 写入 `vm.basic.summary`。产品下架使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，只关闭 `isSearchable` 并把 `whenType` 设为 `0`（No Set Uptime），随后回读验证。
+
 ## 后台会话与产品查询复用
 
 同一站点的连续任务优先复用已验证的商城后台页和账号，不再每次返回 `/templates/index` 或重新读取凭据。产品首次查询仍从 `/goods/index` 严格匹配名称，找到后按“账号 + 产品名”缓存编辑地址。后续回读直接重新加载该地址，依然从后台取得最新数据。

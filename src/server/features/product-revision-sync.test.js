@@ -6,7 +6,8 @@ const {
   parseSpecificationWorkbook,
   resolveWorkbookLanguage,
   buildPcSpecificationHtml,
-  validateRevisionRequest
+  validateRevisionRequest,
+  resolveProductDescription
 } = require("./product-revision-sync");
 
 function workbookBuffer() {
@@ -75,17 +76,21 @@ test("requires explicit target mappings only when auto matching is unavailable",
 test("validates source and target sites for product revision sync", () => {
   const sites = [
     { siteCode: "hq", name: "Global" },
-    { siteCode: "fr", name: "France" }
+    { siteCode: "fr", name: "France" },
+    { siteCode: "de", name: "Germany" }
   ];
   const request = validateRevisionRequest({
     productName: "CP8",
     sourceSiteCode: "hq",
     targetsJson: JSON.stringify([
-      { siteCode: "fr", localeHeader: "11_Français (France-法语)" }
+      { siteCode: "fr", localeHeader: "11_Français (France-法语)" },
+      { siteCode: "de", localeHeader: "3_Deutsch (German-德语)" }
     ])
   }, sites);
   assert.equal(request.productName, "CP8");
+  assert.equal(request.targets.length, 2);
   assert.equal(request.targets[0].site.name, "France");
+  assert.equal(request.targets[1].site.name, "Germany");
   assert.throws(
     () => validateRevisionRequest({
       productName: "CP8",
@@ -94,4 +99,22 @@ test("validates source and target sites for product revision sync", () => {
     }, sites),
     /不能与源站点相同/
   );
+});
+
+test("resolves Product Description from the target Datasheet language", () => {
+  const parsedDatasheet = {
+    headers: ["English", "French"],
+    rows: [{
+      key: "Product Description",
+      source: "Clearer views",
+      rowNumber: 2,
+      translations: { English: "Clearer views", French: "Une vision plus claire" }
+    }]
+  };
+  const result = resolveProductDescription(parsedDatasheet, {
+    siteCode: "fr",
+    languagePackageHeader: "French"
+  });
+  assert.equal(result.description, "Une vision plus claire");
+  assert.equal(result.translationHeader, "French");
 });
