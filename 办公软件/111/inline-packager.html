@@ -14,6 +14,7 @@
       <div class="nav-label">基础工具</div>
       <div class="nav-items-wrapper">
         <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
+        <div class="nav-item" data-target="tab-css-scope">Webflow CSS 作用域</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
       </div>
     </div>
@@ -118,6 +119,29 @@
 
         <div id="status" class="status">等待任务启动...</div>
         <textarea id="output" placeholder="处理后的 HTML 代码预览..."></textarea>
+      </div>
+
+      <div id="tab-css-scope" class="tab-content">
+        <div class="card">
+          <h3>Webflow CSS 作用域处理</h3>
+          <p class="desc">选择 Webflow 导出的项目 CSS，系统会添加页面作用域并返回可直接使用的 CSS 文件。</p>
+
+          <div class="row">
+            <label for="cssScopeFileInput">选择 CSS 文件</label>
+            <input id="cssScopeFileInput" type="file" accept=".css,text/css">
+          </div>
+
+          <div class="row">
+            <label for="cssScopeSelectorInput">页面作用域</label>
+            <input id="cssScopeSelectorInput" type="text" value=".page.page-webflow" style="flex: 1;">
+          </div>
+
+          <div class="row" style="margin-bottom: 0;">
+            <button id="cssScopeRunBtn" type="button" disabled>生成并下载 CSS</button>
+          </div>
+        </div>
+
+        <div id="cssScopeStatus" class="status">请选择一个 Webflow CSS 文件。</div>
       </div>
 
       <div id="tab-pdf-upload" class="tab-content">
@@ -854,6 +878,8 @@
   </div>
 
   <script src="src/ui.js"></script>
+  <script src="src/css-scope.js?v=20260731-1"></script>
+  <script src="src/module-css-scope.js?v=20260731-1"></script>
   <script src="src/module-task-progress.js?v=20260727-1"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-pdf-upload.js"></script>

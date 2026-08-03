@@ -516,7 +516,10 @@
         const baseStyle = "img{\n  width: auto !important;\n}";
         const rawStyleContent = [baseStyle, ...cssBlocks].join("\n\n");
         const cssStats = sanitizeGeneratedCss(rawStyleContent);
-        const styleContent = `.product-content-webflow {\n${cssStats.css}\n}`;
+        if (!window.EzvizCssScope?.scopeCss) {
+          throw new Error("CSS scope module is not loaded.");
+        }
+        const styleContent = window.EzvizCssScope.scopeCss(cssStats.css, ".page.page-webflow");
         const styleTag = `<style>\n${styleContent}\n</style>`;
 
         const webflowScripts = [...inlinedScripts, ...keptRemoteScripts];
