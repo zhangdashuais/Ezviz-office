@@ -70,3 +70,9 @@ TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife
 ## 后台会话与产品查询复用
 
 同一站点的连续任务优先复用已验证的商城后台页和账号，不再每次返回 `/templates/index` 或重新读取凭据。产品首次查询仍从 `/goods/index` 严格匹配名称，找到后按“账号 + 产品名”缓存编辑地址。后续回读直接重新加载该地址，依然从后台取得最新数据。
+
+## 服务中心资料平台
+
+本地入口 `POST /api/ecadmin/run` 支持按选项创建下载资料、访问语言扩展接口、更新产品背景图和生成 SharePoint 归档计划。语言扩展可独立执行：仅提供产品标题并设置 `extendLanguages=1` 即可直接访问扩展接口，不要求本轮创建下载资料或上传文件；若本轮同时创建资料，则请求会自动携带新生成的 `download_id`。
+
+SharePoint 素材归档类目固定为 `02_Security Camera`、`03_Home Sensor & Control`、`04_NVR & Network`、`07_Smart Home`，接口会拒绝其他非空类目值。

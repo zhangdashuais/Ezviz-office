@@ -14,7 +14,6 @@
     translationRoot: "ecTranslationRootInput",
     materialRoot: "ecMaterialRootInput",
     materialCategory: "ecMaterialCategorySelect",
-    materialCategoryCustom: "ecMaterialCategoryCustomInput",
     createDownload: "ecCreateDownloadCheckbox",
     extendLanguages: "ecExtendLanguagesCheckbox",
     updateProductImage: "ecUpdateProductImageCheckbox",
@@ -125,8 +124,9 @@
       return;
     }
 
-    if (!files.length) {
-      setStatus("请先选择产品资料文件夹或文件。", "warn");
+    const needsFiles = el.createDownload.checked || el.updateProductImage.checked || el.sharePoint.checked;
+    if (needsFiles && !files.length) {
+      setStatus("当前勾选的资料创建、图片更新或归档计划需要先选择文件。", "warn");
       return;
     }
 
@@ -160,7 +160,7 @@
     formData.append("sharePoint", el.sharePoint.checked ? "1" : "0");
     formData.append("translationRoot", el.translationRoot.value.trim());
     formData.append("materialRoot", el.materialRoot.value.trim());
-    formData.append("materialCategory", (el.materialCategoryCustom.value.trim() || el.materialCategory.value.trim()));
+    formData.append("materialCategory", el.materialCategory.value.trim());
 
     el.run.disabled = true;
     setStatus("正在执行后台流程，浏览器会自动打开或复用登录态。");

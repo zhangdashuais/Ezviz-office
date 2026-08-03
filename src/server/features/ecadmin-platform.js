@@ -13,6 +13,13 @@ function createEcadminPlatformFeature(deps) {
     SHAREPOINT_DEFAULTS
   } = deps;
 
+  const SHAREPOINT_MATERIAL_CATEGORIES = new Set([
+    "02_Security Camera",
+    "03_Home Sensor & Control",
+    "04_NVR & Network",
+    "07_Smart Home"
+  ]);
+
 async function createDownloadInfo(page, payload, files, logs) {
   const createUrl = "https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportDownloadCenter/SupportDownloadInfo/SupportDownloadInfoCreate";
   await ensureLoggedIn(page, createUrl, payload, logs);
@@ -93,7 +100,9 @@ async function createDownloadInfo(page, payload, files, logs) {
 }
 
 async function triggerLanguageExtend(context, title, downloadId, logs) {
-  const extendUrl = `https://support.ezviz.com/backend/api/ecadmin_support_download_info_extend?download_id=${encodeURIComponent(downloadId)}&language_title=${encodeURIComponent(title)}`;
+  const params = new URLSearchParams({ language_title: title });
+  if (downloadId) params.set("download_id", downloadId);
+  const extendUrl = `https://support.ezviz.com/backend/api/ecadmin_support_download_info_extend?${params.toString()}`;
   logLine(logs, "访问语言扩展接口：" + extendUrl);
   const page = await context.newPage();
   await page.goto(extendUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
@@ -227,6 +236,9 @@ function buildSharePointPlan(payload, files, logs) {
     };
 
     if (!payload.title) throw new Error("产品标题不能为空。");
+    if (payload.materialCategory && !SHAREPOINT_MATERIAL_CATEGORIES.has(payload.materialCategory)) {
+      throw new Error("SharePoint 素材类目不在允许范围内。");
+    }
     if (payload.createDownload && (!files.datasheet || !files.highResImage)) {
       throw new Error("创建下载资料需要 datasheet 和高清图。");
     }
@@ -249,9 +261,6 @@ function buildSharePointPlan(payload, files, logs) {
     }
 
     if (payload.extendLanguages) {
-      if (!result.downloadId) {
-        throw new Error("需要先创建下载资料，才能访问扩展语言接口。");
-      }
       result.extendUrl = await triggerLanguageExtend(context, payload.title, result.downloadId, logs);
     }
 
