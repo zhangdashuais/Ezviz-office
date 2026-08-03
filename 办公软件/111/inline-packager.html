@@ -255,15 +255,18 @@
       <div id="tab-text" class="tab-content">
         <div class="card">
           <h3>文字翻译</h3>
-          <p class="desc">识别 HTML 中的硬编码文字并转换为新的 {{t('...')}} 字段；同时读取 HTML 中已有字段，并根据上传的总语言包列出对应文字。</p>
+          <p class="desc">识别 HTML 中的硬编码文字并转换为新的 {{t('...')}} 字段；产品名称、AES/TLS、数字角标、度数、计量值和标点在单独出现或位于文案末尾时保持原样。同时读取 HTML 中已有字段，并根据上传的总语言包列出对应文字。</p>
 
           <div class="row">
             <label>上传源码</label>
             <input type="file" id="textFileInput" accept=".html">
             <label>产品变量前缀（无需 goods.）</label>
             <input id="langPrefixInput" type="text" value="Alarm_light">
+            <label>产品名称（不转换）</label>
+            <input id="langProductNameInput" type="text" placeholder="例如 H9c Dual">
             <button id="textProcessBtn">解析并提取</button>
-            <button id="textDownloadBtn" disabled>导出 i18n 文件</button>
+            <button id="textDownloadBtn" disabled>下载转换后 HTML</button>
+            <button id="langExcelDownloadBtn" disabled>下载语言包 Excel</button>
           </div>
           <div class="row" style="margin-top: 10px;">
             <label>总语言包表格</label>
@@ -859,7 +862,8 @@
   <script src="src/module-text-comparison.js?v=20260729-2"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
-  <script src="src/module-text.js?v=20260731-2"></script>
+  <script src="src/i18n-conversion-rules.js?v=20260803-1"></script>
+  <script src="src/module-text.js?v=20260803-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
   <script src="src/module-product-replacement.js"></script>

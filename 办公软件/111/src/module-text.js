@@ -5,10 +5,12 @@
   const textFileInput = document.getElementById('textFileInput');
   const textProcessBtn = document.getElementById('textProcessBtn');
   const textDownloadBtn = document.getElementById('textDownloadBtn');
+  const langExcelDownloadBtn = document.getElementById('langExcelDownloadBtn');
   const textOutput = document.getElementById('textOutput');
   const textPreviewFrame = document.getElementById('textPreviewFrame');
   const textStatus = document.getElementById('textStatus');
   const langPrefixInput = document.getElementById('langPrefixInput');
+  const langProductNameInput = document.getElementById('langProductNameInput');
   const convertedTabBtn = document.getElementById('convertedTabBtn');
   const existingTabBtn = document.getElementById('existingTabBtn');
   const langExcelInput = document.getElementById('langExcelInput');
@@ -19,6 +21,7 @@
   const existingValueMap = new Map();
 
   let currentProcessedHtml = '';
+  let generatedLanguageRows = [];
 
   textProcessBtn.addEventListener('click', async () => {
     const file = textFileInput.files[0];
@@ -28,7 +31,10 @@
     }
 
     const prefix = buildProductPrefix(langPrefixInput.value);
+    const productName = langProductNameInput?.value?.trim() || '';
     updateStatus('正在处理中...');
+    generatedLanguageRows = [];
+    if (langExcelDownloadBtn) langExcelDownloadBtn.disabled = true;
 
     const htmlText = await readFileAsText(file);
     const existingKeys = extractExistingI18nKeys(htmlText);
@@ -45,15 +51,8 @@
       
       const text = node.nodeValue.trim();
       if (!text || text.includes('{{t(')) continue;
-      if (/^[\d\s]+$/.test(text)) continue;
-
-      let targetText = text;
-      const endNumMatch = text.match(/^(.*?)(\s*\d+)$/);
-      if (endNumMatch && endNumMatch[1].trim() !== '') {
-        targetText = endNumMatch[1].trim();
-      }
-
-      if (!targetText || /^[\d\s]+$/.test(targetText)) continue;
+      const targetText = window.i18nConversionRules?.extractTranslatableText(text, productName) || '';
+      if (!targetText) continue;
 
       textNodes.push({ node, originalText: targetText });
     }
@@ -68,6 +67,7 @@
     textOutput.value = currentProcessedHtml;
     textPreviewFrame.srcdoc = currentProcessedHtml;
     textDownloadBtn.disabled = false;
+    if (langExcelDownloadBtn) langExcelDownloadBtn.disabled = generatedLanguageRows.length === 0;
     const existingSummary = existingResult.total
       ? `；已有字段 ${existingResult.total} 个，总语言包匹配 ${existingResult.resolved} 个${existingResult.missing ? `，缺失 ${existingResult.missing} 个` : ''}`
       : '；HTML 中没有已有语言字段';
@@ -84,6 +84,24 @@
     a.click();
     URL.revokeObjectURL(url);
   });
+
+  if (langExcelDownloadBtn) {
+    langExcelDownloadBtn.addEventListener('click', () => {
+      if (!generatedLanguageRows.length) return;
+      if (!window.XLSX) {
+        updateStatus('缺少表格生成库，请检查 XLSX 脚本是否加载。', 'warn');
+        return;
+      }
+      const rows = [['字段名', '原文'], ...generatedLanguageRows.map(item => [item.key, item.value])];
+      const sheet = window.XLSX.utils.aoa_to_sheet(rows);
+      sheet['!cols'] = [{ wch: 42 }, { wch: 80 }];
+      const workbook = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(workbook, sheet, '语言包');
+      const prefixName = String(langPrefixInput.value || 'language-package')
+        .trim().replace(/^goods\./i, '').replace(/[\\/:*?"<>|]/g, '-');
+      window.XLSX.writeFile(workbook, `${prefixName || 'language-package'}.语言包.xlsx`);
+    });
+  }
 
   if (langExcelParseBtn) {
     langExcelParseBtn.addEventListener('click', async () => {
@@ -150,6 +168,7 @@
         } while (isReservedLanguageKey(reservedKeys, key));
         textKeyMap.set(normalizedText, key);
         reserveLanguageKey(reservedKeys, key);
+        generatedLanguageRows.push({ key, value: item.originalText });
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
