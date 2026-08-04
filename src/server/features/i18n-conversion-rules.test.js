@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   isNonTranslatableText,
-  extractTranslatableText
+  extractTranslatableText,
+  containsEnglishText,
+  detectLanguageTableLayout
 } = require('../../../办公软件/111/src/i18n-conversion-rules');
 
 test('i18n conversion skips protected standalone values', () => {
@@ -15,6 +17,24 @@ test('i18n conversion skips protected standalone values', () => {
   });
   assert.equal(isNonTranslatableText('H9c Dual', 'H9c Dual'), true);
   assert.equal(isNonTranslatableText('(H9c Dual)', 'H9c Dual'), true);
+});
+
+test('i18n conversion only treats English copy as a new language field', () => {
+  assert.equal(containsEnglishText('Clearer details'), true);
+  assert.equal(containsEnglishText('2.8mm'), false);
+  assert.equal(containsEnglishText('更清晰的画面'), false);
+});
+
+test('total language package detects field and en-US source columns', () => {
+  assert.deepEqual(detectLanguageTableLayout([
+    ['Category', 'Serial number', 'Single word (cannot be modified)', 'en-US(cannot be modified)', 'fr-FR'],
+    ['goods', '1', 'camera_title', 'Smart camera', 'Caméra intelligente']
+  ]), { keyColumn: 2, sourceColumn: 3, firstDataRow: 1, headerRow: 0 });
+  assert.deepEqual(detectLanguageTableLayout([
+    ['字段名', '原文'],
+    ['camera_title', 'Smart camera']
+  ]), { keyColumn: 0, sourceColumn: 1, firstDataRow: 1, headerRow: 0 });
+  assert.throws(() => detectLanguageTableLayout([['A', 'B']]), /没有识别到/);
 });
 
 test('i18n conversion keeps normal copy translatable', () => {

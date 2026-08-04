@@ -74,5 +74,36 @@
     return target.replace(/[\s,，;；:：]+$/u, '').trimEnd();
   }
 
-  return { isNonTranslatableText, extractTranslatableText };
+  function containsEnglishText(value) {
+    return /[A-Za-z]/u.test(String(value || '')) && !isNonTranslatableText(value, '');
+  }
+
+  function detectLanguageTableLayout(rows) {
+    const headerLimit = Math.min(Array.isArray(rows) ? rows.length : 0, 12);
+    for (let rowIndex = 0; rowIndex < headerLimit; rowIndex += 1) {
+      const row = rows[rowIndex] || [];
+      let keyColumn = -1;
+      let sourceColumn = -1;
+      row.forEach((cell, columnIndex) => {
+        const header = normalize(cell).toLowerCase();
+        if (/^(?:key|field)$|single\s*word|field\s*(?:name|key)|i18n\s*key|variable\s*name|变量名|字段名/.test(header)) {
+          keyColumn = columnIndex;
+        }
+        if (/^(?:value|source|original)$|^en-us\b|source\s*(?:text|value)|original\s*(?:text|value)|原文(?:内容)?/.test(header)) {
+          sourceColumn = columnIndex;
+        }
+      });
+      if (keyColumn >= 0 && sourceColumn >= 0) {
+        return { keyColumn, sourceColumn, firstDataRow: rowIndex + 1, headerRow: rowIndex };
+      }
+    }
+    throw new Error('没有识别到字段名列和 en-US 原文列');
+  }
+
+  return {
+    isNonTranslatableText,
+    extractTranslatableText,
+    containsEnglishText,
+    detectLanguageTableLayout
+  };
 });
