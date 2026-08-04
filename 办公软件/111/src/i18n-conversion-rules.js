@@ -52,26 +52,26 @@
     const text = String(value || '').trim();
     if (!text || isNonTranslatableText(text, productName)) return '';
 
-    const withoutEndingPunctuation = text
+    const suffixDetectionText = text
       .replace(/[)\]}'”’.,;:!?，。；：！？]+$/u, '')
       .trimEnd();
-    let target = withoutEndingPunctuation;
+    let target = text;
     const suffixStarts = [];
     const whitespace = /\s+/gu;
     let match;
-    while ((match = whitespace.exec(withoutEndingPunctuation))) {
+    while ((match = whitespace.exec(suffixDetectionText))) {
       suffixStarts.push(match.index + match[0].length);
     }
 
     for (const start of suffixStarts) {
-      const suffix = withoutEndingPunctuation.slice(start);
+      const suffix = suffixDetectionText.slice(start);
       if (isNonTranslatableText(suffix, productName)) {
-        target = withoutEndingPunctuation.slice(0, start).trimEnd();
+        target = suffixDetectionText.slice(0, start).trimEnd();
         break;
       }
     }
 
-    return target.replace(/[\s,，;；:：]+$/u, '').trimEnd();
+    return target;
   }
 
   function containsEnglishText(value) {
@@ -100,10 +100,41 @@
     throw new Error('没有识别到字段名列和 en-US 原文列');
   }
 
+  function buildSourceKeyIndex(entries) {
+    const bySource = new Map();
+    const duplicateSources = new Set();
+    (entries || []).forEach(entry => {
+      const source = normalize(entry?.source);
+      const key = String(entry?.key || '').trim();
+      if (!source || !key) return;
+      if (bySource.has(source) && bySource.get(source).key !== key) {
+        duplicateSources.add(source);
+        bySource.delete(source);
+        return;
+      }
+      if (duplicateSources.has(source)) return;
+      if (!bySource.has(source)) bySource.set(source, { key, source });
+    });
+    return { bySource, duplicateSources };
+  }
+
+  function buildProductPrefix(value) {
+    const short = String(value || '')
+      .trim()
+      .replace(/^goods\./i, '')
+      .replace(/[\s-]+/g, '_')
+      .replace(/[^A-Za-z0-9_.]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^[_.]+|[_.]+$/g, '');
+    return `goods.${short || 'new_product'}_`;
+  }
+
   return {
     isNonTranslatableText,
     extractTranslatableText,
     containsEnglishText,
-    detectLanguageTableLayout
+    detectLanguageTableLayout,
+    buildSourceKeyIndex,
+    buildProductPrefix
   };
 });

@@ -279,18 +279,23 @@
       <div id="tab-text" class="tab-content">
         <div class="card">
           <h3>文字翻译</h3>
-          <p class="desc">先提取 HTML 中包含英文的可见文案，排除单独或末尾出现的数字、单位、产品名称、AES/TLS、数字角标、度数和标点，再生成新语言字段与英文原文；HTML 已有字段则从总语言包的字段名列和 en-US 原文列回查。</p>
+          <p class="desc">先提取 HTML 英文文案并与单产品语言包按原文精确对齐：命中时直接复用原字段，未命中时按设置的产品名称生成新字段。HTML 原有字段再从总语言包回查；数字/单位等受保护尾项保持原样，随文案出现的标点一起转换。</p>
 
           <div class="row">
             <label>上传源码</label>
             <input type="file" id="textFileInput" accept=".html">
-            <label>产品变量前缀（无需 goods.）</label>
+            <label>新字段产品名称（无需 goods.）</label>
             <input id="langPrefixInput" type="text" value="Alarm_light">
-            <label>产品名称（不转换）</label>
+            <label>页面产品名称（不转换，可选）</label>
             <input id="langProductNameInput" type="text" placeholder="例如 H9c Dual">
             <button id="textProcessBtn">解析并提取</button>
             <button id="textDownloadBtn" disabled>下载转换后 HTML</button>
             <button id="langExcelDownloadBtn" disabled>下载字段结果 Excel</button>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <label>单产品语言包</label>
+            <input type="file" id="productLangExcelInput" accept=".xlsx,.xls,.csv">
+            <button id="productLangExcelParseBtn">解析并用于字段对齐</button>
           </div>
           <div class="row" style="margin-top: 10px;">
             <label>总语言包表格</label>
@@ -303,8 +308,22 @@
 
         <div id="tableContainer" style="display:none;" class="card">
           <div class="row" style="gap: 8px; margin-bottom: 12px;">
-            <button id="convertedTabBtn" style="padding: 6px 12px; border: 1px solid var(--border); background: #e2e8f0; border-radius: 6px;">新语言字段</button>
+            <button id="convertedTabBtn" style="padding: 6px 12px; border: 1px solid var(--border); background: #e2e8f0; border-radius: 6px;">新生成字段</button>
+            <button id="alignedTabBtn" style="padding: 6px 12px; border: 1px solid var(--border); background: #fff; border-radius: 6px;">产品包复用字段</button>
             <button id="existingTabBtn" style="padding: 6px 12px; border: 1px solid var(--border); background: #fff; border-radius: 6px;">已有字段原文</button>
+          </div>
+
+          <div id="alignedTablePanel" style="display:none;">
+            <p class="desc" style="margin-top: 0;">以下英文原文已与单产品语言包精确匹配，转换后的 HTML 直接复用对应字段。</p>
+            <table id="alignedLangTable" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead style="background: #f8fafc; text-align: left;">
+                <tr>
+                  <th style="padding: 12px; border-bottom: 2px solid var(--border);">复用的完整语言包字段</th>
+                  <th style="padding: 12px; border-bottom: 2px solid var(--border);">单产品语言包英文原文</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
 
           <div id="convertedTablePanel">
@@ -888,8 +907,8 @@
   <script src="src/module-text-comparison.js?v=20260729-2"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
-  <script src="src/i18n-conversion-rules.js?v=20260804-1"></script>
-  <script src="src/module-text.js?v=20260804-1"></script>
+  <script src="src/i18n-conversion-rules.js?v=20260804-3"></script>
+  <script src="src/module-text.js?v=20260804-3"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
   <script src="src/module-product-replacement.js"></script>

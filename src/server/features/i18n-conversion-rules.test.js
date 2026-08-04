@@ -4,7 +4,9 @@ const {
   isNonTranslatableText,
   extractTranslatableText,
   containsEnglishText,
-  detectLanguageTableLayout
+  detectLanguageTableLayout,
+  buildSourceKeyIndex,
+  buildProductPrefix
 } = require('../../../办公软件/111/src/i18n-conversion-rules');
 
 test('i18n conversion skips protected standalone values', () => {
@@ -37,21 +39,39 @@ test('total language package detects field and en-US source columns', () => {
   assert.throws(() => detectLanguageTableLayout([['A', 'B']]), /没有识别到/);
 });
 
+test('product language package only indexes source text with one corresponding key', () => {
+  const index = buildSourceKeyIndex([
+    { key: 'goods.h9c_1', source: 'Clear image.' },
+    { key: 'goods.h9c_2', source: 'Fast alerts' },
+    { key: 'goods.other_1', source: ' Clear   image. ' }
+  ]);
+  assert.equal(index.bySource.has('Clear image.'), false);
+  assert.equal(index.bySource.get('Fast alerts').key, 'goods.h9c_2');
+  assert.equal(index.duplicateSources.has('Clear image.'), true);
+});
+
+test('unmatched copy uses the configured product name as a safe key prefix', () => {
+  assert.equal(buildProductPrefix('H9c Dual'), 'goods.H9c_Dual_');
+  assert.equal(buildProductPrefix('goods.Alarm-light'), 'goods.Alarm_light_');
+});
+
 test('i18n conversion keeps normal copy translatable', () => {
   assert.equal(isNonTranslatableText('Supports AES encryption', 'H9c Dual'), false);
   assert.equal(isNonTranslatableText('See everything in sharp detail.', 'H9c Dual'), false);
   assert.equal(isNonTranslatableText('2.8mm fixed lens', 'H9c Dual'), false);
+  assert.equal(extractTranslatableText('See everything clearly.', 'H9c Dual'), 'See everything clearly.');
+  assert.equal(extractTranslatableText('Ready!', 'H9c Dual'), 'Ready!');
 });
 
 test('i18n conversion leaves protected final words outside the language field', () => {
   const cases = new Map([
     ['Focal Length 2.8mm', 'Focal Length'],
-    ['Minimum distance: 2 mm.', 'Minimum distance'],
+    ['Minimum distance: 2 mm.', 'Minimum distance:'],
     ['Encryption AES', 'Encryption'],
     ['Protocol TLS 1.3', 'Protocol'],
     ['Operating temperature -20 °C', 'Operating temperature'],
     ['Meet H9c Dual.', 'Meet'],
-    ['High-definition image.', 'High-definition image']
+    ['High-definition image.', 'High-definition image.']
   ]);
   cases.forEach((expected, input) => {
     assert.equal(extractTranslatableText(input, 'H9c Dual'), expected, input);
