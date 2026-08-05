@@ -1,3 +1,13 @@
+function normalizeShopAccountText(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function shopAccountLooksCompatible(accountText, expectedAccount) {
+  const normalizedExpected = normalizeShopAccountText(expectedAccount);
+  if (!normalizedExpected) return false;
+  return normalizeShopAccountText(accountText).includes(normalizedExpected);
+}
+
 function createBrowserAuth(deps) {
   const { chromium, PROFILE_DIR, SHOP_PROFILE_DIR, SHOP_DASHBOARD_URL, SHOP_LOGIN_URL,
     SHOP_LOGOUT_URL, shopCredentials, logLine, normalizeBool } = deps;
@@ -176,14 +186,6 @@ function createBrowserAuth(deps) {
     return true;
   }
 
-  function expectedShopAccountToken(payload) {
-    const domain = String(payload?.credentialDomain || "").toLowerCase();
-    if (!domain || domain === "www.ezviz.com") return "";
-    const pathPart = domain.split("/").filter(Boolean).pop() || "";
-    if (!pathPart || pathPart === "inter") return "";
-    return pathPart.replace(/[^a-z0-9]/g, "");
-  }
-
   async function currentShopBackendAccount(page) {
     let currentIsBackend = false;
     try { currentIsBackend = new URL(page.url()).hostname === "shop.ezvizlife.com"; } catch {}
@@ -202,13 +204,6 @@ function createBrowserAuth(deps) {
     return accountText.replace(/\s+/g, " ").trim();
   }
 
-  function shopAccountLooksCompatible(accountText, payload) {
-    const expectedToken = expectedShopAccountToken(payload);
-    if (!expectedToken) return true;
-    const normalized = String(accountText || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    return normalized.includes(expectedToken);
-  }
-
   async function ensureShopLoggedIn(page, payload, logs) {
     async function isShopLoginPage() {
       const currentUrl = page.url();
@@ -224,15 +219,6 @@ function createBrowserAuth(deps) {
       }
     }
 
-    const currentAccount = normalizeBool(payload.forceShopRelogin) ? null : await currentShopBackendAccount(page);
-    if (currentAccount && shopAccountLooksCompatible(currentAccount, payload)) {
-      logLine(logs, "检测到商城后台已登录，复用当前账号：" + currentAccount);
-      return page;
-    }
-    if (currentAccount) {
-      logLine(logs, "当前后台账号与目标站点不匹配，需要切换账号。当前账号：" + currentAccount);
-    }
-
     let username = payload.shopUsername || payload.username || process.env.EZVIZ_SHOP_USER;
     let password = payload.shopPassword || payload.password || process.env.EZVIZ_SHOP_PASSWORD;
     if ((!username || !password) && payload.credentialDomain) {
@@ -241,12 +227,24 @@ function createBrowserAuth(deps) {
       password = credential.password;
       logLine(logs, "已从网站账号密码表读取目标站点账号：" + payload.credentialDomain);
     }
+
+    const currentAccount = normalizeBool(payload.forceShopRelogin)
+      ? null
+      : await currentShopBackendAccount(page);
+    if (currentAccount && shopAccountLooksCompatible(currentAccount, username)) {
+      logLine(logs, "检测到商城后台已登录，复用当前账号：" + currentAccount);
+      return page;
+    }
+    if (currentAccount) {
+      logLine(logs, "当前后台账号与目标站点不匹配，需要切换账号。当前账号：" + currentAccount);
+    }
+
     if (!username || !password) {
       logLine(logs, "商城后台需要登录，但没有找到账号密码。");
       throw new Error("商城后台未登录，且未找到可用账号密码。");
     }
 
-    if (!currentAccount || !shopAccountLooksCompatible(currentAccount, payload)) {
+    if (!currentAccount || !shopAccountLooksCompatible(currentAccount, username)) {
       const didUiLogout = await logoutShopByUi(page, logs);
       if (!didUiLogout) {
         logLine(logs, "改用退出地址兜底清理登录态。");
@@ -338,6 +336,15 @@ function createBrowserAuth(deps) {
       throw new Error("商城后台跳转到了非后台页面：" + backendPage.url());
     }
 
+    const authenticatedAccount = await currentShopBackendAccount(backendPage);
+    if (!shopAccountLooksCompatible(authenticatedAccount, username)) {
+      throw new Error(
+        "商城后台登录账号与目标站点账号不一致。目标凭据："
+        + (payload.credentialDomain || "页面输入账号")
+        + "；当前账号：" + (authenticatedAccount || "未识别")
+      );
+    }
+
     logLine(logs, "已进入商城后台首页：" + backendPage.url());
     if (page !== backendPage && !page.isClosed()) await page.close().catch(() => {});
     return backendPage;
@@ -350,4 +357,8 @@ function createBrowserAuth(deps) {
   };
 }
 
-module.exports = { createBrowserAuth };
+module.exports = {
+  normalizeShopAccountText,
+  shopAccountLooksCompatible,
+  createBrowserAuth
+};
