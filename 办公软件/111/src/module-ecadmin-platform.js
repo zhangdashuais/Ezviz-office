@@ -180,7 +180,10 @@
 
       if (payload.result) {
         appendLog("下载资料 ID：" + (payload.result.downloadId || "无"));
-        appendLog("扩展地址：" + (payload.result.extendUrl || "无"));
+        if (payload.result.languageCompletion) {
+          appendLog("补全多语言：新增 " + payload.result.languageCompletion.count + " 条记录");
+          appendLog("程序下载管理：" + payload.result.languageCompletion.listUrl);
+        }
         appendLog("产品背景图：" + (payload.result.productImageUrl || "无"));
         if (payload.result.sharePointPlan) {
           appendLog("SharePoint 归档清单：\n" + JSON.stringify(payload.result.sharePointPlan, null, 2));

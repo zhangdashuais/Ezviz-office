@@ -283,6 +283,13 @@ function createProductManagement({ logLine, normalizeBool }) {
   async function findIntGoodsProduct(page, productName, logs) {
     const normalized = String(productName || "").trim();
     if (!normalized) throw new Error("Product name is required.");
+    const primaryDiagnosticToken = normalized.split(/\s+/)[0].toLowerCase();
+    const baseDiagnosticToken = /\d[a-z]+$/i.test(primaryDiagnosticToken)
+      ? primaryDiagnosticToken.replace(/[a-z]+$/i, "")
+      : primaryDiagnosticToken;
+    const diagnosticTokens = [...new Set([primaryDiagnosticToken, baseDiagnosticToken])]
+      .filter((token) => token.length >= 3);
+    const nearMatches = [];
     const categorySelect = page.locator("select.form-control").nth(1);
     if (!(await categorySelect.count())) throw new Error("Product category selector was not found.");
     const options = await categorySelect.locator("option").evaluateAll((items) => items.map((option) => ({
@@ -294,6 +301,14 @@ function createProductManagement({ logLine, normalizeBool }) {
     for (const category of categories) {
       await categorySelect.selectOption(category.value);
       await page.waitForTimeout(900);
+      const categoryTitles = await page.locator(".pro-list-ul li.pro-list-li p.pro-list-title")
+        .allInnerTexts().catch(() => []);
+      categoryTitles.forEach((title) => {
+        const cleaned = String(title || "").trim();
+        if (cleaned && diagnosticTokens.some((token) => cleaned.toLowerCase().includes(token))) {
+          nearMatches.push(`${category.text}: ${cleaned}`);
+        }
+      });
       const matches = page.locator(".pro-list-ul li.pro-list-li").filter({
         has: page.locator("p.pro-list-title", { hasText: normalized })
       });
@@ -319,6 +334,9 @@ function createProductManagement({ logLine, normalizeBool }) {
     }
     throw new Error(
       `Product not found after checking ${categories.length} categories: ${normalized}`
+      + (nearMatches.length
+        ? `; similar products: ${[...new Set(nearMatches)].slice(0, 20).join(" | ")}`
+        : "")
     );
   }
 

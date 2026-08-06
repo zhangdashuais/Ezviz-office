@@ -138,7 +138,7 @@
     invalidatePreview();
     const sourceCode = sourceSiteSelect.value;
     const targetSites = sites.filter((site) =>
-      site.enabled !== false && (isDelisting() || site.siteCode !== sourceCode));
+      site.enabled !== false && (isDelisting() || isBatchPublishing() || site.siteCode !== sourceCode));
     if (!isDelisting() && (!specificationHeaders.length || !languagePackageHeaders.length)) {
       targetsElement.textContent = "上传 Specification Excel 和语言包 Datasheet 后显示站点与语言列。";
       updateSelectedCount();
@@ -463,12 +463,16 @@
     const lines = [
       publishing ? "产品上架预览（尚未复制或保存）" : "产品修订同步预览（尚未保存）",
       `产品：${result.productName}`,
-      `源站点：${result.source.site.name} (${result.source.site.siteCode})`,
-      `源站 Goods ID：${result.source.goodsId}`,
-      `源 Detail：${result.source.overviewLength} 字符`,
-      `源 Specification：${result.source.specificationLength} 字符`,
-      `自动继承图片：${result.source.image.src}`,
-      `图片 alt：${result.source.image.alt || "（空）"}`,
+      ...(publishing ? [
+        "复制源：逐目标站从本站国际产品列表读取，不登录国际站账号"
+      ] : [
+        `源站点：${result.source.site.name} (${result.source.site.siteCode})`,
+        `源站 Goods ID：${result.source.goodsId}`,
+        `源 Detail：${result.source.overviewLength} 字符`,
+        `源 Specification：${result.source.specificationLength} 字符`,
+        `自动继承图片：${result.source.image.src}`,
+        `图片 alt：${result.source.image.alt || "（空）"}`
+      ]),
       `Excel 工作表：${result.workbook.sheetName}`,
       `语言包 Datasheet：${result.languageDatasheet.sheetName}，`
         + `${result.languageDatasheet.fieldCount} 个字段`,
@@ -498,6 +502,11 @@
         lines.push(
           `- 待上架 | ${item.site.name} (${item.site.siteCode}) | `
           + `国际站类目 ${item.copySource.category.text} | Goods ID ${item.copySource.goodsId}`
+        );
+        lines.push(
+          `  · 复制源 Detail：${item.copySource.overviewLength} 字符；`
+          + `Specification：${item.copySource.specificationLength} 字符；`
+          + `图片：${item.copySource.image?.src || "无图"}`
         );
       }
       lines.push(
@@ -678,8 +687,8 @@
     languageDatasheetInput.hidden = batch || delist;
     delistLabel.hidden = !delist;
     delistProductsInput.hidden = !delist;
-    sourceSiteLabel.hidden = delist;
-    sourceSiteSelect.hidden = delist;
+    sourceSiteLabel.hidden = delist || batch;
+    sourceSiteSelect.hidden = delist || batch;
     languageHelp.hidden = delist;
     targetsHeading.textContent = delist ? "下架目标站点" : "目标站点与两份 Excel 的语言列";
     targetsHelp.textContent = delist
@@ -798,6 +807,11 @@
       } else {
         extra = {
           expectedSourceFingerprint: validatedPreview?.source?.fingerprint || "",
+          expectedCopySourceFingerprints: JSON.stringify(Object.fromEntries(
+            (validatedPreview?.results || [])
+              .filter((item) => item.copySource?.sourceFingerprint)
+              .map((item) => [item.site.siteCode, item.copySource.sourceFingerprint])
+          )),
           expectedWorkbookFingerprint: validatedPreview?.workbook?.fingerprint || "",
           expectedLanguageDatasheetFingerprint:
             validatedPreview?.languageDatasheet?.fingerprint || "",

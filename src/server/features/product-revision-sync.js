@@ -90,13 +90,23 @@ function extractSpecificationImage(html) {
   if (!tags.length) {
     throw new Error("国际站 Specification 中没有找到图片，无法自动继承图片地址和 alt。");
   }
+  const imageAddress = (tag) => {
+    const srcset = readTagAttribute(tag, "srcset").trim();
+    return ["src", "data-src", "data-original", "data-lazy-src"]
+      .map((attribute) => readTagAttribute(tag, attribute).trim())
+      .find(Boolean)
+      || normalize(srcset.split(",")[0]?.trim().split(/\s+/)[0]);
+  };
   const preferred = tags.find((tag) =>
     /(?:^|\s)pro-img__src(?:\s|$)/i.test(readTagAttribute(tag, "class"))
+    && imageAddress(tag)
+  ) || tags.find((tag) => imageAddress(tag)) || tags.find((tag) =>
+    /(?:^|\s)pro-img__src(?:\s|$)/i.test(readTagAttribute(tag, "class"))
   ) || tags[0];
-  const src = readTagAttribute(preferred, "src").trim();
+  const src = imageAddress(preferred);
   const alt = readTagAttribute(preferred, "alt");
   if (!src) {
-    throw new Error("国际站 Specification 图片缺少 src，无法生成目标站点代码。");
+    return { src: "", alt, emptyPlaceholder: true };
   }
   return { src, alt };
 }
@@ -225,12 +235,15 @@ function buildPcSpecificationHtml(language, image) {
     })
     .join("\n");
 
+  const imageMarkup = image?.src ? [
+    '    <div class="pro-img">',
+    `      <img class="pro-img__src" src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}">`,
+    "    </div>"
+  ] : [];
   return [
     '<div class="pc-content">',
     '  <div class="p960">',
-    '    <div class="pro-img">',
-    `      <img class="pro-img__src" src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}">`,
-    "    </div>",
+    ...imageMarkup,
     `    <div class="pro-title">${escapeHtml(language.title || "Specifications")}</div>`,
     '    <table class="pro_infobox">',
     "      <tbody>",
@@ -267,18 +280,21 @@ function parseTargets(value) {
   });
 }
 
-function validateRevisionRequest(body, allSites) {
+function validateRevisionRequest(body, allSites, options = {}) {
   const productName = normalize(body?.productName);
-  const sourceSiteCode = normalize(body?.sourceSiteCode || "hq").toLowerCase();
+  const ignoreSourceSite = options.ignoreSourceSite === true;
+  const sourceSiteCode = ignoreSourceSite
+    ? ""
+    : normalize(body?.sourceSiteCode || "hq").toLowerCase();
   const targets = parseTargets(body?.targetsJson ?? body?.targets ?? body?.targetSites);
   if (!productName) throw new Error("请填写产品名称。");
   if (!targets.length) throw new Error("请至少选择一个目标站点。");
   if (targets.length > 50) throw new Error("一次最多同步 50 个目标站点。");
   const byCode = new Map(allSites.map((site) => [site.siteCode, site]));
-  const sourceSite = byCode.get(sourceSiteCode);
-  if (!sourceSite) throw new Error(`没有找到源站点：${sourceSiteCode}。`);
+  const sourceSite = ignoreSourceSite ? null : byCode.get(sourceSiteCode);
+  if (!ignoreSourceSite && !sourceSite) throw new Error(`没有找到源站点：${sourceSiteCode}。`);
   const resolvedTargets = targets.map((target) => {
-    if (target.siteCode === sourceSiteCode) {
+    if (!ignoreSourceSite && target.siteCode === sourceSiteCode) {
       throw new Error("目标站点不能与源站点相同。");
     }
     const site = byCode.get(target.siteCode);
@@ -289,13 +305,17 @@ function validateRevisionRequest(body, allSites) {
 }
 
 function readDetailFromPcView(pcView) {
-  const specificationsField = (pcView?.customs || []).find(
+  const customFields = pcView?.customs || [];
+  const specificationsField = customFields.find(
     (field) => normalizeDetailFieldName(field?.name) === "specifications"
+  ) || customFields.find(
+    (field) => normalizeDetailFieldName(field?.name) === "specification"
   );
   return {
     overview: String(pcView?.summary || ""),
     specifications: String(specificationsField?.value || ""),
-    specificationsFound: Boolean(specificationsField)
+    specificationsFound: Boolean(specificationsField),
+    specificationsFieldName: String(specificationsField?.name || "")
   };
 }
 
@@ -303,7 +323,7 @@ function normalizeDatasheetKey(value) {
   return normalize(value).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
 }
 
-function resolveProductDescription(parsedDatasheet, target) {
+function resolveProductDescription(parsedDatasheet, target, options = {}) {
   const translationHeader = resolveDatasheetLanguage(
     parsedDatasheet,
     target,
@@ -319,6 +339,15 @@ function resolveProductDescription(parsedDatasheet, target) {
   const candidates = parsedDatasheet.rows.filter((row) =>
     acceptedKeys.has(normalizeDatasheetKey(row.key))
   );
+  if (!candidates.length && Object.prototype.hasOwnProperty.call(options, "fallbackDescription")) {
+    return {
+      description: normalize(options.fallbackDescription),
+      translationHeader: "国际产品复制源",
+      key: "",
+      rowNumber: 0,
+      inherited: true
+    };
+  }
   if (candidates.length !== 1) {
     throw new Error(
       candidates.length
@@ -369,7 +398,8 @@ function createProductRevisionSyncFeature(deps) {
       credentialGroup: "Website"
     }, logs);
     const authenticatedIdentity = await page.evaluate(() =>
-      document.querySelector(".clearfix.login-bar")?.innerText
+      document.querySelector("#username > a")?.textContent
+      || document.querySelector(".clearfix.login-bar")?.innerText
       || document.querySelector(".login-bar")?.innerText
       || ""
     ).catch(() => "");
@@ -383,8 +413,7 @@ function createProductRevisionSyncFeature(deps) {
     return { page, authenticatedIdentity: authenticatedIdentity.replace(/\s+/g, " ").trim() };
   }
 
-  async function readProductSnapshot(page, productName, logs) {
-    const editInfo = await openProductEditorByName(page, productName, logs);
+  async function readCurrentProductSnapshot(page, productName, logs, editInfo) {
     await page.waitForFunction(() => {
       const element = document.querySelector("#replenish");
       const scope = window.angular && element ? window.angular.element(element).scope() : null;
@@ -407,7 +436,13 @@ function createProductRevisionSyncFeature(deps) {
     });
     const detail = readDetailFromPcView(snapshot.pcView);
     if (!detail.specificationsFound) {
-      throw new Error(`${productName} 的 Detail 中没有找到 Specifications 字段。`);
+      const availableFields = (snapshot.pcView?.customs || [])
+        .map((field) => normalize(field?.name))
+        .filter(Boolean);
+      throw new Error(
+        `${productName} 的 Detail 中没有找到 Specifications 字段。`
+        + (availableFields.length ? `当前自定义字段：${availableFields.join("、")}。` : "当前没有自定义字段。")
+      );
     }
     return {
       ...snapshot,
@@ -419,15 +454,47 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
+  async function readProductSnapshot(page, productName, logs) {
+    const editInfo = await openProductEditorByName(page, productName, logs);
+    return readCurrentProductSnapshot(page, productName, logs, editInfo);
+  }
+
+  async function readInternationalSourceSnapshot(page, productName, copySource, logs) {
+    const editUrl = `https://shop.ezvizlife.com/goods/add?id=${encodeURIComponent(copySource.goodsId)}`;
+    await page.goto(editUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForTimeout(1200);
+    const snapshot = await readCurrentProductSnapshot(page, productName, logs, {
+      editUrl,
+      productName,
+      internationalSource: true
+    });
+    const image = extractSpecificationImage(snapshot.detail.specifications);
+    if (!image.src) {
+      logLine(logs, "目标站国际产品的 Specification 只有空图片占位，目标规格将保持无图片状态。");
+    }
+    const fingerprint = hashValue(JSON.stringify({
+      productName,
+      goodsId: snapshot.goodsId,
+      overview: snapshot.detail.overview,
+      specifications: snapshot.detail.specifications,
+      productDescription: snapshot.productDescription
+    }));
+    logLine(logs, `已从当前目标站国际产品读取复制源 Detail：${productName} / goods_id=${snapshot.goodsId}`);
+    return { snapshot, image, fingerprint };
+  }
+
   async function buildSavePayload(page, overview, specifications, productDescription) {
     return page.evaluate(({ overview, specifications, productDescription }) => {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
-      const field = (scope.vm.pcView?.customs || []).find(
+      const customFields = scope.vm.pcView?.customs || [];
+      const field = customFields.find(
         (item) => normalizeField(item?.name) === "specifications"
+      ) || customFields.find(
+        (item) => normalizeField(item?.name) === "specification"
       );
-      if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
+      if (!field) throw new Error("Detail 中没有找到 Specification/Specifications 字段。");
       scope.vm.pcView.summary = overview;
       field.value = specifications;
       scope.vm.basic.summary = productDescription;
@@ -469,6 +536,9 @@ function createProductRevisionSyncFeature(deps) {
     const session = await prepareSiteSession(request.sourceSite, body, logs);
     const snapshot = await readProductSnapshot(session.page, request.productName, logs);
     const image = extractSpecificationImage(snapshot.detail.specifications);
+    if (!image.src) {
+      logLine(logs, "国际站 Specification 只有空图片占位，目标规格将保持无图片状态。");
+    }
     const fingerprint = hashValue(JSON.stringify({
       productName: request.productName,
       goodsId: snapshot.goodsId,
@@ -484,10 +554,13 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
-  function buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source) {
+  function buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source, options = {}) {
     const language = resolveWorkbookLanguage(parsedWorkbook, target);
     const specifications = buildPcSpecificationHtml(language, source.image);
-    const productDescription = resolveProductDescription(parsedDatasheet, target);
+    const productDescription = resolveProductDescription(parsedDatasheet, target,
+      options.allowSourceDescriptionFallback
+        ? { fallbackDescription: source.snapshot.productDescription }
+        : {});
     return { language, specifications, productDescription };
   }
 
@@ -522,6 +595,8 @@ function createProductRevisionSyncFeature(deps) {
       throw new Error("语言包预览指纹格式不正确，请重新预览。");
     }
   }
+
+  const parseExpectedCopySourceFingerprints = parseExpectedLanguagePackageFingerprints;
 
   async function prepareLanguagePackage(
     session,
@@ -562,18 +637,18 @@ function createProductRevisionSyncFeature(deps) {
   async function preview(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
-    const request = validateRevisionRequest(body, sites);
+    const request = validateRevisionRequest(body, sites, { ignoreSourceSite: publishing });
     const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
     const parsedDatasheet = parseLanguageDatasheet(languageDatasheetFile.path);
-    const source = await readSource(request, body, logs);
+    const source = publishing ? null : await readSource(request, body, logs);
     const results = [];
     logLine(logs, `开始批量预览 ${request.targets.length} 个目标站点。`);
 
     for (const target of request.targets) {
       let languagePackage = null;
       try {
-        const desired = buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source);
         const session = await prepareSiteSession(target.site, body, logs);
+        let targetSource = source;
         let current = null;
         let copySource = null;
         let detailChanged = true;
@@ -598,8 +673,34 @@ function createProductRevisionSyncFeature(deps) {
             request.productName,
             logs
           );
+          targetSource = await readInternationalSourceSnapshot(
+            session.page,
+            request.productName,
+            copySource,
+            logs
+          );
+          copySource = {
+            ...copySource,
+            sourceFingerprint: targetSource.fingerprint,
+            overviewLength: targetSource.snapshot.detail.overview.length,
+            specificationLength: targetSource.snapshot.detail.specifications.length,
+            image: targetSource.image
+          };
         } else {
           current = await readProductSnapshot(session.page, request.productName, logs);
+        }
+        const desired = buildTargetRevision(
+          parsedWorkbook,
+          parsedDatasheet,
+          target,
+          targetSource,
+          { allowSourceDescriptionFallback: publishing }
+        );
+        if (publishing) {
+          detailChanged = false;
+          specificationChanged = targetSource.snapshot.detail.specifications !== desired.specifications;
+          descriptionChanged = !desired.productDescription.inherited;
+        } else {
           detailChanged = current.detail.overview !== source.snapshot.detail.overview;
           specificationChanged = current.detail.specifications !== desired.specifications;
           descriptionChanged = current.productDescription !== desired.productDescription.description;
@@ -652,7 +753,7 @@ function createProductRevisionSyncFeature(deps) {
           desiredProductDescription: desired.productDescription.description,
           productDescriptionHeader: desired.productDescription.translationHeader,
           currentOverviewLength: current?.detail.overview.length || 0,
-          desiredOverviewLength: source.snapshot.detail.overview.length,
+          desiredOverviewLength: targetSource.snapshot.detail.overview.length,
           currentSpecificationLength: current?.detail.specifications.length || 0,
           desiredSpecificationLength: desired.specifications.length,
           languagePackage: {
@@ -676,7 +777,7 @@ function createProductRevisionSyncFeature(deps) {
     return {
       mode: publishing ? "product-publishing-preview" : "product-revision-sync-preview",
       productName: request.productName,
-      source: {
+      source: publishing ? null : {
         site: request.sourceSite,
         goodsId: source.snapshot.goodsId,
         editUrl: source.snapshot.editUrl,
@@ -709,7 +810,7 @@ function createProductRevisionSyncFeature(deps) {
   async function submit(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
-    const request = validateRevisionRequest(body, sites);
+    const request = validateRevisionRequest(body, sites, { ignoreSourceSite: publishing });
     const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
     const parsedDatasheet = parseLanguageDatasheet(languageDatasheetFile.path);
     const expectedWorkbookFingerprint = normalize(body?.expectedWorkbookFingerprint);
@@ -728,11 +829,16 @@ function createProductRevisionSyncFeature(deps) {
       parseExpectedLanguagePackageFingerprints(
         body?.expectedLanguagePackageFingerprints
       );
-    const source = await readSource(request, body, logs);
-    const expectedSourceFingerprint = normalize(body?.expectedSourceFingerprint);
-    if (!expectedSourceFingerprint || expectedSourceFingerprint !== source.fingerprint) {
-      throw new Error("国际站产品 Detail 在预览后发生变化，请重新预览。");
+    const source = publishing ? null : await readSource(request, body, logs);
+    if (!publishing) {
+      const expectedSourceFingerprint = normalize(body?.expectedSourceFingerprint);
+      if (!expectedSourceFingerprint || expectedSourceFingerprint !== source.fingerprint) {
+        throw new Error("国际站产品 Detail 在预览后发生变化，请重新预览。");
+      }
     }
+    const expectedCopySourceFingerprints = parseExpectedCopySourceFingerprints(
+      body?.expectedCopySourceFingerprints
+    );
 
     const results = [];
     logLine(logs, `开始批量执行 ${request.targets.length} 个目标站点。`);
@@ -748,8 +854,8 @@ function createProductRevisionSyncFeature(deps) {
         languagePackage: "pending"
       };
       try {
-        const desired = buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source);
         const session = await prepareSiteSession(target.site, body, logs);
+        let targetSource = source;
         let copy = null;
         if (publishing) {
           const existing = await productExistsInCurrentSite(
@@ -765,11 +871,43 @@ function createProductRevisionSyncFeature(deps) {
             timeout: 60000
           });
           await session.page.waitForTimeout(1200);
+          const copySource = await findInternationalProduct(
+            session.page,
+            request.productName,
+            logs
+          );
+          targetSource = await readInternationalSourceSnapshot(
+            session.page,
+            request.productName,
+            copySource,
+            logs
+          );
+          const expectedCopySourceFingerprint = normalize(
+            expectedCopySourceFingerprints[target.site.siteCode]
+          );
+          if (!expectedCopySourceFingerprint
+            || expectedCopySourceFingerprint !== targetSource.fingerprint) {
+            throw new Error(
+              `${target.site.name} 国际产品复制源在预览后发生变化，请重新预览。`
+            );
+          }
+          await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+            waitUntil: "domcontentloaded",
+            timeout: 60000
+          });
+          await session.page.waitForTimeout(1200);
           copy = await copyInternationalProduct(session.page, request.productName, logs);
           components.copy = "passed";
         }
+        const desired = buildTargetRevision(
+          parsedWorkbook,
+          parsedDatasheet,
+          target,
+          targetSource,
+          { allowSourceDescriptionFallback: publishing }
+        );
         const before = await readProductSnapshot(session.page, request.productName, logs);
-        const detailChanged = before.detail.overview !== source.snapshot.detail.overview;
+        const detailChanged = before.detail.overview !== targetSource.snapshot.detail.overview;
         const specificationChanged = before.detail.specifications !== desired.specifications;
         const descriptionChanged = before.productDescription
           !== desired.productDescription.description;
@@ -836,13 +974,13 @@ function createProductRevisionSyncFeature(deps) {
           await readProductSnapshot(session.page, request.productName, logs);
           const payload = await buildSavePayload(
             session.page,
-            source.snapshot.detail.overview,
+            targetSource.snapshot.detail.overview,
             desired.specifications,
             desired.productDescription.description
           );
           save = await postProductUpdate(session.page, payload);
           after = await readProductSnapshot(session.page, request.productName, logs);
-          const detailVerified = after.detail.overview === source.snapshot.detail.overview;
+          const detailVerified = after.detail.overview === targetSource.snapshot.detail.overview;
           const specificationVerified = after.detail.specifications === desired.specifications;
           const descriptionVerified = after.productDescription
             === desired.productDescription.description;

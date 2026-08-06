@@ -133,6 +133,11 @@ function createProductPublishingBatchFeature(deps) {
           ...(body || {}),
           productName: product.productName,
           expectedSourceFingerprint: previewResult.source?.fingerprint || "",
+          expectedCopySourceFingerprints: JSON.stringify(Object.fromEntries(
+            (previewResult.results || [])
+              .filter((item) => item.copySource?.sourceFingerprint)
+              .map((item) => [item.site.siteCode, item.copySource.sourceFingerprint])
+          )),
           expectedWorkbookFingerprint: previewResult.workbook?.fingerprint || "",
           expectedLanguageDatasheetFingerprint: previewResult.languageDatasheet?.fingerprint || "",
           expectedLanguagePackageFingerprints: JSON.stringify(Object.fromEntries(

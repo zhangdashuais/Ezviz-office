@@ -55,6 +55,21 @@ test("parses language Datasheet and resolves a target language", () => {
   );
 });
 
+test("skips a note-only Datasheet row but still rejects translated rows without source text", () => {
+  const parsed = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["Review note for the following strings", "", ""],
+    ["product_title", "Smart camera", "Cámara inteligente"]
+  ]));
+  assert.equal(parsed.rows.length, 1);
+  assert.equal(parsed.rows[0].key, "product_title");
+
+  assert.throws(() => parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["product_title", "", "Cámara inteligente"]
+  ])), /缺少原文/);
+});
+
 test("plans exact field and source matches, including identical duplicates", () => {
   const datasheet = parseLanguageDatasheet(datasheetBuffer());
   const languagePackage = readLanguagePackage(packageBuffer(), "es-ES");

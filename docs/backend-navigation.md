@@ -63,9 +63,9 @@ TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife
 
 从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。
 
-本地完整上架流程提供 `POST /api/product-publishing/preview` 和 `POST /api/product-publishing/submit`。执行顺序为：目标站同名产品查重 → 国际站产品复制 → Overview/Specification 同步 → 语言包上传 → 后台回读。预览接口不写入后台。
+本地完整上架流程提供 `POST /api/product-publishing/preview` 和 `POST /api/product-publishing/submit`。产品上架只登录目标国家站账号，不登录国际站账号；在目标站会话中打开 `/goods/int-goods-list`，读取国际产品复制源的 Detail、Specification 图片和 Product Description。执行顺序为：目标站同名产品查重 → 读取并校验本站国际产品复制源 → 国际产品复制 → Specification/语言包更新 → 后台回读。预览接口不写入后台，并按目标站记录复制源指纹供提交前复核。
 
-多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications，并将目标语言的 Product Description 写入 `vm.basic.summary`。产品下架使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，只关闭 `isSearchable` 并把 `whenType` 设为 `0`（No Set Uptime），随后回读验证。
+多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications。Datasheet 明确提供 Product Description 时写入目标译文；未提供时保留目标站国际产品复制源的 Product Description。产品下架使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，只关闭 `isSearchable` 并把 `whenType` 设为 `0`（No Set Uptime），随后回读验证。
 
 ## 后台会话与产品查询复用
 
@@ -79,6 +79,17 @@ TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife
 
 ## 服务中心资料平台
 
-本地入口 `POST /api/ecadmin/run` 支持按选项创建下载资料、访问语言扩展接口、更新产品背景图和生成 SharePoint 归档计划。语言扩展可独立执行：仅提供产品标题并设置 `extendLanguages=1` 即可直接访问扩展接口，不要求本轮创建下载资料或上传文件；若本轮同时创建资料，则请求会自动携带新生成的 `download_id`。
+本地入口 `POST /api/ecadmin/run` 支持按选项创建下载资料、补全多语言、更新产品背景图和生成 SharePoint 归档计划。补全多语言会在 UMP 的“服务中心 → 下载中心管理 → 程序下载管理”中按标题精确搜索资料，点击“补全多语言”，并提交弹窗中的标题；它可独立执行，不要求本轮创建资料或上传文件。提交后读取后台返回的新增多语言记录数量；若本轮同时创建资料，则会在日志中关联新生成的 `downloadId`。
 
 SharePoint 素材归档类目固定为 `02_Security Camera`、`03_Home Sensor & Control`、`04_NVR & Network`、`07_Smart Home`，接口会拒绝其他非空类目值。
+
+## 商城后台登录兼容
+
+商城旧入口 `shop.ezvizlife.com/templates/index` 可能重定向到新版 `new-shop.ezvizlife.com`。本地工具会将两个精确域名都视为正式后台，并分别从旧版登录栏或新版 `#username` 区域读取当前账号；其他域名仍会被拒绝。新版页面只显示站点别名时，工具仅在明确提交目标凭据并认证成功后，为当前服务进程记录登录账号与显示别名的对应关系；未知会话仍强制重新登录，且同一别名不能绑定两个站点账号。
+
+产品上架和产品修订使用的语言包 Datasheet 允许穿插说明行：当一行只有第一列说明文字、原文及全部译文列均为空时会安全跳过；只要任一译文列有内容而原文为空，仍会阻止预览。
+
+产品上架和产品修订读取 Detail 规格字段时兼容明确的单数 `Specification` 与复数 `Specifications`；若两者同时存在，优先使用复数。不会回退到其他自定义字段。
+
+规格 HTML 的主图地址支持标准 `src` 以及常见懒加载属性 `data-src`、`data-original`、`data-lazy-src` 和 `srcset`。
+若源规格明确包含无地址的空图片占位标签，则视为源产品无规格图，目标规格会省略图片块；不会猜测或生成图片地址。

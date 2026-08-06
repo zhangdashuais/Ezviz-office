@@ -8,9 +8,54 @@ function shopAccountLooksCompatible(accountText, expectedAccount) {
   return normalizeShopAccountText(accountText).includes(normalizedExpected);
 }
 
+const SHOP_BACKEND_HOSTNAMES = new Set([
+  "shop.ezvizlife.com",
+  "new-shop.ezvizlife.com"
+]);
+
+function isShopBackendUrl(rawUrl) {
+  try {
+    return SHOP_BACKEND_HOSTNAMES.has(new URL(rawUrl).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function createShopAccountIdentityVerifier() {
+  const aliasesByAccount = new Map();
+
+  function matches(accountText, expectedAccount) {
+    if (shopAccountLooksCompatible(accountText, expectedAccount)) return true;
+    const expectedKey = normalizeShopAccountText(expectedAccount);
+    const accountAlias = normalizeShopAccountText(accountText);
+    return Boolean(expectedKey && accountAlias && aliasesByAccount.get(expectedKey) === accountAlias);
+  }
+
+  function remember(accountText, expectedAccount) {
+    const expectedKey = normalizeShopAccountText(expectedAccount);
+    const accountAlias = normalizeShopAccountText(accountText);
+    if (!expectedKey || !accountAlias) return false;
+    for (const [knownAccount, knownAlias] of aliasesByAccount.entries()) {
+      if (knownAccount !== expectedKey && knownAlias === accountAlias) {
+        throw new Error("商城后台显示账号已绑定到另一个站点账号，已阻止复用当前登录态。");
+      }
+    }
+    aliasesByAccount.set(expectedKey, accountAlias);
+    return true;
+  }
+
+  return { matches, remember };
+}
+
 function createBrowserAuth(deps) {
   const { chromium, PROFILE_DIR, SHOP_PROFILE_DIR, SHOP_DASHBOARD_URL, SHOP_LOGIN_URL,
     SHOP_LOGOUT_URL, shopCredentials, logLine, normalizeBool } = deps;
+  const browserProxy = process.env.EZVIZ_BROWSER_PROXY?.trim();
+  const browserProxyBypass = process.env.EZVIZ_BROWSER_PROXY_BYPASS?.trim();
+  const proxyOptions = browserProxy
+    ? { proxy: { server: browserProxy, ...(browserProxyBypass ? { bypass: browserProxyBypass } : {}) } }
+    : {};
+  const shopAccountVerifier = createShopAccountIdentityVerifier();
 
   async function visibleText(page, limit = 1200) {
     return page.evaluate((max) => document.body.innerText.slice(0, max), limit).catch(() => "");
@@ -105,6 +150,7 @@ function createBrowserAuth(deps) {
     global.__ecadminContext = await chromium.launchPersistentContext(PROFILE_DIR, {
       headless: false,
       channel: "chrome",
+      ...proxyOptions,
       viewport: { width: 1440, height: 900 },
       args: ["--start-maximized"]
     });
@@ -127,6 +173,7 @@ function createBrowserAuth(deps) {
     global.__shopContext = await chromium.launchPersistentContext(SHOP_PROFILE_DIR, {
       headless: false,
       channel: "chrome",
+      ...proxyOptions,
       locale: "en-US",
       viewport: { width: 1440, height: 900 },
       args: ["--start-maximized", "--lang=en-US"]
@@ -139,9 +186,7 @@ function createBrowserAuth(deps) {
 
   async function getOpenPage(context) {
     const pages = context.pages().filter((page) => !page.isClosed());
-    const backendPage = pages.find((page) => {
-      try { return new URL(page.url()).hostname === "shop.ezvizlife.com"; } catch { return false; }
-    });
+    const backendPage = pages.find((page) => isShopBackendUrl(page.url()));
     return backendPage || pages[0] || await context.newPage();
   }
 
@@ -150,7 +195,7 @@ function createBrowserAuth(deps) {
     await page.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(5000);
 
-    const loginBar = page.locator(".clearfix.login-bar, .login-bar").first();
+    const loginBar = page.locator(".clearfix.login-bar, .login-bar, #username").first();
     if (!(await loginBar.count())) {
       logLine(logs, "未找到右上角用户名区域，可能当前没有后台登录态。");
       return false;
@@ -187,8 +232,7 @@ function createBrowserAuth(deps) {
   }
 
   async function currentShopBackendAccount(page) {
-    let currentIsBackend = false;
-    try { currentIsBackend = new URL(page.url()).hostname === "shop.ezvizlife.com"; } catch {}
+    const currentIsBackend = isShopBackendUrl(page.url());
     if (!currentIsBackend) {
       await page.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(1800);
@@ -196,7 +240,8 @@ function createBrowserAuth(deps) {
     const hasPassword = await page.locator('input[type="password"]').first().isVisible().catch(() => false);
     if (/usauth\.ezvizlife\.com|signin|login/i.test(page.url()) || hasPassword) return null;
     const accountText = await page.evaluate(() =>
-      document.querySelector(".clearfix.login-bar")?.innerText
+      document.querySelector("#username > a")?.textContent
+      || document.querySelector(".clearfix.login-bar")?.innerText
       || document.querySelector(".login-bar")?.innerText
       || ""
     ).catch(() => "");
@@ -211,14 +256,6 @@ function createBrowserAuth(deps) {
       return /usauth\.ezvizlife\.com|signin|login/i.test(currentUrl) || hasPassword;
     }
 
-    function isShopBackendUrl(rawUrl) {
-      try {
-        return new URL(rawUrl).hostname === "shop.ezvizlife.com";
-      } catch {
-        return false;
-      }
-    }
-
     let username = payload.shopUsername || payload.username || process.env.EZVIZ_SHOP_USER;
     let password = payload.shopPassword || payload.password || process.env.EZVIZ_SHOP_PASSWORD;
     if ((!username || !password) && payload.credentialDomain) {
@@ -231,7 +268,7 @@ function createBrowserAuth(deps) {
     const currentAccount = normalizeBool(payload.forceShopRelogin)
       ? null
       : await currentShopBackendAccount(page);
-    if (currentAccount && shopAccountLooksCompatible(currentAccount, username)) {
+    if (currentAccount && shopAccountVerifier.matches(currentAccount, username)) {
       logLine(logs, "检测到商城后台已登录，复用当前账号：" + currentAccount);
       return page;
     }
@@ -244,7 +281,7 @@ function createBrowserAuth(deps) {
       throw new Error("商城后台未登录，且未找到可用账号密码。");
     }
 
-    if (!currentAccount || !shopAccountLooksCompatible(currentAccount, username)) {
+    if (!currentAccount || !shopAccountVerifier.matches(currentAccount, username)) {
       const didUiLogout = await logoutShopByUi(page, logs);
       if (!didUiLogout) {
         logLine(logs, "改用退出地址兜底清理登录态。");
@@ -257,6 +294,7 @@ function createBrowserAuth(deps) {
     await page.goto(SHOP_LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(2500);
 
+    let submittedCredentials = false;
     if (await isShopLoginPage()) {
       logLine(logs, "检测到商城后台登录页，正在自动登录。");
       const filled = await page.evaluate(({ username, password }) => {
@@ -300,6 +338,7 @@ function createBrowserAuth(deps) {
         return true;
       }, { username, password });
       if (!filled) throw new Error("没有在商城登录页找到账号或密码输入框。");
+      submittedCredentials = true;
       await Promise.allSettled([
         page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45000 }),
         page.evaluate(() => {
@@ -337,7 +376,11 @@ function createBrowserAuth(deps) {
     }
 
     const authenticatedAccount = await currentShopBackendAccount(backendPage);
-    if (!shopAccountLooksCompatible(authenticatedAccount, username)) {
+    if (!shopAccountVerifier.matches(authenticatedAccount, username) && submittedCredentials) {
+      shopAccountVerifier.remember(authenticatedAccount, username);
+      logLine(logs, "新版后台显示账号与登录账号格式不同，已验证并记录本次会话身份映射。");
+    }
+    if (!shopAccountVerifier.matches(authenticatedAccount, username)) {
       throw new Error(
         "商城后台登录账号与目标站点账号不一致。目标凭据："
         + (payload.credentialDomain || "页面输入账号")
@@ -360,5 +403,7 @@ function createBrowserAuth(deps) {
 module.exports = {
   normalizeShopAccountText,
   shopAccountLooksCompatible,
+  isShopBackendUrl,
+  createShopAccountIdentityVerifier,
   createBrowserAuth
 };

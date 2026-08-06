@@ -99,16 +99,64 @@ async function createDownloadInfo(page, payload, files, logs) {
   return { downloadId, editUrl };
 }
 
-async function triggerLanguageExtend(context, title, downloadId, logs) {
-  const params = new URLSearchParams({ language_title: title });
-  if (downloadId) params.set("download_id", downloadId);
-  const extendUrl = `https://support.ezviz.com/backend/api/ecadmin_support_download_info_extend?${params.toString()}`;
-  logLine(logs, "访问语言扩展接口：" + extendUrl);
-  const page = await context.newPage();
-  await page.goto(extendUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+async function triggerLanguageExtend(page, payload, downloadId, logs) {
+  const listUrl = "https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportDownloadCenter/SupportDownloadInfo/SupportDownloadInfoList?table%5Bpage%5D=1&table%5BpageSize%5D=20";
+  await ensureLoggedIn(page, listUrl, payload, logs);
   await page.waitForTimeout(2500);
-  await page.close().catch(() => {});
-  return extendUrl;
+
+  const titleInput = page.locator('input[placeholder="标题"]').first();
+  if (!await titleInput.count()) throw new Error("程序下载管理页面未找到标题搜索框。");
+  await titleInput.fill(payload.title);
+  await page.getByRole("button", { name: "搜索", exact: true }).click();
+  await page.waitForTimeout(1500);
+
+  const rows = page.locator("tr");
+  const rowIndex = await rows.evaluateAll((elements, title) => elements.findIndex((row) => {
+    return [...row.querySelectorAll("td")]
+      .some((cell) => (cell.innerText || "").trim() === title);
+  }), payload.title);
+  if (rowIndex < 0) throw new Error("程序下载管理中未找到标题完全匹配的资料：" + payload.title);
+
+  const row = rows.nth(rowIndex);
+  const rowText = (await row.innerText()).replace(/\s+/g, " ").trim();
+  const extendButton = row.getByRole("button", { name: "补全多语言", exact: true });
+  if (!await extendButton.count()) throw new Error("匹配资料中未找到“补全多语言”操作：" + payload.title);
+
+  logLine(logs, "程序下载管理匹配资料：" + rowText);
+  if (downloadId) logLine(logs, "本轮创建的下载资料 ID：" + downloadId);
+  await extendButton.click();
+  await page.waitForTimeout(500);
+
+  const dialog = page.locator('.el-dialog:visible, [role="dialog"]:visible').last();
+  if (!await dialog.count()) throw new Error("“补全多语言”弹窗未打开。");
+  const languageTitle = dialog.locator("input").first();
+  if (!await languageTitle.count()) throw new Error("“补全多语言”弹窗未找到标题输入框。");
+  await languageTitle.fill(payload.title);
+
+  const responsePromise = page.waitForResponse(
+    (response) => /download_info_extend\/batch_create(?:\?|$)/i.test(response.url()),
+    { timeout: 60000 }
+  );
+  await dialog.getByRole("button", { name: "提交", exact: true }).click();
+  const response = await responsePromise;
+  const responseText = await response.text().catch(() => "");
+  let responseJson = null;
+  try { responseJson = JSON.parse(responseText); } catch {}
+  if (!response.ok() || Number(responseJson?.code || 200) >= 400) {
+    throw new Error(responseJson?.msg || `补全多语言失败（HTTP ${response.status()}）：${responseText.slice(0, 300)}`);
+  }
+
+  const count = Number(responseJson?.data?.count ?? responseJson?.count ?? 0);
+  logLine(logs, count > 0
+    ? `补全多语言完成：新增 ${count} 条记录。`
+    : "补全多语言完成：所有语言均已存在，无需新增。");
+  return {
+    listUrl,
+    downloadId: downloadId || "",
+    title: payload.title,
+    count,
+    response: responseJson || responseText.slice(0, 1000)
+  };
 }
 
 async function updateProductImage(page, payload, file, logs) {
@@ -261,7 +309,7 @@ function buildSharePointPlan(payload, files, logs) {
     }
 
     if (payload.extendLanguages) {
-      result.extendUrl = await triggerLanguageExtend(context, payload.title, result.downloadId, logs);
+      result.languageCompletion = await triggerLanguageExtend(page, payload, result.downloadId, logs);
     }
 
     if (payload.updateProductImage) {

@@ -78,7 +78,8 @@ function registerCampaignRoutes(app, deps) {
       const intGoodsCopySnapshot = normalizeBool(req.body?.inspectIntGoodsCopy) ? await product.inspectCopyPage(backendPage) : null;
       const intGoodsCopyResult = normalizeBool(req.body?.copyIntGoodsProduct)
         ? await product.copy(backendPage, req.body?.productName, logs) : null;
-      const accountText = await backendPage.evaluate(() => document.querySelector(".clearfix.login-bar")?.innerText
+      const accountText = await backendPage.evaluate(() => document.querySelector("#username > a")?.textContent
+        || document.querySelector(".clearfix.login-bar")?.innerText
         || document.querySelector(".login-bar")?.innerText || document.body.innerText.slice(0, 500)).catch(() => "");
       res.json({ ok: true, site, logs, currentUrl: backendPage.url(), accountText, bannerDiagnostic,
         wtbProbe: whereToBuyProbe, productKeywordSnapshot, languageUploadProbe, intGoodsCopySnapshot, intGoodsCopyResult });

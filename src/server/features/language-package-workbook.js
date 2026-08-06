@@ -49,7 +49,13 @@ function parseLanguageDatasheet(input) {
     const source = normalize(cellValue(sheet, row, range.s.c + 1));
     if (!key && !source) continue;
     if (!key) throw new Error(`语言包 Datasheet 第 ${row + 1} 行缺少字段名。`);
-    if (!source) throw new Error(`语言包 Datasheet 第 ${row + 1} 行缺少原文。`);
+    if (!source) {
+      const hasTranslation = headers.some(({ column }) =>
+        normalize(cellValue(sheet, row, column))
+      );
+      if (!hasTranslation) continue;
+      throw new Error(`语言包 Datasheet 第 ${row + 1} 行缺少原文。`);
+    }
     if (byKey.has(key)) {
       throw new Error(
         `语言包 Datasheet 字段名重复：${key}（第 ${byKey.get(key)}、${row + 1} 行）。`

@@ -6,9 +6,29 @@ const {
   parseSpecificationWorkbook,
   resolveWorkbookLanguage,
   buildPcSpecificationHtml,
+  readDetailFromPcView,
   validateRevisionRequest,
   resolveProductDescription
 } = require("./product-revision-sync");
+
+test("reads both singular and plural Specification custom field names", () => {
+  const singular = readDetailFromPcView({
+    summary: "Overview",
+    customs: [{ name: "Specification", value: "Singular content" }]
+  });
+  assert.equal(singular.specificationsFound, true);
+  assert.equal(singular.specifications, "Singular content");
+  assert.equal(singular.specificationsFieldName, "Specification");
+
+  const plural = readDetailFromPcView({
+    customs: [
+      { name: "Specification", value: "Singular content" },
+      { name: "Specifications", value: "Plural content" }
+    ]
+  });
+  assert.equal(plural.specifications, "Plural content");
+  assert.equal(plural.specificationsFieldName, "Specifications");
+});
 
 function workbookBuffer() {
   const worksheet = XLSX.utils.aoa_to_sheet([
@@ -40,6 +60,32 @@ test("reads the preferred Specification image src and alt from international HTM
     src: "https://cdn.example/spec?a=1&b=2",
     alt: "A & B"
   });
+});
+
+test("reads a lazy-loaded Specification image address", () => {
+  const image = extractSpecificationImage(
+    '<img class="pro-img__src" data-src="https://example.com/specification.jpg" alt="Specification">'
+  );
+  assert.equal(image.src, "https://example.com/specification.jpg");
+  assert.equal(image.alt, "Specification");
+});
+
+test("skips an empty preferred image placeholder when another image has an address", () => {
+  const image = extractSpecificationImage([
+    '<img class="pro-img__src" alt="Empty placeholder">',
+    '<img src="https://example.com/fallback.jpg" alt="Fallback">'
+  ].join(""));
+  assert.equal(image.src, "https://example.com/fallback.jpg");
+  assert.equal(image.alt, "Fallback");
+});
+
+test("keeps a source Specification with an empty image placeholder image-free", () => {
+  const image = extractSpecificationImage('<img class="pro-img__src" alt="No image">');
+  assert.equal(image.src, "");
+  assert.equal(image.emptyPlaceholder, true);
+  const parsed = parseSpecificationWorkbook(workbookBuffer());
+  const html = buildPcSpecificationHtml(parsed.languages[0], image);
+  assert.doesNotMatch(html, /<img\b/i);
 });
 
 test("parses paired language columns and generates Specification HTML", () => {
@@ -117,4 +163,35 @@ test("resolves Product Description from the target Datasheet language", () => {
   });
   assert.equal(result.description, "Une vision plus claire");
   assert.equal(result.translationHeader, "French");
+});
+
+test("product publishing may preserve the target site's international copy source description", () => {
+  const parsed = {
+    headers: ["Vietnamese"],
+    rows: [{
+      key: "product_title",
+      source: "Smart camera",
+      translations: { Vietnamese: "Camera thông minh" }
+    }]
+  };
+  const result = resolveProductDescription(parsed, { siteCode: "vn" }, {
+    fallbackDescription: "International source description"
+  });
+  assert.equal(result.description, "International source description");
+  assert.equal(result.inherited, true);
+  assert.equal(result.translationHeader, "国际产品复制源");
+});
+
+test("product publishing ignores the legacy source-site selection", () => {
+  const sites = [
+    { siteCode: "hq", name: "Global" },
+    { siteCode: "vn", name: "Viet Nam" }
+  ];
+  const request = validateRevisionRequest({
+    productName: "CB90f Triple Kit",
+    sourceSiteCode: "hq",
+    targetsJson: JSON.stringify([{ siteCode: "hq" }, { siteCode: "vn" }])
+  }, sites, { ignoreSourceSite: true });
+  assert.equal(request.sourceSite, null);
+  assert.deepEqual(request.targets.map((target) => target.siteCode), ["hq", "vn"]);
 });
