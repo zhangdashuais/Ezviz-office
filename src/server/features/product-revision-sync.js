@@ -319,6 +319,49 @@ function readDetailFromPcView(pcView) {
   };
 }
 
+function revisionPreviewStatus({
+  publishing,
+  detailChanged,
+  specificationChanged,
+  descriptionChanged,
+  languagePackageChanged
+}) {
+  return publishing || detailChanged || specificationChanged
+    || descriptionChanged || languagePackageChanged
+    ? "ready"
+    : "no-change";
+}
+
+function normalizeInternationalImageUrl(value) {
+  const imageUrl = normalize(value);
+  return imageUrl.startsWith("//") ? `https:${imageUrl}` : imageUrl;
+}
+
+function internationalListSource(productName, copySource) {
+  const image = {
+    src: normalizeInternationalImageUrl(copySource?.imageUrl),
+    alt: normalize(productName)
+  };
+  const snapshot = {
+    goodsId: normalize(copySource?.goodsId),
+    editUrl: "",
+    detail: {
+      overview: "",
+      specifications: "",
+      specificationsFound: false,
+      specificationsFieldName: ""
+    },
+    productDescription: normalize(copySource?.brief)
+  };
+  const fingerprint = hashValue(JSON.stringify({
+    productName: normalize(productName),
+    goodsId: snapshot.goodsId,
+    brief: snapshot.productDescription,
+    imageUrl: image.src
+  }));
+  return { snapshot, image, fingerprint };
+}
+
 function normalizeDatasheetKey(value) {
   return normalize(value).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
 }
@@ -424,10 +467,18 @@ function createProductRevisionSyncFeature(deps) {
         && typeof scope?.md?.toModel === "function"
       );
     }, null, { timeout: 30000 });
-    const snapshot = await page.evaluate(() => {
+    await page.evaluate(() => {
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
       scope.vm.tabNav.moveTo(2);
       (scope.$root || scope).$applyAsync?.();
+    });
+    await page.waitForFunction(() => {
+      const element = document.querySelector("#replenish");
+      const scope = window.angular && element ? window.angular.element(element).scope() : null;
+      return Boolean(scope?.vm?.pcView?.customs?.length);
+    }, null, { timeout: 10000 }).catch(() => {});
+    const snapshot = await page.evaluate(() => {
+      const scope = window.angular.element(document.querySelector("#replenish")).scope();
       return {
         goodsId: String(scope.goodsId),
         pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {})),
@@ -457,30 +508,6 @@ function createProductRevisionSyncFeature(deps) {
   async function readProductSnapshot(page, productName, logs) {
     const editInfo = await openProductEditorByName(page, productName, logs);
     return readCurrentProductSnapshot(page, productName, logs, editInfo);
-  }
-
-  async function readInternationalSourceSnapshot(page, productName, copySource, logs) {
-    const editUrl = `https://shop.ezvizlife.com/goods/add?id=${encodeURIComponent(copySource.goodsId)}`;
-    await page.goto(editUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(1200);
-    const snapshot = await readCurrentProductSnapshot(page, productName, logs, {
-      editUrl,
-      productName,
-      internationalSource: true
-    });
-    const image = extractSpecificationImage(snapshot.detail.specifications);
-    if (!image.src) {
-      logLine(logs, "目标站国际产品的 Specification 只有空图片占位，目标规格将保持无图片状态。");
-    }
-    const fingerprint = hashValue(JSON.stringify({
-      productName,
-      goodsId: snapshot.goodsId,
-      overview: snapshot.detail.overview,
-      specifications: snapshot.detail.specifications,
-      productDescription: snapshot.productDescription
-    }));
-    logLine(logs, `已从当前目标站国际产品读取复制源 Detail：${productName} / goods_id=${snapshot.goodsId}`);
-    return { snapshot, image, fingerprint };
   }
 
   async function buildSavePayload(page, overview, specifications, productDescription) {
@@ -673,11 +700,11 @@ function createProductRevisionSyncFeature(deps) {
             request.productName,
             logs
           );
-          targetSource = await readInternationalSourceSnapshot(
-            session.page,
-            request.productName,
-            copySource,
-            logs
+          targetSource = internationalListSource(request.productName, copySource);
+          logLine(
+            logs,
+            `已锁定国际产品复制源：${request.productName} / goods_id=${copySource.goodsId}；`
+            + "完整 Detail 将在提交复制后从目标站产品回读。"
           );
           copySource = {
             ...copySource,
@@ -736,9 +763,13 @@ function createProductRevisionSyncFeature(deps) {
         }
         const languagePackageChanged = languagePackage.plan.changedCellCount > 0;
         results.push({
-          status: detailChanged || specificationChanged || descriptionChanged || languagePackageChanged
-            ? "ready"
-            : "no-change",
+          status: revisionPreviewStatus({
+            publishing,
+            detailChanged,
+            specificationChanged,
+            descriptionChanged,
+            languagePackageChanged
+          }),
           site: target.site,
           authenticatedIdentity: session.authenticatedIdentity,
           goodsId: current?.goodsId || "",
@@ -857,6 +888,7 @@ function createProductRevisionSyncFeature(deps) {
         const session = await prepareSiteSession(target.site, body, logs);
         let targetSource = source;
         let copy = null;
+        let before = null;
         if (publishing) {
           const existing = await productExistsInCurrentSite(
             session.page,
@@ -876,12 +908,7 @@ function createProductRevisionSyncFeature(deps) {
             request.productName,
             logs
           );
-          targetSource = await readInternationalSourceSnapshot(
-            session.page,
-            request.productName,
-            copySource,
-            logs
-          );
+          targetSource = internationalListSource(request.productName, copySource);
           const expectedCopySourceFingerprint = normalize(
             expectedCopySourceFingerprints[target.site.siteCode]
           );
@@ -898,6 +925,16 @@ function createProductRevisionSyncFeature(deps) {
           await session.page.waitForTimeout(1200);
           copy = await copyInternationalProduct(session.page, request.productName, logs);
           components.copy = "passed";
+          before = await readProductSnapshot(session.page, request.productName, logs);
+          const copiedImage = extractSpecificationImage(before.detail.specifications);
+          if (!copiedImage.src) {
+            logLine(logs, "复制后的目标产品 Specification 没有可用图片地址，目标规格将保持无图片状态。");
+          }
+          targetSource = {
+            snapshot: before,
+            image: copiedImage,
+            fingerprint: targetSource.fingerprint
+          };
         }
         const desired = buildTargetRevision(
           parsedWorkbook,
@@ -906,7 +943,7 @@ function createProductRevisionSyncFeature(deps) {
           targetSource,
           { allowSourceDescriptionFallback: publishing }
         );
-        const before = await readProductSnapshot(session.page, request.productName, logs);
+        if (!before) before = await readProductSnapshot(session.page, request.productName, logs);
         const detailChanged = before.detail.overview !== targetSource.snapshot.detail.overview;
         const specificationChanged = before.detail.specifications !== desired.specifications;
         const descriptionChanged = before.productDescription
@@ -1123,6 +1160,9 @@ module.exports = {
   parseTargets,
   validateRevisionRequest,
   readDetailFromPcView,
+  revisionPreviewStatus,
+  normalizeInternationalImageUrl,
+  internationalListSource,
   resolveProductDescription,
   createProductRevisionSyncFeature
 };

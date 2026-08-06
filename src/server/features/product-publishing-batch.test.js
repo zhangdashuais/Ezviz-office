@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 const {
   fileKind,
   productNameFromPath,
-  groupProductFiles
+  groupProductFiles,
+  createProductPublishingBatchFeature
 } = require("./product-publishing-batch");
 
 test("recognizes Datasheet and Specifications files in a selected folder", () => {
@@ -38,4 +39,50 @@ test("rejects an incomplete product folder", () => {
     [{ originalname: "0000__CP8_Datasheet.xlsx", path: "a" }],
     [{ uploadName: "0000__CP8_Datasheet.xlsx", relativePath: "Products/CP8 Datasheet.xlsx" }]
   ), /缺少 Specifications/);
+});
+
+test("batch preview enables submission when at least one target is executable", async () => {
+  const feature = createProductPublishingBatchFeature({
+    logLine() {},
+    revisionFeature: {
+      async previewPublishing() {
+        return { readyCount: 1, failedCount: 1 };
+      }
+    }
+  });
+  const files = [
+    { originalname: "0000__S10_Datasheet.xlsx", path: "a" },
+    { originalname: "0001__S10_Specifications.xlsx", path: "b" }
+  ];
+  const manifest = JSON.stringify([
+    { uploadName: files[0].originalname, relativePath: "S10/S10 Datasheet.xlsx" },
+    { uploadName: files[1].originalname, relativePath: "S10/S10 Specifications.xlsx" }
+  ]);
+  const result = await feature.preview({ batchManifest: manifest }, files, []);
+  assert.equal(result.readyCount, 1);
+  assert.equal(result.partialCount, 1);
+  assert.equal(result.results[0].status, "partial");
+});
+
+test("batch preview stays disabled when every target failed", async () => {
+  const feature = createProductPublishingBatchFeature({
+    logLine() {},
+    revisionFeature: {
+      async previewPublishing() {
+        return { readyCount: 0, failedCount: 1 };
+      }
+    }
+  });
+  const files = [
+    { originalname: "0000__S10_Datasheet.xlsx", path: "a" },
+    { originalname: "0001__S10_Specifications.xlsx", path: "b" }
+  ];
+  const manifest = JSON.stringify([
+    { uploadName: files[0].originalname, relativePath: "S10/S10 Datasheet.xlsx" },
+    { uploadName: files[1].originalname, relativePath: "S10/S10 Specifications.xlsx" }
+  ]);
+  const result = await feature.preview({ batchManifest: manifest }, files, []);
+  assert.equal(result.readyCount, 0);
+  assert.equal(result.failedCount, 1);
+  assert.equal(result.results[0].status, "failed");
 });

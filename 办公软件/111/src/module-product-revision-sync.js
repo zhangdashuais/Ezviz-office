@@ -792,7 +792,7 @@
       if (isBatchPublishing()) {
         extra.expectedBatchPreviews = JSON.stringify(Object.fromEntries(
           (validatedPreview?.results || [])
-            .filter((item) => item.result && item.status === "ready")
+            .filter((item) => item.result && ["ready", "partial"].includes(item.status))
             .map((item) => [item.productName, item.result])
         ));
       } else if (isDelisting()) {

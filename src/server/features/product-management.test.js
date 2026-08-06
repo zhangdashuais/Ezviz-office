@@ -2,8 +2,13 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   INT_GOODS_CATEGORY_PRIORITY,
+  INT_GOODS_SOURCE_SITE_VALUE,
   orderedIntGoodsCategories
 } = require("./product-management");
+
+test("product publishing always reads from the international source selector", () => {
+  assert.equal(INT_GOODS_SOURCE_SITE_VALUE, "0");
+});
 
 test("product copy categories prefer WiFi Cameras then For Home", () => {
   const result = orderedIntGoodsCategories([

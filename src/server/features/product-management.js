@@ -1,5 +1,6 @@
 const INT_GOODS_COPY_URL = "https://shop.ezvizlife.com/goods/save-cite";
 const INT_GOODS_CATEGORY_PRIORITY = ["WiFi Cameras", "For Home"];
+const INT_GOODS_SOURCE_SITE_VALUE = "0";
 
 function orderedIntGoodsCategories(options = []) {
   const usable = options
@@ -223,11 +224,35 @@ function createProductManagement({ logLine, normalizeBool }) {
       products: productItems.map((item) => {
         const title = item.querySelector("p.pro-list-title");
         const copy = item.querySelector(".link-btn.pro-list-link");
+        const good = window.angular && window.angular.element(item).scope()?.good;
+        const sourceFields = [];
+        const collect = (value, fieldPath, depth = 0) => {
+          if (sourceFields.length >= 80 || depth > 4 || value == null) return;
+          if (["string", "number", "boolean"].includes(typeof value)) {
+            const text = String(value);
+            if (/spec|detail|image|img|pic|summary|description/i.test(fieldPath)
+              || /<img\b|https?:\/\//i.test(text)) {
+              sourceFields.push({ path: fieldPath, value: text.slice(0, 1000) });
+            }
+            return;
+          }
+          if (Array.isArray(value)) {
+            value.slice(0, 20).forEach((entry, index) => collect(entry, `${fieldPath}[${index}]`, depth + 1));
+            return;
+          }
+          if (typeof value === "object") {
+            Object.entries(value).slice(0, 80).forEach(([key, entry]) =>
+              collect(entry, fieldPath ? `${fieldPath}.${key}` : key, depth + 1));
+          }
+        };
+        collect(good, "good");
         return {
           name: (title?.innerText || title?.textContent || "").trim(),
           itemNgRepeat: item.getAttribute("ng-repeat") || "",
           copyNgClick: copy?.getAttribute("ng-click") || "",
-          copyHref: copy?.getAttribute("href") || ""
+          copyHref: copy?.getAttribute("href") || "",
+          modelKeys: good ? Object.keys(good) : [],
+          sourceFields
         };
       }),
       actionBindings: {
@@ -290,6 +315,17 @@ function createProductManagement({ logLine, normalizeBool }) {
     const diagnosticTokens = [...new Set([primaryDiagnosticToken, baseDiagnosticToken])]
       .filter((token) => token.length >= 3);
     const nearMatches = [];
+    const sourceSiteSelect = page.locator("select.form-control").nth(0);
+    if (!(await sourceSiteSelect.count())) throw new Error("International source-site selector was not found.");
+    if (await sourceSiteSelect.inputValue() !== INT_GOODS_SOURCE_SITE_VALUE) {
+      await sourceSiteSelect.selectOption(INT_GOODS_SOURCE_SITE_VALUE);
+      await page.waitForTimeout(300);
+    }
+    const sourceSiteText = await sourceSiteSelect.locator(
+      `option[value="${INT_GOODS_SOURCE_SITE_VALUE}"]`
+    ).first().innerText().catch(() => "International");
+    logLine(logs, `Copy source fixed to ${sourceSiteText.trim() || "International"}.`);
+
     const categorySelect = page.locator("select.form-control").nth(1);
     if (!(await categorySelect.count())) throw new Error("Product category selector was not found.");
     const options = await categorySelect.locator("option").evaluateAll((items) => items.map((option) => ({
@@ -299,8 +335,23 @@ function createProductManagement({ logLine, normalizeBool }) {
     const categories = orderedIntGoodsCategories(options);
 
     for (const category of categories) {
+      const previousSignature = await page.locator(
+        ".pro-list-ul li.pro-list-li p.pro-list-title"
+      ).allInnerTexts().then((titles) => titles.map((title) => title.trim()).join("\n"))
+        .catch(() => "");
       await categorySelect.selectOption(category.value);
-      await page.waitForTimeout(900);
+      await page.waitForFunction(({ categoryValue, oldSignature }) => {
+        const selects = [...document.querySelectorAll("select.form-control")];
+        const titles = [...document.querySelectorAll(
+          ".pro-list-ul li.pro-list-li p.pro-list-title"
+        )].map((element) => (element.textContent || "").trim()).filter(Boolean);
+        return selects[1]?.value === categoryValue
+          && titles.length > 0
+          && titles.join("\n") !== oldSignature;
+      }, { categoryValue: String(category.value), oldSignature: previousSignature }, {
+        timeout: 8000
+      }).catch(() => {});
+      await page.waitForTimeout(250);
       const categoryTitles = await page.locator(".pro-list-ul li.pro-list-li p.pro-list-title")
         .allInnerTexts().catch(() => []);
       categoryTitles.forEach((title) => {
@@ -322,6 +373,8 @@ function createProductManagement({ logLine, normalizeBool }) {
           const good = scope?.good || null;
           return {
             goodsId: good?.goods_id == null ? "" : String(good.goods_id),
+            brief: good?.brief == null ? "" : String(good.brief),
+            imageUrl: good?.image_url == null ? "" : String(good.image_url),
             modelKeys: good ? Object.keys(good) : []
           };
         });
@@ -329,7 +382,13 @@ function createProductManagement({ logLine, normalizeBool }) {
           throw new Error("Product was found but goods_id is missing: " + title);
         }
         logLine(logs, `Found ${title} in ${category.text}, goods_id=${product.goodsId}.`);
-        return { productName: title, category, goodsId: product.goodsId };
+        return {
+          productName: title,
+          category,
+          goodsId: product.goodsId,
+          brief: product.brief,
+          imageUrl: product.imageUrl
+        };
       }
     }
     throw new Error(
@@ -535,6 +594,7 @@ function createProductManagement({ logLine, normalizeBool }) {
 module.exports = {
   INT_GOODS_COPY_URL,
   INT_GOODS_CATEGORY_PRIORITY,
+  INT_GOODS_SOURCE_SITE_VALUE,
   orderedIntGoodsCategories,
   createProductManagement
 };

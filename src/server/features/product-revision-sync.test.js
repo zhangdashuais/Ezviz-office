@@ -7,6 +7,9 @@ const {
   resolveWorkbookLanguage,
   buildPcSpecificationHtml,
   readDetailFromPcView,
+  revisionPreviewStatus,
+  normalizeInternationalImageUrl,
+  internationalListSource,
   validateRevisionRequest,
   resolveProductDescription
 } = require("./product-revision-sync");
@@ -28,6 +31,43 @@ test("reads both singular and plural Specification custom field names", () => {
   });
   assert.equal(plural.specifications, "Plural content");
   assert.equal(plural.specificationsFieldName, "Specifications");
+});
+
+test("product publishing remains executable when copied content needs no later edits", () => {
+  assert.equal(revisionPreviewStatus({
+    publishing: true,
+    detailChanged: false,
+    specificationChanged: false,
+    descriptionChanged: false,
+    languagePackageChanged: false
+  }), "ready");
+  assert.equal(revisionPreviewStatus({
+    publishing: false,
+    detailChanged: false,
+    specificationChanged: false,
+    descriptionChanged: false,
+    languagePackageChanged: false
+  }), "no-change");
+});
+
+test("international list metadata provides a stable pre-copy source fingerprint", () => {
+  assert.equal(
+    normalizeInternationalImageUrl("//mfs.ezvizlife.com/s10.png"),
+    "https://mfs.ezvizlife.com/s10.png"
+  );
+  const first = internationalListSource("S10", {
+    goodsId: "68505",
+    brief: "Robot Vacuum & Mop Combo",
+    imageUrl: "//mfs.ezvizlife.com/s10.png"
+  });
+  const second = internationalListSource("S10", {
+    goodsId: "68505",
+    brief: "Robot Vacuum & Mop Combo",
+    imageUrl: "//mfs.ezvizlife.com/s10.png"
+  });
+  assert.equal(first.fingerprint, second.fingerprint);
+  assert.equal(first.snapshot.goodsId, "68505");
+  assert.equal(first.image.src, "https://mfs.ezvizlife.com/s10.png");
 });
 
 function workbookBuffer() {

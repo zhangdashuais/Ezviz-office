@@ -265,7 +265,8 @@ function createBrowserAuth(deps) {
       logLine(logs, "已从网站账号密码表读取目标站点账号：" + payload.credentialDomain);
     }
 
-    const currentAccount = normalizeBool(payload.forceShopRelogin)
+    const forceShopRelogin = normalizeBool(payload.forceShopRelogin);
+    const currentAccount = forceShopRelogin
       ? null
       : await currentShopBackendAccount(page);
     if (currentAccount && shopAccountVerifier.matches(currentAccount, username)) {
@@ -281,13 +282,10 @@ function createBrowserAuth(deps) {
       throw new Error("商城后台未登录，且未找到可用账号密码。");
     }
 
-    if (!currentAccount || !shopAccountVerifier.matches(currentAccount, username)) {
-      const didUiLogout = await logoutShopByUi(page, logs);
-      if (!didUiLogout) {
-        logLine(logs, "改用退出地址兜底清理登录态。");
-        await page.goto(SHOP_LOGOUT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-        await page.waitForTimeout(2500);
-      }
+    if (forceShopRelogin
+      || (currentAccount && !shopAccountVerifier.matches(currentAccount, username))) {
+      logLine(logs, "清理商城专用浏览器的旧账号会话，直接登录目标站点。");
+      await page.context().clearCookies();
     }
 
     logLine(logs, "打开商城登录入口：" + SHOP_LOGIN_URL);

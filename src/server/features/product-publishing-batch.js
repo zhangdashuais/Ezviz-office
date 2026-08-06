@@ -97,7 +97,13 @@ function createProductPublishingBatchFeature(deps) {
           product.files.datasheet,
           logs
         );
-        results.push({ status: result.failedCount ? "partial" : "ready", productName: product.productName, result });
+        const executable = Number(result.readyCount || 0) > 0;
+        results.push({
+          status: executable ? (result.failedCount ? "partial" : "ready") : "failed",
+          productName: product.productName,
+          result,
+          ...(!executable ? { error: "没有可执行的目标站点，请查看逐站预览错误。" } : {})
+        });
       } catch (error) {
         results.push({ status: "failed", productName: product.productName, error: error?.message || String(error) });
       }
@@ -105,7 +111,7 @@ function createProductPublishingBatchFeature(deps) {
     return {
       mode: "product-publishing-batch-preview",
       productCount: products.length,
-      readyCount: results.filter((item) => item.status === "ready").length,
+      readyCount: results.filter((item) => ["ready", "partial"].includes(item.status)).length,
       partialCount: results.filter((item) => item.status === "partial").length,
       failedCount: results.filter((item) => item.status === "failed").length,
       results
