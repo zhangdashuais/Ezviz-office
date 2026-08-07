@@ -1,7 +1,38 @@
 function createPopupManagement(deps) {
   const { fs, path, logLine, normalizeBool, FS_UPLOAD_URL, NEW_SHOP_API_BASE, NEW_SHOP_POPUP_EDIT_URL,
     readCampaignConfig, requireSingleCampaignSite, getShopContext, getOpenPage,
-    ensureShopLoggedIn, credentialDomainForSite } = deps;
+    ensureShopLoggedIn, credentialDomainForSite, buildPopupPlan } = deps;
+
+  async function clickByText(page, text, options = {}) {
+    const pattern = typeof text === "string"
+      ? new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
+      : text;
+    await page.getByText(pattern).first().click({ timeout: options.timeout || 15000 });
+  }
+
+  async function selectByVisibleTextOrValue(page, selector, value) {
+    if (!value) return;
+    const locator = page.locator(selector).first();
+    await locator.waitFor({ state: "attached", timeout: 15000 });
+    await locator.evaluate((el, nextValue) => {
+      const normalized = String(nextValue).toLowerCase();
+      const option = [...el.options].find((item) =>
+        item.value.toLowerCase() === normalized || item.textContent.trim().toLowerCase() === normalized
+      );
+      el.value = option ? option.value : nextValue;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }, String(value));
+  }
+
+  function normalizePopupDateTime(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const normalized = text.replace(/\//g, "-").replace("T", " ");
+    return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)
+      ? normalized + ":00"
+      : normalized;
+  }
 
   async function fillPopupTime(page, selector, value) {
     if (!value) return;
@@ -152,7 +183,16 @@ function createPopupManagement(deps) {
 
   function popupEndTimeOf(row) {
     const content = parsePopupContent(row);
-    return content.endTime || content.popupEndTime || row?.endTime || row?.popupEndTime || "";
+    const direct = content.endTime || content.popupEndTime || row?.endTime || row?.popupEndTime;
+    if (direct) return direct;
+    const period = content.period || content.popupPeriod || row?.period || row?.popupPeriod;
+    if (period && typeof period === "object") {
+      return period.endTime || period.end || period.to || period[1] || "";
+    }
+    const text = String(period || "").trim();
+    if (!text) return "";
+    const parts = text.split(/\s+(?:to|至|~|–|—)\s+/i).filter(Boolean);
+    return parts.length > 1 ? parts[parts.length - 1] : "";
   }
 
   function popupRowIsEnabled(row) {
@@ -190,7 +230,11 @@ function createPopupManagement(deps) {
       return { action: "none", previous: null };
     }
 
-    const previous = rows.find((row) => popupRowIsEnabled(row)) || rows[0];
+    if (rows.length > 1) {
+      throw new Error("Popup 资源位检测到多条配置，与单资源位规则不一致，已停止新建。请先人工核对后台列表。当前数量：" + rows.length);
+    }
+
+    const previous = rows[0];
     const configNo = popupConfigNo(previous);
     const name = popupNameOf(previous) || "未命名 Popup";
     const endTimeText = popupEndTimeOf(previous);
@@ -247,8 +291,8 @@ function createPopupManagement(deps) {
       content: {
         popupName: fields.name,
         popupBrief: fields.brief,
-        startTime: normalizeBannerDateTime(fields.startAt),
-        endTime: normalizeBannerDateTime(fields.endAt),
+        startTime: normalizePopupDateTime(fields.startAt),
+        endTime: normalizePopupDateTime(fields.endAt),
         popupFrequency: normalizePopupFrequency(fields.frequency),
         popupWebUrl: webUrl,
         popupMobileUrl: mobileUrl,
@@ -312,6 +356,8 @@ function createPopupManagement(deps) {
     await page.goto(editUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(4000);
 
+    const slotCleanup = await clearExpiredPopupSlot(page, logs);
+
     logLine(logs, "填写 Popup 字段。");
     await page.locator('input[placeholder*="Popup Name" i], input[name*="name" i]').first().fill(fields.name);
     await page.locator('textarea[placeholder*="Popup Brief" i], textarea[name*="brief" i]').first().fill(fields.brief);
@@ -342,7 +388,7 @@ function createPopupManagement(deps) {
       await page.waitForTimeout(4000);
     }
 
-    return { site, webUrl: item.localizedWebUrlSuggestion || item.webUrl, mobileUrl: item.localizedMobileUrlSuggestion || item.mobileUrl, currentUrl: page.url() };
+    return { site, webUrl: item.localizedWebUrlSuggestion || item.webUrl, mobileUrl: item.localizedMobileUrlSuggestion || item.mobileUrl, slotCleanup, currentUrl: page.url() };
   }
 
   async function submitPopupToBackend(body, files, logs) {

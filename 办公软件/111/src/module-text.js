@@ -394,7 +394,10 @@
   }
 
   async function parseProductLanguageTable(file) {
-    const parsed = await readLanguageTableEntries(file);
+    const parsed = await readLanguageTableEntries(
+      file,
+      window.i18nConversionRules.detectProductLanguageTableLayout
+    );
     const indexed = window.i18nConversionRules.buildSourceKeyIndex(parsed.entries);
     productSourceIndex = new Map();
     productLanguageKeys.clear();
@@ -418,7 +421,10 @@
     };
   }
 
-  async function readLanguageTableEntries(file) {
+  async function readLanguageTableEntries(
+    file,
+    detectLayout = window.i18nConversionRules.detectLanguageTableLayout
+  ) {
     const data = await readFileAsArrayBuffer(file);
     const workbook = window.XLSX.read(data, { type: 'array' });
     const entries = [];
@@ -428,7 +434,7 @@
       const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       let layout;
       try {
-        layout = window.i18nConversionRules.detectLanguageTableLayout(rows);
+        layout = detectLayout(rows);
       } catch {
         return;
       }

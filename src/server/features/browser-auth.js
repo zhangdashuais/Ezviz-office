@@ -15,10 +15,19 @@ const SHOP_BACKEND_HOSTNAMES = new Set([
 
 function isShopBackendUrl(rawUrl) {
   try {
-    return SHOP_BACKEND_HOSTNAMES.has(new URL(rawUrl).hostname.toLowerCase());
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.toLowerCase();
+    return url.protocol === "https:"
+      && (SHOP_BACKEND_HOSTNAMES.has(hostname)
+        || /^new-[a-z]{2,3}-shop\.ezvizlife\.com$/.test(hostname));
   } catch {
     return false;
   }
+}
+
+function shopAccountLooksLikeConcreteLogin(accountText) {
+  const value = String(accountText || "").trim();
+  return /@|\d/.test(value);
 }
 
 function createShopAccountIdentityVerifier() {
@@ -26,6 +35,10 @@ function createShopAccountIdentityVerifier() {
 
   function matches(accountText, expectedAccount) {
     if (shopAccountLooksCompatible(accountText, expectedAccount)) return true;
+    // The new shop may show a human-readable site alias (for example "Japan")
+    // instead of the submitted login. A different account-like value such as
+    // "nl114514" is not an alias and must never be accepted through the alias map.
+    if (shopAccountLooksLikeConcreteLogin(accountText)) return false;
     const expectedKey = normalizeShopAccountText(expectedAccount);
     const accountAlias = normalizeShopAccountText(accountText);
     return Boolean(expectedKey && accountAlias && aliasesByAccount.get(expectedKey) === accountAlias);
@@ -35,6 +48,10 @@ function createShopAccountIdentityVerifier() {
     const expectedKey = normalizeShopAccountText(expectedAccount);
     const accountAlias = normalizeShopAccountText(accountText);
     if (!expectedKey || !accountAlias) return false;
+    if (shopAccountLooksLikeConcreteLogin(accountText)
+      && !shopAccountLooksCompatible(accountText, expectedAccount)) {
+      throw new Error("商城后台返回了与目标站点不一致的登录账号，已阻止将该账号记录为站点别名。");
+    }
     for (const [knownAccount, knownAlias] of aliasesByAccount.entries()) {
       if (knownAccount !== expectedKey && knownAlias === accountAlias) {
         throw new Error("商城后台显示账号已绑定到另一个站点账号，已阻止复用当前登录态。");
@@ -401,6 +418,7 @@ function createBrowserAuth(deps) {
 module.exports = {
   normalizeShopAccountText,
   shopAccountLooksCompatible,
+  shopAccountLooksLikeConcreteLogin,
   isShopBackendUrl,
   createShopAccountIdentityVerifier,
   createBrowserAuth

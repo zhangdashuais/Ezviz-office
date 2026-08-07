@@ -19,7 +19,7 @@ const { createShopCredentials } = require("./src/server/features/shop-credential
 const { createProductManagement } = require("./src/server/features/product-management");
 const { createBannerManagement } = require("./src/server/features/banner-management");
 const { createPopupManagement } = require("./src/server/features/popup-management");
-const { createBrowserAuth } = require("./src/server/features/browser-auth");
+const { createBrowserAuth, isShopBackendUrl } = require("./src/server/features/browser-auth");
 const { createSpecificationTranslationFeature } = require("./src/server/features/specification-translation");
 const { registerSpecificationTranslationRoutes } = require("./src/server/routes/specification-translation-routes");
 const { registerCampaignRoutes } = require("./src/server/routes/campaign-routes");
@@ -54,6 +54,7 @@ const BANNER_CONFIG_DOC = path.join(ROOT, "docs", "homepage-banner-config.md");
 const POPUP_CONFIG_DOC = path.join(ROOT, "docs", "popup-upload.md");
 const CREDENTIAL_WORKBOOK_NAMES = ["网站账号密码", "账号密码"];
 const SHOP_DASHBOARD_URL = "https://shop.ezvizlife.com/templates/index";
+const SHOP_HOMEPAGE_URL = "https://shop.ezvizlife.com/pages/index";
 const SHOP_LOGIN_URL = "https://usauth.ezvizlife.com/signIn?from=ezviz_mall_global_gateway&r=1726447618240890209&returnUrl=www.ezvizlife.com&host=";
 const SHOP_LOGOUT_URL = "https://sgpwww.ezvizlife.com/login/logout.html";
 const NEW_SHOP_POPUP_EDIT_URL = "https://new-shop.ezvizlife.com/popup/edit";
@@ -217,19 +218,19 @@ const browserAuth = createBrowserAuth({
   SHOP_LOGOUT_URL, shopCredentials, logLine, normalizeBool
 });
 const bannerManagement = createBannerManagement({
-  fs, path, logLine, normalizeBool, SHOP_DASHBOARD_URL,
+  fs, path, logLine, normalizeBool, SHOP_HOMEPAGE_URL,
   readCampaignConfig, getShopContext: browserAuth.getShopContext,
   getOpenPage: browserAuth.getOpenPage,
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn, credentialDomainForSite,
   selectedCampaignSites, parseSelectedSites,
-  buildCampaignUrl, auditAndRepairBannerAfterSubmit
+  buildCampaignUrl, buildBannerPlan, auditAndRepairBannerAfterSubmit
 });
 const requireSingleCampaignSite = (...args) => bannerManagement.requireSingleSite(...args);
 const popupManagement = createPopupManagement({
   fs, path, logLine, normalizeBool, FS_UPLOAD_URL, NEW_SHOP_API_BASE, NEW_SHOP_POPUP_EDIT_URL,
   readCampaignConfig, requireSingleCampaignSite,
   getShopContext: browserAuth.getShopContext, getOpenPage: browserAuth.getOpenPage,
-  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn, credentialDomainForSite
+  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn, credentialDomainForSite, buildPopupPlan
 });
 const specificationTranslationFeature = createSpecificationTranslationFeature({
   logLine,
@@ -759,7 +760,7 @@ registerCampaignRoutes(app, {
   getShopContext: browserAuth.getShopContext,
   getOpenPage: browserAuth.getOpenPage,
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
-  credentialDomainForSite: shopCredentials.domainForSite,
+  credentialDomainForSite: shopCredentials.domainForSite, isShopBackendUrl,
   banner: bannerManagement,
   product: {
     openFirstEdit: productManagement.openFirstEdit,

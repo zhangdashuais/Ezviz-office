@@ -10,8 +10,24 @@ const {
   readLanguagePackage,
   planLanguagePackageUpdates,
   assertSafePlan,
-  writeUpdatedLanguagePackage
+  writeUpdatedLanguagePackage,
+  normalizeSourceForComparison
 } = require("./language-package-workbook");
+
+test("source comparison ignores casing and whitespace but not changed words", () => {
+  assert.equal(
+    normalizeSourceForComparison("Great Brands Don't Age. They Adapt."),
+    normalizeSourceForComparison("Great brands don't age. They adapt.")
+  );
+  assert.equal(
+    normalizeSourceForComparison("appearance) from 2022"),
+    normalizeSourceForComparison("appearance)from 2022")
+  );
+  assert.notEqual(
+    normalizeSourceForComparison("ULTRA HD"),
+    normalizeSourceForComparison("ULTRA UD")
+  );
+});
 
 function workbookBuffer(rows, bookType = "xlsx") {
   const workbook = XLSX.utils.book_new();
@@ -80,7 +96,7 @@ test("plans exact field and source matches, including identical duplicates", () 
   assert.equal(plan.skippedBlankCount, 1);
 });
 
-test("blocks missing fields and source mismatches", () => {
+test("blocks missing keys but treats the site package source as authoritative", () => {
   const datasheet = parseLanguageDatasheet(workbookBuffer([
     ["Field", "Source", "Spanish"],
     ["product_title", "Different source", "Nuevo"],
@@ -91,7 +107,21 @@ test("blocks missing fields and source mismatches", () => {
   assert.equal(plan.safe, false);
   assert.equal(plan.missing.length, 1);
   assert.equal(plan.sourceMismatches.length, 1);
+  assert.equal(plan.changedCellCount, 1);
   assert.throws(() => assertSafePlan(plan), /预检未通过/);
+});
+
+test("copies translations by stable key while only reporting a source mismatch", () => {
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["product_title", "Revised source", "Nuevo"]
+  ]));
+  const languagePackage = readLanguagePackage(packageBuffer(), "es-ES");
+  const plan = planLanguagePackageUpdates(languagePackage, datasheet, "Spanish");
+  assert.equal(plan.safe, true);
+  assert.equal(plan.sourceMismatches.length, 1);
+  assert.equal(plan.changedCellCount, 1);
+  assert.doesNotThrow(() => assertSafePlan(plan));
 });
 
 test("writes an xls package and verifies updated cells", () => {

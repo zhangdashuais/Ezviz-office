@@ -45,6 +45,42 @@ const SITE_LANGUAGE_NEEDLES = {
   cn: ["繁体中文", "chinese"]
 };
 
+const SITE_SPECIFICATION_TITLES = {
+  hq: "Specifications", us: "Specifications", ca: "Specifications", in: "Specifications",
+  au: "Specifications", my: "Specifications", uk: "Specifications", eu: "Specifications",
+  af: "Specifications",
+  la: "Especificaciones", arg: "Especificaciones", es: "Especificaciones",
+  br: "Especificações",
+  th: "ข้อมูลจำเพาะ",
+  id: "Spesifikasi",
+  vn: "Thông số kỹ thuật",
+  jp: "仕様",
+  kr: "사양",
+  cn: "规格参数",
+  cis: "Технические характеристики",
+  de: "Technische Daten",
+  fr: "Caractéristiques", be: "Caractéristiques",
+  it: "Specifiche",
+  pl: "Specyfikacja",
+  cz: "Specifikace",
+  nl: "Specificaties",
+  tr: "Teknik Özellikler",
+  ro: "Specificații",
+  ar: "المواصفات", sa: "المواصفات"
+};
+
+function specificationTitleForSite(siteCode, fallback = "Specifications") {
+  return SITE_SPECIFICATION_TITLES[normalize(siteCode).toLowerCase()]
+    || normalize(fallback)
+    || "Specifications";
+}
+
+const SPECIFICATION_DETAIL_FIELD_NAMES = [
+  "specifications",
+  "specification",
+  "\u4ed5\u69d8"
+];
+
 function normalize(value) {
   return String(value == null ? "" : value)
     .replace(/\u00a0/g, " ")
@@ -54,6 +90,17 @@ function normalize(value) {
 
 function normalizeDetailFieldName(value) {
   return normalize(value).toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function findSpecificationDetailField(customFields) {
+  const fields = Array.isArray(customFields) ? customFields : [];
+  for (const fieldName of SPECIFICATION_DETAIL_FIELD_NAMES) {
+    const field = fields.find(
+      (item) => normalizeDetailFieldName(item?.name) === fieldName
+    );
+    if (field) return field;
+  }
+  return null;
 }
 
 function escapeHtml(value) {
@@ -207,7 +254,7 @@ function resolveWorkbookLanguage(parsedWorkbook, target) {
   return matches[0];
 }
 
-function buildPcSpecificationHtml(language, image) {
+function buildPcSpecificationHtml(language, image, titleOverride) {
   const rows = language.rows
     .filter(Boolean)
     .map((items, index) => {
@@ -244,7 +291,7 @@ function buildPcSpecificationHtml(language, image) {
     '<div class="pc-content">',
     '  <div class="p960">',
     ...imageMarkup,
-    `    <div class="pro-title">${escapeHtml(language.title || "Specifications")}</div>`,
+    `    <div class="pro-title">${escapeHtml(titleOverride || language.title || "Specifications")}</div>`,
     '    <table class="pro_infobox">',
     "      <tbody>",
     rows,
@@ -306,17 +353,27 @@ function validateRevisionRequest(body, allSites, options = {}) {
 
 function readDetailFromPcView(pcView) {
   const customFields = pcView?.customs || [];
-  const specificationsField = customFields.find(
-    (field) => normalizeDetailFieldName(field?.name) === "specifications"
-  ) || customFields.find(
-    (field) => normalizeDetailFieldName(field?.name) === "specification"
-  );
+  const specificationsField = findSpecificationDetailField(customFields);
   return {
     overview: String(pcView?.summary || ""),
     specifications: String(specificationsField?.value || ""),
     specificationsFound: Boolean(specificationsField),
     specificationsFieldName: String(specificationsField?.name || "")
   };
+}
+
+function productSnapshotStabilitySignature(snapshot) {
+  return hashValue(JSON.stringify({
+    goodsId: String(snapshot?.goodsId || ""),
+    overview: String(snapshot?.pcView?.summary || ""),
+    customs: (snapshot?.pcView?.customs || []).map((field) => ({
+      name: String(field?.name || ""),
+      value: String(field?.value || "")
+    })),
+    productDescription: String(snapshot?.basic?.summary || ""),
+    isSearchable: Boolean(snapshot?.basic?.isSearchable),
+    whenType: Number(snapshot?.basic?.whenType ?? 0)
+  }));
 }
 
 function revisionPreviewStatus({
@@ -477,14 +534,31 @@ function createProductRevisionSyncFeature(deps) {
       const scope = window.angular && element ? window.angular.element(element).scope() : null;
       return Boolean(scope?.vm?.pcView?.customs?.length);
     }, null, { timeout: 10000 }).catch(() => {});
-    const snapshot = await page.evaluate(() => {
-      const scope = window.angular.element(document.querySelector("#replenish")).scope();
-      return {
-        goodsId: String(scope.goodsId),
-        pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {})),
-        basic: JSON.parse(JSON.stringify(scope.vm.basic || {}))
-      };
-    });
+    let snapshot = null;
+    let previousSignature = "";
+    let stableReadCount = 0;
+    await page.waitForTimeout(800);
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const candidate = await page.evaluate(() => {
+        const scope = window.angular.element(document.querySelector("#replenish")).scope();
+        return {
+          goodsId: String(scope.goodsId),
+          pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {})),
+          basic: JSON.parse(JSON.stringify(scope.vm.basic || {}))
+        };
+      });
+      const signature = productSnapshotStabilitySignature(candidate);
+      stableReadCount = signature === previousSignature ? stableReadCount + 1 : 1;
+      previousSignature = signature;
+      if (stableReadCount >= 3) {
+        snapshot = candidate;
+        break;
+      }
+      await page.waitForTimeout(400);
+    }
+    if (!snapshot) {
+      throw new Error(`${productName} 的 Detail 异步加载后仍未稳定，请稍后重试。`);
+    }
     const detail = readDetailFromPcView(snapshot.pcView);
     if (!detail.specificationsFound) {
       const availableFields = (snapshot.pcView?.customs || [])
@@ -511,16 +585,23 @@ function createProductRevisionSyncFeature(deps) {
   }
 
   async function buildSavePayload(page, overview, specifications, productDescription) {
-    return page.evaluate(({ overview, specifications, productDescription }) => {
+    return page.evaluate(({
+      overview,
+      specifications,
+      productDescription,
+      specificationFieldNames
+    }) => {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
       const customFields = scope.vm.pcView?.customs || [];
-      const field = customFields.find(
-        (item) => normalizeField(item?.name) === "specifications"
-      ) || customFields.find(
-        (item) => normalizeField(item?.name) === "specification"
-      );
+      let field = null;
+      for (const fieldName of specificationFieldNames) {
+        field = customFields.find(
+          (item) => normalizeField(item?.name) === fieldName
+        );
+        if (field) break;
+      }
       if (!field) throw new Error("Detail 中没有找到 Specification/Specifications 字段。");
       scope.vm.pcView.summary = overview;
       field.value = specifications;
@@ -529,7 +610,12 @@ function createProductRevisionSyncFeature(deps) {
       const data = scope.md.toModel(scope.vm);
       data.goods_id = scope.goodsId;
       return data;
-    }, { overview, specifications, productDescription });
+    }, {
+      overview,
+      specifications,
+      productDescription,
+      specificationFieldNames: SPECIFICATION_DETAIL_FIELD_NAMES
+    });
   }
 
   async function postProductUpdate(page, payload) {
@@ -583,12 +669,15 @@ function createProductRevisionSyncFeature(deps) {
 
   function buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source, options = {}) {
     const language = resolveWorkbookLanguage(parsedWorkbook, target);
-    const specifications = buildPcSpecificationHtml(language, source.image);
-    const productDescription = resolveProductDescription(parsedDatasheet, target,
-      options.allowSourceDescriptionFallback
+    const specificationTitle = specificationTitleForSite(target.siteCode, language.title);
+    const specifications = buildPcSpecificationHtml(language, source.image, specificationTitle);
+    const fallbackOptions = Object.prototype.hasOwnProperty.call(options, "fallbackDescription")
+      ? { fallbackDescription: options.fallbackDescription }
+      : options.allowSourceDescriptionFallback
         ? { fallbackDescription: source.snapshot.productDescription }
-        : {});
-    return { language, specifications, productDescription };
+        : {};
+    const productDescription = resolveProductDescription(parsedDatasheet, target, fallbackOptions);
+    return { language: { ...language, title: specificationTitle }, specifications, productDescription };
   }
 
   function summarizeLanguagePackagePlan(plan) {
@@ -625,12 +714,7 @@ function createProductRevisionSyncFeature(deps) {
 
   const parseExpectedCopySourceFingerprints = parseExpectedLanguagePackageFingerprints;
 
-  async function prepareLanguagePackage(
-    session,
-    target,
-    parsedDatasheet,
-    logs
-  ) {
+  async function prepareLanguagePackage(session, target, parsedDatasheet, logs) {
     const translationHeader = resolveDatasheetLanguage(
       parsedDatasheet,
       target,
@@ -721,7 +805,11 @@ function createProductRevisionSyncFeature(deps) {
           parsedDatasheet,
           target,
           targetSource,
-          { allowSourceDescriptionFallback: publishing }
+          {
+            fallbackDescription: publishing
+              ? targetSource.snapshot.productDescription
+              : current.productDescription
+          }
         );
         if (publishing) {
           detailChanged = false;
@@ -936,14 +1024,14 @@ function createProductRevisionSyncFeature(deps) {
             fingerprint: targetSource.fingerprint
           };
         }
+        if (!before) before = await readProductSnapshot(session.page, request.productName, logs);
         const desired = buildTargetRevision(
           parsedWorkbook,
           parsedDatasheet,
           target,
           targetSource,
-          { allowSourceDescriptionFallback: publishing }
+          { fallbackDescription: before.productDescription }
         );
-        if (!before) before = await readProductSnapshot(session.page, request.productName, logs);
         const detailChanged = before.detail.overview !== targetSource.snapshot.detail.overview;
         const specificationChanged = before.detail.specifications !== desired.specifications;
         const descriptionChanged = before.productDescription
@@ -988,10 +1076,9 @@ function createProductRevisionSyncFeature(deps) {
             "runtime",
             "language-package-revision"
           );
-          const extension = path.extname(languagePackage.downloaded.fileName) || ".xls";
           const outputPath = path.join(
             outputDirectory,
-            `${Date.now()}-${target.site.siteCode}-${languagePackage.downloaded.langCode}${extension}`
+            `${Date.now()}-${target.site.siteCode}-${languagePackage.downloaded.langCode}.xlsx`
           );
           generatedPackage = writeUpdatedLanguagePackage(
             languagePackage.packageInfo,
@@ -1049,7 +1136,6 @@ function createProductRevisionSyncFeature(deps) {
             session.page,
             {
               ...generatedPackage,
-              fileName: languagePackage.downloaded.fileName,
               langCode: languagePackage.downloaded.langCode
             },
             logs
@@ -1152,7 +1238,12 @@ function createProductRevisionSyncFeature(deps) {
 
 module.exports = {
   SITE_LANGUAGE_NEEDLES,
+  SITE_SPECIFICATION_TITLES,
+  specificationTitleForSite,
+  SPECIFICATION_DETAIL_FIELD_NAMES,
   normalizeDetailFieldName,
+  findSpecificationDetailField,
+  productSnapshotStabilitySignature,
   extractSpecificationImage,
   parseSpecificationWorkbook,
   resolveWorkbookLanguage,

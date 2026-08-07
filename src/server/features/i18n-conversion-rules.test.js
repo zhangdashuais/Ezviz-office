@@ -5,6 +5,7 @@ const {
   extractTranslatableText,
   containsEnglishText,
   detectLanguageTableLayout,
+  detectProductLanguageTableLayout,
   buildSourceKeyIndex,
   buildProductPrefix
 } = require('../../../办公软件/111/src/i18n-conversion-rules');
@@ -48,6 +49,24 @@ test('product language package only indexes source text with one corresponding k
   assert.equal(index.bySource.has('Clear image.'), false);
   assert.equal(index.bySource.get('Fast alerts').key, 'goods.h9c_2');
   assert.equal(index.duplicateSources.has('Clear image.'), true);
+});
+
+test('single-product language package requires the Datasheet key/source layout', () => {
+  assert.deepEqual(detectProductLanguageTableLayout([
+    ['Field', 'Source', 'Japanese'],
+    ['camera_title', 'Smart camera', 'スマートカメラ']
+  ]), { keyColumn: 0, sourceColumn: 1, firstDataRow: 1, headerRow: 0 });
+  assert.throws(() => detectProductLanguageTableLayout([
+    ['Category', 'Serial number', 'Single word (cannot be modified)', 'en-US(cannot be modified)', 'ja-JP'],
+    ['goods', '1', 'camera_title', 'Smart camera', 'スマートカメラ']
+  ]), /Datasheet/);
+});
+
+test('single-product language package accepts a real Datasheet language header', () => {
+  assert.deepEqual(detectProductLanguageTableLayout([
+    ['', '1_English (English-英文)', '29_日本語 (Japanese-日语)'],
+    ['CB90f_1', 'Triple-Lens Camera', 'トリプルレンズカメラ']
+  ]), { keyColumn: 0, sourceColumn: 1, firstDataRow: 1, headerRow: 0 });
 });
 
 test('unmatched copy uses the configured product name as a safe key prefix', () => {

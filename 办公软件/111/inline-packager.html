@@ -297,6 +297,7 @@
             <input type="file" id="productLangExcelInput" accept=".xlsx,.xls,.csv">
             <button id="productLangExcelParseBtn">解析并用于字段对齐</button>
           </div>
+          <p class="desc">单产品语言包使用 Datasheet 结构：第 1 列字段键、第 2 列英文原文、后续列为各语种；不接受下方总语言包的第 3/4/5 列布局。</p>
           <div class="row" style="margin-top: 10px;">
             <label>总语言包表格</label>
             <input type="file" id="langExcelInput" accept=".xlsx,.xls,.csv">
@@ -420,7 +421,7 @@
             <label id="revisionSyncDelistLabel" for="revisionSyncDelistProducts" hidden>下架产品名称</label>
             <textarea id="revisionSyncDelistProducts" rows="5" hidden placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
           </div>
-          <p id="revisionSyncLanguageHelp" class="desc">语言包操作顺序：先按目标站点确定 Datasheet 语种列（例如法国站取 French、德国站取 German）→ 下载该站当前语言包 → 用语言包第 3 列字段名匹配 Datasheet → 保留第 4 列原文，并用本站对应语种覆盖第 5 列译文 → 上传新语言包 → 再次下载回读验证。</p>
+          <p id="revisionSyncLanguageHelp" class="desc">产品上架语言包操作：先按目标站点选择 Datasheet 语种列 → 下载该站当前总语言包 → 以站点包的字段键和原文列为准，仅把 Datasheet 对应译文覆盖到目标列 → 上传新语言包 → 再次下载回读验证。</p>
           <div class="row">
             <button id="revisionSyncSelectMatched" type="button">一键选择全部可执行站点</button>
             <button id="revisionSyncClearTargets" type="button">清空目标站点</button>
@@ -907,12 +908,12 @@
   <script src="src/module-text-comparison.js?v=20260729-2"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
-  <script src="src/i18n-conversion-rules.js?v=20260804-3"></script>
-  <script src="src/module-text.js?v=20260804-3"></script>
+  <script src="src/i18n-conversion-rules.js?v=20260807-2"></script>
+  <script src="src/module-text.js?v=20260807-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js"></script>
   <script src="src/module-product-replacement.js"></script>
-  <script src="src/module-product-revision-sync.js?v=20260802-7"></script>
+  <script src="src/module-product-revision-sync.js?v=20260807-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260724-3"></script>
   <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260724-4"></script>

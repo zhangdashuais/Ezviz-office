@@ -11,7 +11,10 @@ const {
   normalizeInternationalImageUrl,
   internationalListSource,
   validateRevisionRequest,
-  resolveProductDescription
+  resolveProductDescription,
+  findSpecificationDetailField,
+  productSnapshotStabilitySignature,
+  specificationTitleForSite
 } = require("./product-revision-sync");
 
 test("reads both singular and plural Specification custom field names", () => {
@@ -31,6 +34,33 @@ test("reads both singular and plural Specification custom field names", () => {
   });
   assert.equal(plural.specifications, "Plural content");
   assert.equal(plural.specificationsFieldName, "Specifications");
+});
+
+test("reads the exact Japanese Specification custom field name", () => {
+  const field = findSpecificationDetailField([
+    { name: "概要", value: "Overview" },
+    { name: "\u4ed5\u69d8", value: "Japanese specifications" }
+  ]);
+  assert.equal(field.name, "\u4ed5\u69d8");
+  assert.equal(field.value, "Japanese specifications");
+});
+
+test("product snapshot stability changes when asynchronously loaded Detail changes", () => {
+  const first = {
+    goodsId: "1",
+    pcView: { summary: "Overview", customs: [{ name: "仕様", value: "Old" }] },
+    basic: { summary: "Description", isSearchable: true, whenType: 0 }
+  };
+  const second = JSON.parse(JSON.stringify(first));
+  assert.equal(
+    productSnapshotStabilitySignature(first),
+    productSnapshotStabilitySignature(second)
+  );
+  second.pcView.customs[0].value = "Loaded";
+  assert.notEqual(
+    productSnapshotStabilitySignature(first),
+    productSnapshotStabilitySignature(second)
+  );
 });
 
 test("product publishing remains executable when copied content needs no later edits", () => {
@@ -144,6 +174,23 @@ test("parses paired language columns and generates Specification HTML", () => {
   assert.match(html, /word-break: normal/);
 });
 
+test("maps the Specification title to the selected target site", () => {
+  assert.equal(specificationTitleForSite("la"), "Especificaciones");
+  assert.equal(specificationTitleForSite("br"), "Especificações");
+  assert.equal(specificationTitleForSite("jp"), "仕様");
+  assert.equal(specificationTitleForSite("de"), "Technische Daten");
+  assert.equal(specificationTitleForSite("sa"), "المواصفات");
+  assert.equal(specificationTitleForSite("unknown", "Workbook title"), "Workbook title");
+});
+
+test("uses a target-site title override in Detail Specification HTML", () => {
+  const parsed = parseSpecificationWorkbook(workbookBuffer());
+  const english = resolveWorkbookLanguage(parsed, { siteCode: "hq" });
+  const html = buildPcSpecificationHtml(english, null, specificationTitleForSite("la"));
+  assert.match(html, /<div class="pro-title">Especificaciones<\/div>/);
+  assert.doesNotMatch(html, /<div class="pro-title">Specifications<\/div>/);
+});
+
 test("requires explicit target mappings only when auto matching is unavailable", () => {
   const parsed = parseSpecificationWorkbook(workbookBuffer());
   assert.equal(
@@ -220,6 +267,15 @@ test("product publishing may preserve the target site's international copy sourc
   assert.equal(result.description, "International source description");
   assert.equal(result.inherited, true);
   assert.equal(result.translationHeader, "国际产品复制源");
+});
+
+test("product revision may preserve the current target description when Datasheet omits it", () => {
+  const result = resolveProductDescription({ headers: ["Japanese"], rows: [] }, {
+    siteCode: "jp",
+    languagePackageHeader: "Japanese"
+  }, { fallbackDescription: "Existing JP product description" });
+  assert.equal(result.description, "Existing JP product description");
+  assert.equal(result.inherited, true);
 });
 
 test("product publishing ignores the legacy source-site selection", () => {

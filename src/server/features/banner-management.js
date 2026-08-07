@@ -1,44 +1,13 @@
 function createBannerManagement(deps) {
-  const { fs, path, logLine, normalizeBool, SHOP_DASHBOARD_URL, readCampaignConfig,
+  const { fs, path, logLine, normalizeBool, SHOP_HOMEPAGE_URL, readCampaignConfig,
     getShopContext, getOpenPage, ensureShopLoggedIn,
     credentialDomainForSite, selectedCampaignSites, parseSelectedSites,
-    buildCampaignUrl, auditAndRepairBannerAfterSubmit } = deps;
-
-  async function clickVisibleTextCandidate(page, pattern, description) {
-    const clicked = await page.evaluate((source) => {
-      const pattern = new RegExp(source, "i");
-      const elements = [...document.querySelectorAll("a, button, span, li, div")].filter((el) => {
-        const text = (el.innerText || el.textContent || "").trim();
-        const visible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-        return visible && pattern.test(text);
-      });
-      const exactAnchor = elements.find((el) => {
-        const tag = el.tagName.toLowerCase();
-        const text = (el.innerText || el.textContent || "").trim().toLowerCase();
-        return text === "homepage" && tag === "a";
-      });
-      const exactClickable = elements.find((el) => {
-        const tag = el.tagName.toLowerCase();
-        const text = (el.innerText || el.textContent || "").trim().toLowerCase();
-        return text === "homepage" && ["button", "li"].includes(tag);
-      });
-      const exact = elements.find((el) => (el.innerText || el.textContent || "").trim().toLowerCase() === "homepage");
-      const target = exactAnchor || exactClickable || exact?.closest("a, button, li, [role='menuitem']") || exact || elements[0]?.closest("a, button, li, [role='menuitem']") || elements[0];
-      if (!target) return false;
-      target.click();
-      return true;
-    }, pattern.source);
-    if (!clicked) throw new Error("没有找到可点击的 " + description + "。");
-  }
+    buildCampaignUrl, buildBannerPlan, auditAndRepairBannerAfterSubmit } = deps;
 
   async function openHomepageBannerEditor(page, logs) {
-    logLine(logs, "进入商城后台首页：" + SHOP_DASHBOARD_URL);
-    await page.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    logLine(logs, "直接进入旧版 Homepage 管理：" + SHOP_HOMEPAGE_URL);
+    await page.goto(SHOP_HOMEPAGE_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(5000);
-
-    logLine(logs, "点击后台 Homepage 入口。");
-    await clickVisibleTextCandidate(page, /^Homepage$/i, "Homepage 入口");
-    await page.waitForTimeout(4000);
 
     logLine(logs, "查找启用状态的 Homepage Visual Editor 链接。");
     const editorHref = await page.evaluate(() => {

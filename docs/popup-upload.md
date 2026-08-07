@@ -74,6 +74,8 @@ node .\campaign-url-tools\scripts\campaign-url.mjs --site es --placement popup -
 
 ## Automation Notes
 
+Popup is a single-slot resource. Before creating one, read the current list. Create directly when it is empty. When exactly one record exists, read its `Period` (or content End Time); delete it only if the end time has passed, verify that it disappeared from the list, and then create the replacement. Stop and report when the existing Popup is still current, the Period cannot be parsed, or multiple records are returned.
+
 For one-click multi-site setup, parameterize:
 
 - target account domain, such as `www.ezviz.com/fr`

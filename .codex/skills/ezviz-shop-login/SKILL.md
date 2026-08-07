@@ -64,10 +64,10 @@ description: 使用 Playwright CLI 登录并验证 EZVIZ 国际商城后台。�
    playwright-cli -s=ezviz-shop goto https://shop.ezvizlife.com/templates/index
    ```
 
-6. 严格验证登录。旧入口可能停留在 `shop.ezvizlife.com/templates/index`，也可能重定向到 `new-shop.ezvizlife.com`。必须同时满足：域名精确属于这两个正式后台域名之一、没有可见密码框、右上角账号区域不为空。
+6. 严格验证登录。旧入口可能停留在 `shop.ezvizlife.com/templates/index`，也可能重定向到 `new-shop.ezvizlife.com` 或 `new-<两到三位区域码>-shop.ezvizlife.com`。必须同时满足：使用 HTTPS、域名精确符合正式后台规则、没有可见密码框、右上角账号区域不为空。
 
    ```powershell
-   playwright-cli -s=ezviz-shop run-code "async page => { await page.waitForLoadState('domcontentloaded'); await page.waitForTimeout(2500); const u = new URL(page.url()); const allowedHosts = new Set(['shop.ezvizlife.com', 'new-shop.ezvizlife.com']); const hasPassword = await page.locator('input[type=password]').first().isVisible().catch(() => false); const account = await page.locator('#username > a, .clearfix.login-bar, .login-bar').first().innerText().catch(() => ''); if (!allowedHosts.has(u.hostname) || hasPassword || !account.trim()) throw new Error('EZVIZ shop login verification failed: ' + page.url()); return { ok: true, url: page.url(), account: account.replace(/\\s+/g, ' ').trim() }; }"
+   playwright-cli -s=ezviz-shop run-code "async page => { await page.waitForLoadState('domcontentloaded'); await page.waitForTimeout(2500); const u = new URL(page.url()); const allowedHost = ['shop.ezvizlife.com', 'new-shop.ezvizlife.com'].includes(u.hostname) || /^new-[a-z]{2,3}-shop\\.ezvizlife\\.com$/.test(u.hostname); const hasPassword = await page.locator('input[type=password]').first().isVisible().catch(() => false); const account = await page.locator('#username > a, .clearfix.login-bar, .login-bar').first().innerText().catch(() => ''); if (u.protocol !== 'https:' || !allowedHost || hasPassword || !account.trim()) throw new Error('EZVIZ shop login verification failed: ' + page.url()); return { ok: true, url: page.url(), account: account.replace(/\\s+/g, ' ').trim() }; }"
    ```
 
 只有该命令返回 `ok: true` 才能继续执行后续后台操作。不要把 SSO 页面、公共官网、空白后台壳或其他域名当作登录成功。新版后台显示的可能是站点别名而非登录账号；本地工具仅在明确提交目标凭据且认证成功后，为当前进程记录该登录账号与显示别名的映射，未知会话仍需重新登录。

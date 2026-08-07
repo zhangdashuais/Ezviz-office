@@ -26,6 +26,8 @@
 | POST | `/api/campaign/audit-job` | 创建异步巡查 |
 | GET | `/api/campaign/audit-job/:jobId` | 读取巡查进度 |
 
+Popup 为单资源位。提交前先读取列表：无记录时直接新增；唯一记录的 `Period` 已过期时删除并回读确认后新增；未过期、日期无法解析或出现多条记录时停止并汇报。
+
 内部 EZVIZ Banner UTM：
 
 ```text
@@ -86,6 +88,8 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/product-publishing/submit` | 在单个目标站复制产品、更新资料并回读 |
 | POST | `/api/product-publishing/batch-preview` | 多产品、逐目标站预览上架，不提交 |
 | POST | `/api/product-publishing/batch-submit` | 多产品、逐目标站执行上架并回读 |
+
+产品上架写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列，顶部 Specification 标题按站点代码自动使用本地化译文；未知站点回退到工作簿标题。
 | POST | `/api/language-package/upload` | 上传语言包 |
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |
 | POST | `/api/assets/upload-image` | 上传图片 |

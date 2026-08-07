@@ -168,6 +168,10 @@ function workbookContentFingerprint(workbook) {
   return hashBuffer(Buffer.from(JSON.stringify(content), "utf8"));
 }
 
+function normalizeSourceForComparison(value) {
+  return normalize(value).toLocaleLowerCase().replace(/\s+/g, "");
+}
+
 function readLanguagePackage(input, langCode) {
   const buffer = readInputBuffer(input);
   const workbook = XLSX.read(buffer, {
@@ -224,19 +228,19 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
       missing.push({ key: entry.key, source: entry.source, datasheetRow: entry.rowNumber });
       return;
     }
-    const matches = candidates.filter(
-      (candidate) => normalize(candidate.source) === normalize(entry.source)
+    const sourceMatches = candidates.filter(
+      (candidate) => normalizeSourceForComparison(candidate.source)
+        === normalizeSourceForComparison(entry.source)
     );
-    if (!matches.length) {
+    if (!sourceMatches.length) {
       sourceMismatches.push({
         key: entry.key,
         datasheetRow: entry.rowNumber,
         expectedSource: entry.source,
         packageSources: [...new Set(candidates.map((candidate) => candidate.source))]
       });
-      return;
     }
-    matches.forEach((candidate) => {
+    candidates.forEach((candidate) => {
       const item = { ...candidate, key: entry.key, translation };
       if (candidate.current === translation) unchanged.push(item);
       else updates.push(item);
@@ -245,7 +249,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
 
   return {
     translationHeader,
-    safe: missing.length === 0 && sourceMismatches.length === 0,
+    safe: missing.length === 0,
     requestedCount: parsedDatasheet.rows.length - skippedBlank.length,
     matchedFieldCount: new Set(
       updates.concat(unchanged).map((item) => item.key)
@@ -320,6 +324,7 @@ module.exports = {
   parseLanguageDatasheet,
   resolveDatasheetLanguage,
   findLanguagePackageSections,
+  normalizeSourceForComparison,
   workbookContentFingerprint,
   readLanguagePackage,
   planLanguagePackageUpdates,

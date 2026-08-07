@@ -1,7 +1,7 @@
 function registerCampaignRoutes(app, deps) {
   const {
     upload, logLine, normalizeBool, readCampaignConfig, getCampaignSites, parseSelectedSites,
-    getShopContext, getOpenPage, ensureShopLoggedIn, credentialDomainForSite,
+    getShopContext, getOpenPage, ensureShopLoggedIn, credentialDomainForSite, isShopBackendUrl,
     banner, product, popup, wtbProbe, languagePackageFeature, campaignLinkInspector,
     buildBannerPlan, buildPopupPlan, runCampaignAudit, campaignAuditIssues,
     startCampaignAuditJob, campaignAuditJobs
@@ -40,7 +40,7 @@ function registerCampaignRoutes(app, deps) {
       const page = await getOpenPage(await getShopContext());
       page.setDefaultTimeout(25000);
       const targetUrl = String(req.body?.targetUrl || "").trim();
-      if (targetUrl && !/^https:\/\/(shop|new-shop)\.ezvizlife\.com\//.test(targetUrl)) {
+      if (targetUrl && !isShopBackendUrl(targetUrl)) {
         throw new Error("登录检查目标地址必须是 shop/new-shop 后台地址。");
       }
       let backendPage = await ensureShopLoggedIn(page, {

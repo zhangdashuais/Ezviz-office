@@ -100,6 +100,33 @@
     throw new Error('没有识别到字段名列和 en-US 原文列');
   }
 
+  function detectProductLanguageTableLayout(rows) {
+    try {
+      const layout = detectLanguageTableLayout(rows);
+      if (layout.keyColumn === 0 && layout.sourceColumn === 1) return layout;
+    } catch {}
+
+    const headerLimit = Math.min(Array.isArray(rows) ? rows.length : 0, 12);
+    for (let rowIndex = 0; rowIndex < headerLimit; rowIndex += 1) {
+      const row = rows[rowIndex] || [];
+      const englishHeader = normalize(row[1]).toLowerCase();
+      const hasEnglishHeader = /(?:^|[_\s(])(?:english|en-us)(?:$|[_\s(-])|英文/u
+        .test(englishHeader);
+      const hasDataRows = rows.slice(rowIndex + 1, rowIndex + 6).some(
+        (dataRow) => normalize(dataRow?.[0]) && normalize(dataRow?.[1])
+      );
+      if (hasEnglishHeader && hasDataRows) {
+        return {
+          keyColumn: 0,
+          sourceColumn: 1,
+          firstDataRow: rowIndex + 1,
+          headerRow: rowIndex
+        };
+      }
+    }
+    throw new Error('单产品语言包必须使用 Datasheet 结构：第 1 列字段键，第 2 列英文原文');
+  }
+
   function buildSourceKeyIndex(entries) {
     const bySource = new Map();
     const duplicateSources = new Set();
@@ -134,6 +161,7 @@
     extractTranslatableText,
     containsEnglishText,
     detectLanguageTableLayout,
+    detectProductLanguageTableLayout,
     buildSourceKeyIndex,
     buildProductPrefix
   };
