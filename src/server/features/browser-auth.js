@@ -62,6 +62,8 @@ function shopAccountLooksLikeConcreteLogin(accountText) {
   return /@|\d/.test(value);
 }
 
+const LEGACY_SHOP_ROOT_URL = "https://shop.ezvizlife.com/";
+
 function createShopAccountIdentityVerifier() {
   const aliasesByAccount = new Map();
 
@@ -298,6 +300,15 @@ function createBrowserAuth(deps) {
     return accountText.replace(/\s+/g, " ").trim();
   }
 
+  async function jumpToLegacyShopRoot(page, logs) {
+    if (!page || page.isClosed()) return page;
+    if (page.url() === LEGACY_SHOP_ROOT_URL) return page;
+    logLine(logs, "后台登录态已建立，跳转一次旧版商城根地址以恢复旧后台读取逻辑：" + LEGACY_SHOP_ROOT_URL);
+    await page.goto(LEGACY_SHOP_ROOT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(1800);
+    return page;
+  }
+
   async function ensureShopLoggedIn(page, payload, logs) {
     async function isShopLoginPage() {
       const currentUrl = page.url();
@@ -316,12 +327,13 @@ function createBrowserAuth(deps) {
 
     const identityOptions = { credentialDomain: payload.credentialDomain };
     const forceShopRelogin = normalizeBool(payload.forceShopRelogin);
+    const trustSubmittedShopCredentials = normalizeBool(payload.trustSubmittedShopCredentials);
     const currentAccount = forceShopRelogin
       ? null
       : await currentShopBackendAccount(page);
     if (currentAccount && shopAccountVerifier.matches(currentAccount, username, identityOptions)) {
       logLine(logs, "检测到商城后台已登录，复用当前账号：" + currentAccount);
-      return page;
+      return jumpToLegacyShopRoot(page, logs);
     }
     if (currentAccount) {
       logLine(logs, "当前后台账号与目标站点不匹配，需要切换账号。当前账号：" + currentAccount);
@@ -424,11 +436,17 @@ function createBrowserAuth(deps) {
     }
 
     const authenticatedAccount = await currentShopBackendAccount(backendPage);
+    const trustAuthenticatedSubmittedCredentials = trustSubmittedShopCredentials && submittedCredentials;
     if (!shopAccountVerifier.matches(authenticatedAccount, username, identityOptions) && submittedCredentials) {
-      shopAccountVerifier.remember(authenticatedAccount, username, identityOptions);
-      logLine(logs, "新版后台显示账号与登录账号格式不同，已验证并记录本次会话身份映射。");
+      if (trustSubmittedShopCredentials) {
+        logLine(logs, "已使用目标站点账号密码完成登录；本次 WTB 不再因新版后台显示账号格式差异中断。");
+      } else {
+        shopAccountVerifier.remember(authenticatedAccount, username, identityOptions);
+        logLine(logs, "新版后台显示账号与登录账号格式不同，已验证并记录本次会话身份映射。");
+      }
     }
-    if (!shopAccountVerifier.matches(authenticatedAccount, username, identityOptions)) {
+    if (!trustAuthenticatedSubmittedCredentials
+      && !shopAccountVerifier.matches(authenticatedAccount, username, identityOptions)) {
       throw new Error(
         "商城后台登录账号与目标站点账号不一致。目标凭据："
         + (payload.credentialDomain || "页面输入账号")
@@ -438,7 +456,7 @@ function createBrowserAuth(deps) {
 
     logLine(logs, "已进入商城后台首页：" + backendPage.url());
     if (page !== backendPage && !page.isClosed()) await page.close().catch(() => {});
-    return backendPage;
+    return jumpToLegacyShopRoot(backendPage, logs);
   }
 
   return {

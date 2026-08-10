@@ -1063,7 +1063,8 @@ async function submitWtbToBackend(body, files, logs) {
   let backendPage = await ensureShopLoggedIn(page, {
     ...body,
     credentialDomain: credentialDomainForSite(site),
-    credentialGroup: "Website"
+    credentialGroup: "Website",
+    trustSubmittedShopCredentials: true
   }, logs);
   const authenticatedIdentity = await backendPage.evaluate(() =>
     document.querySelector(".clearfix.login-bar")?.innerText
@@ -1136,7 +1137,8 @@ async function submitWtbToBackend(body, files, logs) {
           backendPage = await ensureShopLoggedIn(await context.newPage(), {
             ...body,
             credentialDomain: credentialDomainForSite(site),
-            credentialGroup: "Website"
+            credentialGroup: "Website",
+            trustSubmittedShopCredentials: true
           }, logs);
           logLine(logs, "WTB 后台页已恢复，继续处理剩余产品。");
         } catch (recoveryError) {
@@ -1222,7 +1224,8 @@ async function testWtbRoundTrip(body, logs) {
   let backendPage = await ensureShopLoggedIn(page, {
     ...body,
     credentialDomain: credentialDomainForSite(site),
-    credentialGroup: "Website"
+    credentialGroup: "Website",
+    trustSubmittedShopCredentials: true
   }, logs);
   const authenticatedIdentity = await backendPage.evaluate(() =>
     document.querySelector(".clearfix.login-bar")?.innerText
@@ -1286,7 +1289,8 @@ async function testWtbRoundTrip(body, logs) {
             ...body,
             forceShopRelogin: true,
             credentialDomain: credentialDomainForSite(site),
-            credentialGroup: "Website"
+            credentialGroup: "Website",
+            trustSubmittedShopCredentials: true
           }, logs);
           const retryEditInfo = await findAndOpenProductEdit(backendPage, productName, logs);
           const rollbackUpdate = await buildWtbDirectPayload(backendPage, [restoreLink]);
@@ -1342,7 +1346,8 @@ async function restoreWtbLink(body, logs) {
   page = await ensureShopLoggedIn(page, {
     ...body,
     credentialDomain: credentialDomainForSite(site),
-    credentialGroup: "Website"
+    credentialGroup: "Website",
+    trustSubmittedShopCredentials: true
   }, logs);
   const editInfo = await findAndOpenProductEdit(page, productName, logs);
   const state = await readWtbEditorState(page);

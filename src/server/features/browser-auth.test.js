@@ -5,7 +5,8 @@ const {
   shopAccountLooksCompatible,
   shopAccountLooksLikeConcreteLogin,
   isShopBackendUrl,
-  createShopAccountIdentityVerifier
+  createShopAccountIdentityVerifier,
+  createBrowserAuth
 } = require("./browser-auth");
 
 test("shop backend URL accepts legacy, global, and regional production hosts only", () => {
@@ -107,4 +108,53 @@ test("shop account verifier ignores a previously poisoned concrete-login alias",
   const verifier = createShopAccountIdentityVerifier();
   assert.throws(() => verifier.remember("nl114514", "jp114514"));
   assert.equal(verifier.matches("nl114514", "jp114514"), false);
+});
+
+test("shop login reuse jumps back to the legacy shop root before returning", async () => {
+  const visited = [];
+  const page = {
+    currentUrl: "https://shop.ezvizlife.com/templates/index",
+    isClosed() {
+      return false;
+    },
+    url() {
+      return this.currentUrl;
+    },
+    locator() {
+      return {
+        first() {
+          return {
+            async isVisible() {
+              return false;
+            }
+          };
+        }
+      };
+    },
+    async evaluate() {
+      return "website-tr@example.com";
+    },
+    async goto(url) {
+      visited.push(url);
+      this.currentUrl = url;
+    },
+    async waitForTimeout() {}
+  };
+  const auth = createBrowserAuth({
+    chromium: {},
+    PROFILE_DIR: "",
+    SHOP_PROFILE_DIR: "",
+    SHOP_DASHBOARD_URL: "https://shop.ezvizlife.com/templates/index",
+    SHOP_LOGIN_URL: "https://usauth.ezvizlife.com/signIn",
+    SHOP_LOGOUT_URL: "",
+    shopCredentials: { read() { throw new Error("should not read credentials"); } },
+    logLine() {},
+    normalizeBool: Boolean
+  });
+
+  const result = await auth.ensureShopLoggedIn(page, { username: "website-tr@example.com", password: "ok" }, []);
+
+  assert.equal(result, page);
+  assert.deepEqual(visited, ["https://shop.ezvizlife.com/"]);
+  assert.equal(page.url(), "https://shop.ezvizlife.com/");
 });
