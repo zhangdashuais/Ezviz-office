@@ -1,3 +1,48 @@
+function cleanFolderSegment(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+}
+
+function validateSharePointRoot(value, label) {
+  const normalized = String(value || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter(Boolean)
+    .join("/");
+  const parts = normalized.split("/");
+  const hasWebsiteRoot = parts.includes("05_Website") && !normalized.includes("..");
+  if (!hasWebsiteRoot) {
+    throw new Error(`${label || "SharePoint 目录"}必须位于 05_Website 下。`);
+  }
+  return normalized;
+}
+
+function isSharePointTranslationExcel(file) {
+  const name = String(file?.originalname || file?.filename || "");
+  return /\.xlsx$/i.test(name);
+}
+
+function sharePointTranslationRole(file) {
+  return isSharePointTranslationExcel(file) ? "translationExcel" : "material";
+}
+
+function productFolderNameFromDatasheet(files) {
+  const list = files?.allFiles || [];
+  const datasheet = list.find((file) => /datasheet/i.test(String(file?.originalname || file?.filename || "")));
+  if (!datasheet) throw new Error("缺少 Datasheet 文件，无法推断产品文件夹名。");
+  const baseName = String(datasheet.originalname || datasheet.filename || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop()
+    .replace(/\.[^.]+$/, "");
+  const productName = baseName.replace(/[\s_-]*datasheet.*$/i, "").trim();
+  if (!productName) throw new Error("Datasheet 文件名缺少产品名称。");
+  return cleanFolderSegment(productName);
+}
+
 function createEcadminPlatformFeature(deps) {
   const {
     path,
@@ -198,14 +243,6 @@ async function updateProductImage(page, payload, file, logs) {
   return after;
 }
 
-function cleanFolderSegment(value) {
-  return String(value || "")
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "-")
-    .replace(/\s+/g, " ")
-    .slice(0, 120);
-}
-
 function isSameUpload(a, b) {
   if (!a || !b) return false;
   return a.path === b.path || (a.originalname === b.originalname && a.size === b.size);
@@ -322,4 +359,11 @@ function buildSharePointPlan(payload, files, logs) {
   return { runEcadminPlatform };
 }
 
-module.exports = { createEcadminPlatformFeature };
+module.exports = {
+  createEcadminPlatformFeature,
+  cleanFolderSegment,
+  validateSharePointRoot,
+  isSharePointTranslationExcel,
+  sharePointTranslationRole,
+  productFolderNameFromDatasheet
+};

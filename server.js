@@ -38,6 +38,8 @@ const { createCampaignLinkInspector } = require("./src/server/features/campaign-
 const textComparisonFeature = require("./src/server/features/text-comparison");
 const textComparisonFileFeature = require("./src/server/features/text-comparison-files");
 const { registerTextComparisonRoutes } = require("./src/server/routes/text-comparison-routes");
+const { createGa4Connection } = require("./src/server/features/ga4-connection");
+const { registerGa4Routes } = require("./src/server/routes/ga4-routes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -48,6 +50,7 @@ const UPLOAD_ROOT = path.join(ROOT, "runtime_uploads");
 const PROFILE_DIR = path.join(ROOT, ".pw-ecadmin-auto-profile");
 const SHOP_PROFILE_DIR = path.join(ROOT, ".pw-ezviz-shop-profile");
 const CREDENTIAL_ROOT = path.join(ROOT, "credentials");
+const GA4_CONFIG_PATH = path.join(ROOT, "runtime", "ga4-config.json");
 const CAMPAIGN_CONFIG_PATH = path.resolve(process.env.EZVIZ_CAMPAIGN_CONFIG || path.join(ROOT, "config", "banner-check.json"));
 const CAMPAIGN_AUDIT_SCRIPT = path.join(ROOT, "scripts", "check-homepage-campaign-rendered.mjs");
 const BANNER_CONFIG_DOC = path.join(ROOT, "docs", "homepage-banner-config.md");
@@ -839,6 +842,12 @@ const productDelistingFeature = createProductDelistingFeature({
   credentialDomainForSite,
   openProductEditorByName: productManagement.openByName
 });
+const ga4Feature = createGa4Connection({
+  clientPath: path.join(CREDENTIAL_ROOT, "ga4-oauth-client.json"),
+  configPath: GA4_CONFIG_PATH,
+  tokenPath: path.join(ROOT, "runtime", "ga4-oauth-token.json"),
+  redirectUri: `http://localhost:${PORT}/api/ga4/oauth/callback`
+});
 
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
 registerLanguagePackageRoutes(app, { upload, languagePackageFeature, logLine });
@@ -874,6 +883,7 @@ registerSpecificationTranslationRoutes(app, {
 
 registerEcadminPlatformRoutes(app, { upload, ecadminPlatformFeature, logLine });
 registerEzvizSiteAuditRoutes(app, { feature: ezvizSiteAuditFeature, scheduler: ezvizSiteAuditScheduler });
+registerGa4Routes(app, { feature: ga4Feature });
 
 app.use((error, _req, res, next) => {
   if (error?.code !== "TASK_CANCELLED") return next(error);

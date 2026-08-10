@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GA4 / Search Console 服务</title>
+  <link rel="stylesheet" href="assets/style.css?v=20260730-1">
+</head>
+<body>
+  <div class="main-container" style="width: 100%;">
+    <header class="main-header">
+      <div class="page-title">GA4 / Search Console 服务</div>
+      <a class="button" href="inline-packager.html">一键内联打包</a>
+    </header>
+    <main class="content-area">
+      <div class="card">
+        <h3>连接 GA4 / Search Console</h3>
+        <p class="desc">使用 Google OAuth 授权 GA4 与 Search Console 只读权限。OAuth 客户端和 token 只保存在本机，不提交 Git。</p>
+        <div class="row">
+          <label for="ga4PropertyId">Property ID</label>
+          <input id="ga4PropertyId" type="text" inputmode="numeric" value="311294431" placeholder="例如 311294431">
+          <span class="desc" style="margin: 0;">OAuth JSON 固定读取 credentials/ga4-oauth-client.json</span>
+        </div>
+        <div class="row">
+          <button id="ga4Connect" type="button">登录 Google 并连接</button>
+          <button id="ga4Test" type="button">测试 GA4</button>
+        </div>
+        <div class="row">
+          <label for="gscSiteUrl">GSC 站点 URL</label>
+          <input id="gscSiteUrl" type="text" placeholder="例如 https://www.ezviz.com/ 或 sc-domain:ezviz.com" style="flex: 1;">
+          <button id="gscListSites" type="button">读取 GSC 站点</button>
+          <button id="gscTest" type="button">测试 GSC</button>
+        </div>
+      </div>
+      <div id="ga4Status" class="status">正在读取 Google 数据连接状态...</div>
+      <textarea id="ga4Output" placeholder="GA4 / Search Console 连接信息和最近 7 天数据会显示在这里..."></textarea>
+    </main>
+  </div>
+  <script src="src/module-ga4.js"></script>
+</body>
+</html>

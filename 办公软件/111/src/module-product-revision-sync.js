@@ -237,74 +237,39 @@
   }
 
   async function parseExcel(file) {
-    if (!file) {
-      specificationHeaders = [];
-      renderTargets();
-      return;
-    }
-    if (!window.XLSX) throw new Error("Excel 解析库尚未加载，请刷新页面后重试。");
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    if (!sheet?.["!ref"]) throw new Error("Specification Excel 的第一个工作表为空。");
-    const range = XLSX.utils.decode_range(sheet["!ref"]);
-    specificationHeaders = [];
-    for (let column = range.s.c; column <= range.e.c; column += 2) {
-      const first = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: column })];
-      const second = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: column + 1 })];
-      const header = String(first?.w ?? first?.v ?? second?.w ?? second?.v ?? "").trim();
-      if (header) specificationHeaders.push(header);
-    }
+    specificationHeaders = file ? await workbookHeaders(file, "specification") : [];
     if (!specificationHeaders.length) {
-      throw new Error("没有识别到语言列；每种语言应占相邻两列。");
+      if (file) throw new Error("没有识别到语言列；每种语言应占相邻两列。");
     }
     renderTargets();
   }
 
   async function parseLanguageDatasheet(file) {
-    if (!file) {
-      languagePackageHeaders = [];
-      renderTargets();
-      return;
-    }
-    if (!window.XLSX) throw new Error("Excel 解析库尚未加载，请刷新页面后重试。");
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    if (!sheet?.["!ref"]) throw new Error("语言包 Datasheet 的第一个工作表为空。");
-    const range = XLSX.utils.decode_range(sheet["!ref"]);
-    if (range.e.c < range.s.c + 2) {
-      throw new Error("语言包 Datasheet 至少需要字段名、原文和一种译文三列。");
-    }
-    languagePackageHeaders = [];
-    for (let column = range.s.c + 2; column <= range.e.c; column += 1) {
-      const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: column })];
-      const header = String(cell?.w ?? cell?.v ?? "").trim();
-      if (header) languagePackageHeaders.push(header);
-    }
+    languagePackageHeaders = file ? await workbookHeaders(file, "datasheet") : [];
     if (!languagePackageHeaders.length) {
-      throw new Error("语言包 Datasheet 中没有识别到译文列。");
+      if (file) throw new Error("语言包 Datasheet 中没有识别到译文列。");
     }
     renderTargets();
   }
 
   async function workbookHeaders(file, kind) {
+    if (!window.XLSX) throw new Error("Excel 解析库尚未加载，请刷新页面后重试。");
     const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     if (!sheet?.["!ref"]) throw new Error(`${file.webkitRelativePath || file.name} 的工作表为空。`);
     const range = XLSX.utils.decode_range(sheet["!ref"]);
+    if (kind === "datasheet" && range.e.c < range.s.c + 2) {
+      throw new Error("语言包 Datasheet 至少需要字段名、原文和一种译文三列。");
+    }
     const headers = [];
-    if (kind === "specification") {
-      for (let column = range.s.c; column <= range.e.c; column += 2) {
-        const first = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: column })];
-        const second = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: column + 1 })];
-        const header = String(first?.w ?? first?.v ?? second?.w ?? second?.v ?? "").trim();
-        if (header) headers.push(header);
-      }
-    } else {
-      for (let column = range.s.c + 2; column <= range.e.c; column += 1) {
-        const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: column })];
-        const header = String(cell?.w ?? cell?.v ?? "").trim();
-        if (header) headers.push(header);
-      }
+    const specification = kind === "specification";
+    for (let column = range.s.c + (specification ? 0 : 2);
+      column <= range.e.c; column += specification ? 2 : 1) {
+      const cells = [column, ...(specification ? [column + 1] : [])]
+        .map((c) => sheet[XLSX.utils.encode_cell({ r: range.s.r, c })]);
+      const cell = cells.find((item) => item?.w != null || item?.v != null);
+      const header = String(cell?.w ?? cell?.v ?? "").trim();
+      if (header) headers.push(header);
     }
     return headers;
   }
@@ -457,6 +422,29 @@
     return data;
   }
 
+  function productEndpoint(action) {
+    if (isBatchPublishing()) return `/api/product-publishing/batch-${action}`;
+    if (isDelisting()) return `/api/product-delisting/${action}`;
+    return `/api/product-revision-sync/${action}`;
+  }
+
+  function renderProductResult(data, submitting) {
+    if (isBatchPublishing()) return submitting ? renderBatchSubmit(data) : renderBatchPreview(data);
+    if (isDelisting()) return renderDelisting(data);
+    return submitting ? renderSubmit(data) : renderPreview(data);
+  }
+
+  function showRequestError(prefix, error) {
+    const message = error.message || error;
+    outputElement.value = [`${prefix}失败：${message}`, ...(error.logs || [])].join("\n");
+    setStatus(`${prefix}失败：${message}`, "warn");
+  }
+
+  function showLines(lines, data) {
+    if (data.logs?.length) lines.push("", "执行日志：", ...data.logs.map((line) => "- " + line));
+    outputElement.value = lines.join("\n");
+  }
+
   function renderPreview(data) {
     const result = data.result;
     const publishing = result.mode === "product-publishing-preview";
@@ -547,8 +535,7 @@
         }
       }
     });
-    if (data.logs?.length) lines.push("", "执行日志：", ...data.logs.map((line) => "- " + line));
-    outputElement.value = lines.join("\n");
+    showLines(lines, data);
   }
 
   function renderSubmit(data) {
@@ -582,8 +569,7 @@
         lines.push(`- 失败 | ${item.site.name} (${item.site.siteCode}) | ${item.error}`);
       }
     });
-    if (data.logs?.length) lines.push("", "执行日志：", ...data.logs.map((line) => "- " + line));
-    outputElement.value = lines.join("\n");
+    showLines(lines, data);
   }
 
   function renderBatchPreview(data) {
@@ -609,8 +595,7 @@
         });
       }
     });
-    if (data.logs?.length) lines.push("", "执行日志：", ...data.logs.map((line) => "- " + line));
-    outputElement.value = lines.join("\n");
+    showLines(lines, data);
   }
 
   function renderBatchSubmit(data) {
@@ -627,8 +612,7 @@
           + (siteResult.error ? ` | ${siteResult.error}` : ""));
       });
     });
-    if (data.logs?.length) lines.push("", "执行日志：", ...data.logs.map((line) => "- " + line));
-    outputElement.value = lines.join("\n");
+    showLines(lines, data);
   }
 
   function renderDelisting(data) {
@@ -647,8 +631,7 @@
       `- ${item.productName} | ${item.site.name} (${item.site.siteCode}) | ${item.status}`
       + (item.error ? ` | ${item.error}` : "")
     ));
-    if (data.logs?.length) lines.push("", "执行日志：", ...data.logs.map((line) => "- " + line));
-    outputElement.value = lines.join("\n");
+    showLines(lines, data);
   }
 
   async function loadSites() {
@@ -765,21 +748,15 @@
     try {
       const request = buildForm();
       setStatus("正在执行只读预览，不会复制或保存产品...");
-      const endpoint = isBatchPublishing()
-        ? "/api/product-publishing/batch-preview"
-        : isDelisting() ? "/api/product-delisting/preview" : "/api/product-revision-sync/preview";
-      const data = await postForm(endpoint, request.form);
-      if (isBatchPublishing()) renderBatchPreview(data);
-      else if (isDelisting()) renderDelisting(data);
-      else renderPreview(data);
+      const data = await postForm(productEndpoint("preview"), request.form);
+      renderProductResult(data, false);
       validatedPreview = data.result;
       validatedSignature = request.signature;
       submitButton.disabled = !data.result.readyCount;
       setStatus(`预览完成：待执行 ${data.result.readyCount}，失败 ${data.result.failedCount}。`,
         data.result.failedCount ? "warn" : "ok");
     } catch (error) {
-      outputElement.value = ["预览失败：" + (error.message || error), ...(error.logs || [])].join("\n");
-      setStatus("预览失败：" + (error.message || error), "warn");
+      showRequestError("预览", error);
     } finally {
       previewButton.disabled = false;
     }
@@ -843,19 +820,13 @@
     submitButton.disabled = true;
     setStatus("正在逐产品、逐站点执行并回读验证，请勿关闭页面...");
     try {
-      const endpoint = isBatchPublishing()
-        ? "/api/product-publishing/batch-submit"
-        : isDelisting() ? "/api/product-delisting/submit" : "/api/product-revision-sync/submit";
-      const data = await postForm(endpoint, request.form);
-      if (isBatchPublishing()) renderBatchSubmit(data);
-      else if (isDelisting()) renderDelisting(data);
-      else renderSubmit(data);
+      const data = await postForm(productEndpoint("submit"), request.form);
+      renderProductResult(data, true);
       setStatus(`执行完成：失败 ${data.result.failedCount}。`,
         data.result.failedCount ? "warn" : "ok");
       invalidatePreview();
     } catch (error) {
-      outputElement.value = ["执行失败：" + (error.message || error), ...(error.logs || [])].join("\n");
-      setStatus("执行失败：" + (error.message || error), "warn");
+      showRequestError("执行", error);
     } finally {
       previewButton.disabled = false;
     }
