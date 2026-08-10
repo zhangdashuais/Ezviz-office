@@ -1,0 +1,3943 @@
+{
+  "fetchedAt": "2026-08-10T03:17:10.586Z",
+  "totalRows": 462,
+  "totalDatasheets": 436,
+  "groups": {
+    "nvr": [
+      {
+        "category": "nvr",
+        "title": "H3c 2K NVR+HDD Kit",
+        "pathname": "H3c-2K-NVR+HDD-Kit",
+        "downloadId": "j1z579ku8_I3XGLTd0HeU",
+        "state": 1,
+        "updatedAt": "2024-12-18 11:21:43",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "H3c 2K+ NVR Kit",
+        "pathname": "H3c-2K+-NVR-Kit",
+        "downloadId": "8ty5d4klH3yWFl72rMV5E",
+        "state": 1,
+        "updatedAt": "2024-12-18 15:16:40",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "H3c 2K+ NVR+HDD Kit",
+        "pathname": "H3c-2K+-NVR+HDD-Kit",
+        "downloadId": "dt51UxgI9DayX7YQpDP3k",
+        "state": 1,
+        "updatedAt": "2024-12-18 11:22:37",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "NVR",
+        "pathname": "NVR",
+        "downloadId": "W5uBRgHtHJjIA3hby-OEB",
+        "state": 1,
+        "updatedAt": "2026-08-07 01:50:14",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "X5C (ezNVR) Datasheet",
+        "pathname": "X5C-(ezNVR)-Datasheet",
+        "downloadId": "VDXDRj9AuAZHUZoiAjKKd",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "X5S Datasheet",
+        "pathname": "X5S-Datasheet",
+        "downloadId": "JZ1uK_VgY_a1I4tPtvTEr",
+        "state": 1,
+        "updatedAt": "2024-05-27 14:39:12",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "X5S POE",
+        "pathname": "X5S-POE",
+        "downloadId": "dZp8ySb-0wG5bwQGbZxRD",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "X5S-16H",
+        "pathname": "X5S-16H",
+        "downloadId": "qrIx2LsDJE9MvkF5SVvPj",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "nvr",
+        "title": "X5S-16L2",
+        "pathname": "X5S-16L2",
+        "downloadId": "f7NFDe2kJsQFE6aE8S3uR",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      }
+    ],
+    "network": [
+      {
+        "category": "network",
+        "title": "NETWORK",
+        "pathname": "NETWORK",
+        "downloadId": "ZXp28krukS-NFa2C5Z_46",
+        "state": 1,
+        "updatedAt": "2026-08-07 01:51:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "Outdoor PoE Splitter",
+        "pathname": "Outdoor-PoE-Splitter",
+        "downloadId": "55IcRrzyk7SnryIhKKo1e",
+        "state": 1,
+        "updatedAt": "2026-01-19 23:40:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "RT1 AX3000",
+        "pathname": "RT1-AX3000",
+        "downloadId": "UwHkYcYcqXm_fcEwu35Ym",
+        "state": 1,
+        "updatedAt": "2024-09-02 11:23:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "W3",
+        "pathname": "W3",
+        "downloadId": "Goa5plJQVgBDwMLQcNMnV",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "W3C",
+        "pathname": "W3C",
+        "downloadId": "o92vKrfv1pMvkAx90yXf6",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "W3R",
+        "pathname": "W3R",
+        "downloadId": "DoFOpdbWECvM6SH6a78py",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "W6 (SD05G)",
+        "pathname": "W6-(SD05G)",
+        "downloadId": "t99IuKnysf-9FGOj17rn1",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "W6 (SD05GP)",
+        "pathname": "W6-(SD05GP)",
+        "downloadId": "CWohffTQb9XtAoR2DmIB7",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "W6 (SD09G)",
+        "pathname": "W6-(SD09G)",
+        "downloadId": "GbLum47BhMpl-AHn1qLQQ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "network",
+        "title": "W6 (SD09GP)",
+        "pathname": "W6-(SD09GP)",
+        "downloadId": "JMziGyJsDIEJnZ2PVbWRz",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      }
+    ],
+    "action camera": [
+      {
+        "category": "action camera",
+        "title": "Action Camera",
+        "pathname": "Action-Camera",
+        "downloadId": "b1d-Czu0w3FZvDi-N60KM",
+        "state": 1,
+        "updatedAt": "2026-08-07 01:36:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "action camera",
+        "title": "S2 Datasheet",
+        "pathname": "S2-Datasheet",
+        "downloadId": "mqWjVUbYRmzqf4JStpsJs",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "action camera",
+        "title": "S3 Datasheet",
+        "pathname": "S3-Datasheet",
+        "downloadId": "Vd6CNKTF2G9p_ttH7pbod",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "action camera",
+        "title": "S6 Datasheet",
+        "pathname": "S6-Datasheet",
+        "downloadId": "Y-ACFElLlxCrPVQqXFVja",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      }
+    ],
+    "smart home": [
+      {
+        "category": "smart home",
+        "title": "4-Piece Home Sensor Kit 2.0",
+        "pathname": "4-Piece-Home-Sensor-Kit-2.0",
+        "downloadId": "cGgMMV5xdPqI6P_5vtVeX",
+        "state": 1,
+        "updatedAt": "2024-12-30 15:29:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "A1 Datasheet",
+        "pathname": "A1-Datasheet",
+        "downloadId": "fuZmfGx2djLgMOUUGzH7Y",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "A1 Datasheet",
+        "pathname": "A1-Datasheet",
+        "downloadId": "fjQ4uhzSsh8nFIgafSDG0",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "A1 Datasheet",
+        "pathname": "A1-Datasheet",
+        "downloadId": "89KFEK-2DJ_MwpFWPDYed",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "A1S",
+        "pathname": "A1S",
+        "downloadId": "5FYqREv6PmbUaAIOXE7EO",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "A3 Home Getaway",
+        "pathname": "A3-Home-Getaway",
+        "downloadId": "sgS-z63eFWWtuXCIqWyNv",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "A3-R200",
+        "pathname": "A3-R200",
+        "downloadId": "v7Z92FPVggQrQh4GSw9Zt",
+        "state": 1,
+        "updatedAt": "2023-11-16 13:34:46",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Alarm Starter Kit Datasheet",
+        "pathname": "Alarm-Starter-Kit-Datasheet",
+        "downloadId": "4caHr4hr1F2-8kAnDaPtX",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Alarm-and-Sensor",
+        "pathname": "Alarm-and-Sensor",
+        "downloadId": "OWSEkQq9_WE4uJLBWKzIg",
+        "state": 1,
+        "updatedAt": "2026-08-07 01:51:03",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "BM1 Datasheet",
+        "pathname": "BM1-Datasheet",
+        "downloadId": "ZtoaLtrtl2PrvA01wtgMk",
+        "state": 1,
+        "updatedAt": "2024-05-28 16:43:13",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Chime",
+        "pathname": "Chime",
+        "downloadId": "cjFmmGgzBvAgK0u3EjIzt",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB1 Datasheet",
+        "pathname": "DB1-Datasheet",
+        "downloadId": "CU6z7s34IDJSYO0GyCvrL",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB1 Pro",
+        "pathname": "DB1-Pro",
+        "downloadId": "lePC-_duVfKGJy0NVlSQl",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB1C",
+        "pathname": "DB1C",
+        "downloadId": "3OQXD0UqjDAcKg7CF_B6F",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB1C Kit",
+        "pathname": "DB1C-Kit",
+        "downloadId": "O2f1nRfTdkUDHQ1cRwIcY",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB2",
+        "pathname": "DB2",
+        "downloadId": "Wx_IirlFZvCQUesK0xPmL",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB2 Pro",
+        "pathname": "DB2-Pro",
+        "downloadId": "NEQY8lkcNfB4qhqot7PDF",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB2-B",
+        "pathname": "DB2-B",
+        "downloadId": "qWyFaDCJ7z1lp4EBuMYpx",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB2-B Pro",
+        "pathname": "DB2-B-Pro",
+        "downloadId": "LHf8JnN5HoBHlLHvCEbYG",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DB2C Kit",
+        "pathname": "DB2C-Kit",
+        "downloadId": "63VUA4DpKm_lLYKnWr93R",
+        "state": 1,
+        "updatedAt": "2024-07-17 17:03:53",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL01 Pro",
+        "pathname": "DL01-Pro",
+        "downloadId": "WTS1l-Tz8zI93Kz810kNx",
+        "state": 1,
+        "updatedAt": "2024-07-04 15:18:19",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL01 Pro",
+        "pathname": "DL01-Pro",
+        "downloadId": "M1m3V2JokqWi6pBzkTABE",
+        "state": 1,
+        "updatedAt": "2024-06-30 10:56:03",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL01BCP Keypad",
+        "pathname": "DL01BCP-Keypad",
+        "downloadId": "rqqsT4hK1C5Vic1tlkDp9",
+        "state": 1,
+        "updatedAt": "2024-08-08 16:22:28",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL01CP",
+        "pathname": "DL01CP",
+        "downloadId": "XwhGDUV7_WuW4T4ertOm-",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL01CP Keypad",
+        "pathname": "DL01CP-Keypad",
+        "downloadId": "cxqvx_DO9nZOOJqq5FqNj",
+        "state": 1,
+        "updatedAt": "2024-08-11 15:45:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL01P",
+        "pathname": "DL01P",
+        "downloadId": "7uyTPO_1dXDcBTyhwEDiY",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL01S",
+        "pathname": "DL01S",
+        "downloadId": "QDCUZ3ooUtcerq4UnCFwq",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL03",
+        "pathname": "DL03",
+        "downloadId": "9nwYWShLnXe-TM7eZrvu-",
+        "state": 1,
+        "updatedAt": "2024-07-15 14:16:34",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL03 Digital",
+        "pathname": "DL03-Digital",
+        "downloadId": "_jSoQTJJqwdLO594Qer35",
+        "state": 1,
+        "updatedAt": "2024-07-16 14:08:20",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL03 Pro",
+        "pathname": "DL03-Pro",
+        "downloadId": "n2eaMEuXExmrzg25CyJqQ",
+        "state": 1,
+        "updatedAt": "2025-02-13 15:58:18",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL04",
+        "pathname": "DL04",
+        "downloadId": "QB8EzWOu9CBa50Xxetqw4",
+        "state": 1,
+        "updatedAt": "2024-10-10 09:35:22",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL04 Pro",
+        "pathname": "DL04-Pro",
+        "downloadId": "pW9VVsSfpckG-Vxrwl3Xj",
+        "state": 1,
+        "updatedAt": "2024-09-25 16:41:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL05",
+        "pathname": "DL05",
+        "downloadId": "KzkWdawFBuJjMXanqsa4r",
+        "state": 1,
+        "updatedAt": "2023-12-07 17:07:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL05 (6068)",
+        "pathname": "DL05-(6068)",
+        "downloadId": "-l9lZdG9QMmLRhauYbH9j",
+        "state": 1,
+        "updatedAt": "2026-05-19 00:01:45",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL06",
+        "pathname": "DL06",
+        "downloadId": "5I5rc8wPPhAauKt5_TkMz",
+        "state": 1,
+        "updatedAt": "2025-08-18 23:46:13",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL06 Pro",
+        "pathname": "DL06-Pro",
+        "downloadId": "T5IJckZPAsm1CESujfps9",
+        "state": 1,
+        "updatedAt": "2025-03-13 01:13:29",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL20FVS Plus",
+        "pathname": "DL20FVS-Plus",
+        "downloadId": "4AfSkfGbGZV4DjidZ4Ier",
+        "state": 1,
+        "updatedAt": "2025-11-18 22:44:43",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL50 FVS Plus (6068)",
+        "pathname": "DL50-FVS-Plus-(6068)",
+        "downloadId": "rdnYeyV-xx4okNMhhRqap",
+        "state": 1,
+        "updatedAt": "2026-04-09 22:17:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL50FVS (5085)",
+        "pathname": "DL50FVS",
+        "downloadId": "MhdRmmlyAwD3or54x4VLa",
+        "state": 1,
+        "updatedAt": "2024-05-27 14:48:35",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL50FVS (6068)",
+        "pathname": "DL50FVS-6068",
+        "downloadId": "Qsu69U-D-AdkC_EOP6sFZ",
+        "state": 1,
+        "updatedAt": "2026-04-16 00:41:25",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL50FVS Plus (5085)",
+        "pathname": "DL50FVS-Plus",
+        "downloadId": "I-jSCersrolnZY-7iz6I2",
+        "state": 1,
+        "updatedAt": "2025-12-16 22:56:19",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DL50FVX",
+        "pathname": "DL50FVX",
+        "downloadId": "wYRii97yQMAcvCjAAntqn",
+        "state": 1,
+        "updatedAt": "2026-01-26 21:58:23",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DP1 Datasheet",
+        "pathname": "DP1-Datasheet",
+        "downloadId": "g0tp0mfJYf2W4dWcOch3-",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DP1C",
+        "pathname": "DP1C",
+        "downloadId": "Dq7kLbZ1Zzmto4PskUdaz",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DP2",
+        "pathname": "DP2",
+        "downloadId": "XjvUxIbEsxfU4JJt-asNu",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DP2 2K",
+        "pathname": "DP2-2K",
+        "downloadId": "nSLNVsJGuQQB6I29RfmCj",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "DP2C",
+        "pathname": "DP2C",
+        "downloadId": "j4V7lIcDmNXKFMKQkhpca",
+        "state": 1,
+        "updatedAt": "2024-05-06 15:12:53",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Dust Bag for Plus Robot Vacuums",
+        "pathname": "Dust-Bag-for-Plus-Robot-Vacuums",
+        "downloadId": "XD4eIvgHVt9F3SXbEdbjL",
+        "state": 1,
+        "updatedAt": "2023-12-11 11:13:42",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Dust Bag for RE4C Plus",
+        "pathname": "Dust-Bag-for-RE4C-Plus",
+        "downloadId": "xNPDVlVDVaa8YgPT6dOEZ",
+        "state": 1,
+        "updatedAt": "2024-12-18 15:51:18",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Dust Bag for RE7 Edge",
+        "pathname": "Dust-Bag-for-RE7-Edge",
+        "downloadId": "tfy_hFNFyDXFoUwDcu285",
+        "state": 1,
+        "updatedAt": "2026-01-23 00:27:20",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "EP3x",
+        "pathname": "EP3x",
+        "downloadId": "MU-T5c1UsyVi0WcvRnuJf",
+        "state": 1,
+        "updatedAt": "2024-11-03 14:24:23",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "EP3x Pro",
+        "pathname": "EP3x-Pro",
+        "downloadId": "7Qy1s3wmA1T7MG4mKOES1",
+        "state": 1,
+        "updatedAt": "2024-08-05 11:11:58",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "EP3x Pro Kit",
+        "pathname": "EP3x-Pro-Kit",
+        "downloadId": "DcIlvSTLozayvT6qspNGo",
+        "state": 1,
+        "updatedAt": "2025-06-05 18:33:13",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "EZVIZ 4-Piece Home Sensor Kit",
+        "pathname": "EZVIZ-4-Piece-Home-Sensor-Kit",
+        "downloadId": "ARWKFgRCNBT3k6t10ZcgK",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "EZVIZ 9-Piece Home Sensor Kit",
+        "pathname": "EZVIZ-9-Piece-Home-Sensor-Kit",
+        "downloadId": "hp4nPBulUsF2tpYx7rNxe",
+        "state": 1,
+        "updatedAt": "2024-01-11 15:33:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Hard Floor Cleaning Solution",
+        "pathname": "Hard-Floor-Cleaning-Solution",
+        "downloadId": "NHrinftILbcEh4SYvvcUI",
+        "state": 1,
+        "updatedAt": "2023-12-11 11:12:42",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "HP7",
+        "pathname": "HP7",
+        "downloadId": "MbwEMi9Vgi8DpL7fOF2qp",
+        "state": 1,
+        "updatedAt": "2023-12-17 13:40:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "HP7",
+        "pathname": "HP7",
+        "downloadId": "aV63CddSPayBmkOBW2Oei",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "HP7 2-Entry Kit",
+        "pathname": "HP7-2-Entry-Kit",
+        "downloadId": "F5NciGdiQh_rauMEQExcm",
+        "state": 1,
+        "updatedAt": "2025-09-22 22:51:52",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "HP7 2-Family Kit",
+        "pathname": "HP7-2-Family-Kit",
+        "downloadId": "EHek0gLKEtYR2kIEKx0oC",
+        "state": 1,
+        "updatedAt": "2025-04-14 18:51:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "HP7 Pro",
+        "pathname": "HP7-Pro",
+        "downloadId": "3i0rrerMvnB8PHfzquDFK",
+        "state": 1,
+        "updatedAt": "2025-06-10 18:40:40",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "K2 Datasheet",
+        "pathname": "K2-Datasheet",
+        "downloadId": "JChfEzGkVBVM8fjZCrUZH",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "K2 Datasheet",
+        "pathname": "K2-Datasheet",
+        "downloadId": "rO8AG6CBZPvZFPvqmSbLU",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "K2 Datasheet",
+        "pathname": "K2-Datasheet",
+        "downloadId": "7F8xvV8XOVnW7Q4Hp47lH",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "K3",
+        "pathname": "K3",
+        "downloadId": "1OFhezm0B_VtSMHOFn0VN",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "L2",
+        "pathname": "L2",
+        "downloadId": "AwhH3khdA7hQ4PfD-Rq9z",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "L2S",
+        "pathname": "L2S",
+        "downloadId": "urCDZ2FSH2DbGWL5a0_9X",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "LB1-Color",
+        "pathname": "LB1-Color",
+        "downloadId": "cmddyGoSBbUweYJU1UEky",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "LB1-White",
+        "pathname": "LB1-White",
+        "downloadId": "YoyabB1fPrqO6pP4OP9CX",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Power Backup Pod",
+        "pathname": "Power-Backup-Pod",
+        "downloadId": "ftV2bPyKazAWh1E7FtHQm",
+        "state": 1,
+        "updatedAt": "2026-01-11 21:49:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Power Partner",
+        "pathname": "Power-Partner",
+        "downloadId": "RAsoY-Nr7ApP3KN42rP2c",
+        "state": 1,
+        "updatedAt": "2024-07-31 15:46:34",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "PS1300",
+        "pathname": "PS1300",
+        "downloadId": "y6UxS8vFh_1dgQsvUTPvx",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "PS300",
+        "pathname": "PS300",
+        "downloadId": "siszJkWjfNfonBzmlV_nJ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "PS600",
+        "pathname": "PS600",
+        "downloadId": "C5UvXZMHB-75I1YXBvgh1",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "PSP100",
+        "pathname": "PSP100",
+        "downloadId": "b5x5p46F8zZWKEfKlCZ3t",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "PSP200",
+        "pathname": "PSP200",
+        "downloadId": "SThsDsk8rg-ppOx8J0KcT",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RC3",
+        "pathname": "RC3",
+        "downloadId": "2YNDP4rzna_ZfkIVHY0UX",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RC3 Plus",
+        "pathname": "RC3-Plus",
+        "downloadId": "4PHvrfhf2YKvnVB0RwEYw",
+        "state": 1,
+        "updatedAt": "2023-11-14 15:12:33",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RC3 Series Accessory Pack",
+        "pathname": "RC3-Series-Accessory-Pack",
+        "downloadId": "TioBkje3aVZYEcild1E_X",
+        "state": 1,
+        "updatedAt": "2024-08-27 13:55:34",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE4",
+        "pathname": "RE4",
+        "downloadId": "suy9BM5CcikWdQ0mBdKdW",
+        "state": 1,
+        "updatedAt": "2024-05-29 14:28:40",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE4 & RE5 Series Accessory Pack",
+        "pathname": "RE4-and-RE5-Series-Accessory-Pack",
+        "downloadId": "00Y7qPO-6w1a1AmgDIJFn",
+        "state": 1,
+        "updatedAt": "2024-08-27 13:56:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE4 Plus",
+        "pathname": "RE4-Plus",
+        "downloadId": "jfX01bJY0FaQDZaDHCU3R",
+        "state": 1,
+        "updatedAt": "2024-05-29 14:28:56",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE4C",
+        "pathname": "RE4C",
+        "downloadId": "FWuHCI_erxIPgWcbeyK7y",
+        "state": 1,
+        "updatedAt": "2024-11-04 15:05:03",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE4C & RE4 & RE5 Series Accessory Pack",
+        "pathname": "RE4C-and-RE4-and-RE5-Series-Accessory-Pack",
+        "downloadId": "FdB2FpT2xRdKpotXdLRkw",
+        "state": 1,
+        "updatedAt": "2024-11-20 15:07:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE4C Pus",
+        "pathname": "RE4C-Pus",
+        "downloadId": "J_h84T9xGNAueJ3XW1nNo",
+        "state": 1,
+        "updatedAt": "2024-11-19 14:45:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE4C&RE4&RE5 Series Accessory Pack",
+        "pathname": "RE4CandRE4andRE5-Series-Accessory-Pack",
+        "downloadId": "xpXw25BGVOL_Bxg_LeeNu",
+        "state": 1,
+        "updatedAt": "2024-09-03 11:29:26",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE5",
+        "pathname": "RE5",
+        "downloadId": "9Ns_2zym0zd6hsTLfuAd_",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE5 Plus",
+        "pathname": "RE5-Plus",
+        "downloadId": "0FG2QPRihfc4Yx73kG9-K",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE5S Plus",
+        "pathname": "RE5S-Plus",
+        "downloadId": "oki0dGVmzDe0DJxLdRv13",
+        "state": 1,
+        "updatedAt": "2025-03-13 01:07:11",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE7 Edge",
+        "pathname": "RE7-Edge",
+        "downloadId": "f-hWRi4f4xr7M7AdLb3mm",
+        "state": 1,
+        "updatedAt": "2025-12-30 22:26:55",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RE7 Edge Accessory Pack",
+        "pathname": "RE7-Edge-Accessory-Pack",
+        "downloadId": "lXuSr4PeinOh4d99njJEw",
+        "state": 1,
+        "updatedAt": "2026-01-21 03:06:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RH1",
+        "pathname": "RH1",
+        "downloadId": "fNyTEFUNuC9lGmFsSqbck",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RH2",
+        "pathname": "RH2",
+        "downloadId": "7SXmdnY1CdzPky7ifdEuU",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RH2 Fragrance Card",
+        "pathname": "RH2-Fragrance-Card",
+        "downloadId": "24pE2VX3Wxtf0TzirHlVK",
+        "state": 1,
+        "updatedAt": "2023-12-11 11:13:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RH2 Rolling Brush & HEPA Kit",
+        "pathname": "RH2-Rolling-Brush-and-HEPA-Kit",
+        "downloadId": "VQje6NjPbJd8V7T3LEaXJ",
+        "state": 1,
+        "updatedAt": "2023-12-10 14:19:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RM600",
+        "pathname": "RM600",
+        "downloadId": "NIl6l2gx3KiaOueBBp72Z",
+        "state": 1,
+        "updatedAt": "2025-01-15 17:09:46",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RS2",
+        "pathname": "RS2",
+        "downloadId": "sAyEky-vMaBvzjnkvSOhl",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RS2 Accessory Pack",
+        "pathname": "RS2-Accessory-Pack",
+        "downloadId": "zGdOUTq2L1y6advEfd_20",
+        "state": 1,
+        "updatedAt": "2023-12-10 11:24:05",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RS20 Max",
+        "pathname": "RS20-Max",
+        "downloadId": "LIJu1CHT62CL_BfmXQkKl",
+        "state": 1,
+        "updatedAt": "2025-02-25 15:03:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RS20 Pro",
+        "pathname": "RS20-Pro",
+        "downloadId": "0dj1YqXJD1ZV7dM9utEaZ",
+        "state": 1,
+        "updatedAt": "2024-09-24 14:02:37",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RS20 Pro Accessory Pack",
+        "pathname": "RS20-Pro-Accessory-Pack",
+        "downloadId": "d79jFV4Q5KVW2uwLIZ-J1",
+        "state": 1,
+        "updatedAt": "2024-09-03 11:33:05",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "RS20 Series Hard Floor Cleaning Solution",
+        "pathname": "RS20-Series-Hard-Floor-Cleaning-Solution",
+        "downloadId": "4LX2iYIC7eSjdcA4ICxLc",
+        "state": 1,
+        "updatedAt": "2024-09-03 11:33:48",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Smart Chime",
+        "pathname": "Smart-Chime",
+        "downloadId": "oAv7iVZJzeV0MAIo3VSXh",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Smart Home",
+        "pathname": "Smart-Home",
+        "downloadId": "riYl7OuAf8jFGHyZ1KX1C",
+        "state": 1,
+        "updatedAt": "2026-08-07 01:54:13",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T1 Datasheet",
+        "pathname": "T1-Datasheet",
+        "downloadId": "BexkaUMkh6K3qTN-IzyH9",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T1 Datasheet",
+        "pathname": "T1-Datasheet",
+        "downloadId": "oq7lrqjFPasiATwyvDdDf",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T1 Datasheet",
+        "pathname": "T1-Datasheet",
+        "downloadId": "5aF2F4PKxZDjnFveuh-K4",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T10 Datasheet",
+        "pathname": "T10-Datasheet",
+        "downloadId": "NEBJAwHA_1Bxm9cPXWQGx",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T10C",
+        "pathname": "T10C",
+        "downloadId": "bdrVdecPk7zaOdyJpNEHF",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T1C PIR Motion Sensor",
+        "pathname": "T1C-PIR-Motion-Sensor",
+        "downloadId": "jCRdvHLRIH5GdMcCZJYcH",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T2 Datasheet",
+        "pathname": "T2-Datasheet",
+        "downloadId": "yMA_1psf9HXZSlXbk7Gqo",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T2 Datasheet",
+        "pathname": "T2-Datasheet",
+        "downloadId": "FA9rXLAM88fxdUz2kcFk_",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T2 Datasheet",
+        "pathname": "T2-Datasheet",
+        "downloadId": "eXLIcZ0NxuP2AIeXoMCS7",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T2C Open/Close Sensor",
+        "pathname": "T2C-OpenClose-Sensor",
+        "downloadId": "enYHO0rHgr2mIoeCdH_vj",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T3 Datasheet",
+        "pathname": "T3-Datasheet",
+        "downloadId": "e9PWxL2nw0s8a9NCvtd6g",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T30-10A-EU",
+        "pathname": "T30-10A-EU",
+        "downloadId": "6USQGK0fRnCjz97vUVujX",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T30-10A-US",
+        "pathname": "T30-10A-US",
+        "downloadId": "ZIscPQ5VMUs8RlKwxo_zD",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T30-10B-EU",
+        "pathname": "T30-10B-EU",
+        "downloadId": "33qeEpzjCRhkDjO0S61hY",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T30-10B-US",
+        "pathname": "T30-10B-US",
+        "downloadId": "Q7ucrZ4UlBhTqcgB69E4h",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T30-10E-EU",
+        "pathname": "T30-10E-EU",
+        "downloadId": "ekAmT-ykJkEak8QBfbiO5",
+        "state": 1,
+        "updatedAt": "2025-09-09 19:07:14",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T31-16E-EU",
+        "pathname": "T31-16E-EU",
+        "downloadId": "jXN0H1fleOAU3kjKOacNw",
+        "state": 1,
+        "updatedAt": "2025-09-09 23:14:46",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T31(EU)",
+        "pathname": "T31(EU)",
+        "downloadId": "qzJnBiV8iOXuaGx2MHjcW",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T31(UK)",
+        "pathname": "T31(UK)",
+        "downloadId": "XbWjQv1k02FQtSokczthi",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T31(US)",
+        "pathname": "T31(US)",
+        "downloadId": "LT-4F_aNqb-yTYLe_qMTB",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T33",
+        "pathname": "T33",
+        "downloadId": "mBd9fNQoIDtosz6HRXKAz",
+        "state": 1,
+        "updatedAt": "2025-02-18 14:36:08",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T35W",
+        "pathname": "T35W",
+        "downloadId": "OpldgQOfxknlCB-FeMXXS",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T35W Matter",
+        "pathname": "T35W-Matter",
+        "downloadId": "Z0v8mKsqWPlDOAAHtlHYS",
+        "state": 1,
+        "updatedAt": "2025-09-11 22:19:53",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T35WD",
+        "pathname": "T35WD",
+        "downloadId": "UivUeOvJuNCogG_xKudV9",
+        "state": 1,
+        "updatedAt": "2025-01-07 11:11:08",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T35WM",
+        "pathname": "T35WM",
+        "downloadId": "deLR9bRWglReResJFFCle",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T35WM Matter",
+        "pathname": "T35WM-Matter",
+        "downloadId": "wqr6yohsZnZ7Va_NSMmwT",
+        "state": 1,
+        "updatedAt": "2025-09-11 23:51:44",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T36",
+        "pathname": "T36",
+        "downloadId": "kLAzJgVsw1JOj5HL-rjAq",
+        "state": 1,
+        "updatedAt": "2024-04-23 15:47:51",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T3C Smart Button",
+        "pathname": "T3C-Smart-Button",
+        "downloadId": "7t5FrayJ6cedmVsqpDxyM",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T4",
+        "pathname": "T4",
+        "downloadId": "bMyGsMvGE8h24ojE62fJw",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T51C",
+        "pathname": "T51C",
+        "downloadId": "pSTBM7v17-a2ZpmPNf3LM",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T55",
+        "pathname": "T55",
+        "downloadId": "T36h2ecYBcQd_p0bV28cz",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T56",
+        "pathname": "T56",
+        "downloadId": "VdB3lU7fu7Cu_-wVVKOvA",
+        "state": 1,
+        "updatedAt": "2025-09-09 19:27:08",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T6 Datasheet",
+        "pathname": "T6-Datasheet",
+        "downloadId": "FYIKVU5-ckFGkM4YZKME-",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T6 Datasheet",
+        "pathname": "T6-Datasheet",
+        "downloadId": "Jc3O-1MTxKTkV-0QjSOqy",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T6 Datasheet",
+        "pathname": "T6-Datasheet",
+        "downloadId": "isKYtezoxA3DfEWkAgM61",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T9 Datasheet",
+        "pathname": "T9-Datasheet",
+        "downloadId": "1_12gBDsDp2mblF72h-6U",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T9 Datasheet",
+        "pathname": "T9-Datasheet",
+        "downloadId": "fI0-bmzzObsD5Y5XYBj8j",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T9 Datasheet",
+        "pathname": "T9-Datasheet",
+        "downloadId": "Zm02vubQJO-F2OcxrSuLm",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "T9C",
+        "pathname": "T9C",
+        "downloadId": "A075i9UA3wsXE9nlivr4v",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "TP7",
+        "pathname": "TP7",
+        "downloadId": "BzMx8ORtYKpmHnMhFNwDO",
+        "state": 1,
+        "updatedAt": "2024-12-22 11:23:28",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "TP9 Pro",
+        "pathname": "TP9-Pro",
+        "downloadId": "MuROH_YVkTj_u1_m1mNm1",
+        "state": 1,
+        "updatedAt": "2025-09-24 23:15:07",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Transformer",
+        "pathname": "Transformer",
+        "downloadId": "olDyyNvIhvvFsA89HCFO1",
+        "state": 1,
+        "updatedAt": "2025-03-10 00:30:41",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "smart home",
+        "title": "Transformer",
+        "pathname": "Transformer",
+        "downloadId": "aUbTQ5-cPclht9VIa7xZC",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      }
+    ],
+    "security camera": [
+      {
+        "category": "security camera",
+        "title": "12W Battery Solar Panel",
+        "pathname": "12W-Battery-Solar-Panel",
+        "downloadId": "7JPFBbP7h9GxB17Jfr2Zw",
+        "state": 1,
+        "updatedAt": "2024-05-08 10:58:56",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "24W Battery Solar Panel",
+        "pathname": "24W-Battery-Solar-Panel",
+        "downloadId": "oawWdjvWl7uaiWTGPP8N6",
+        "state": 1,
+        "updatedAt": "2024-04-23 16:08:49",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "8W Battery Solar Panel",
+        "pathname": "8W-Battery-Solar-Panel",
+        "downloadId": "TB-ThdjYDwd-1mdImthoI",
+        "state": 1,
+        "updatedAt": "2025-10-16 01:14:38",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "Adjustable Cylinder",
+        "pathname": "Adjustable-Cylinder",
+        "downloadId": "6AQ6eNAJzFBXVYXi-yB7j",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "Alarm Light Camera",
+        "pathname": "Alarm-Light-Camera",
+        "downloadId": "wdbLtjR0EokJUjHqn83JN",
+        "state": 1,
+        "updatedAt": "2026-04-16 00:37:21",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-Add-on",
+        "pathname": "BC1-Add-on",
+        "downloadId": "o2LjPobymNx_kFQmikgQ-",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-Add-on 2K⁺",
+        "pathname": "BC1-Add-on-2K",
+        "downloadId": "VpI5FCL_EjkqtpwtuXwOO",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-B1",
+        "pathname": "BC1-B1",
+        "downloadId": "KbyHIC_Tycdv_oRd_YUZ4",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-B1 2K⁺",
+        "pathname": "BC1-B1-2K",
+        "downloadId": "UZOOJ5iX4HHoAEwhWMHun",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-B2",
+        "pathname": "BC1-B2",
+        "downloadId": "Ai7ZHjyem4Ofl_ezi3oTw",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-B2 2K⁺",
+        "pathname": "BC1-B2-2K",
+        "downloadId": "5YmbSdVzSTOl_XneeQ_0q",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-B3",
+        "pathname": "BC1-B3",
+        "downloadId": "uhpCY8unTv1jk-o4Wi5Mm",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1-B3 2K⁺",
+        "pathname": "BC1-B3-2K",
+        "downloadId": "8PetpuMrkiWRMmCDGmzgl",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1c 4K",
+        "pathname": "BC1c-4K",
+        "downloadId": "xgk9wei5lM9FboDeIzlo2",
+        "state": 1,
+        "updatedAt": "2025-01-19 16:04:00",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC1c 4K Kit",
+        "pathname": "BC1c-4K-Kit",
+        "downloadId": "tRnMFIlRjd4LocN2ZREop",
+        "state": 1,
+        "updatedAt": "2025-01-19 16:04:31",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "BC2",
+        "pathname": "BC2",
+        "downloadId": "L6Lnq0Mni3pMm_WlNc7WF",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C1C",
+        "pathname": "C1C",
+        "downloadId": "NTGmczTBNgpXnmb30BDfd",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "c1c pir",
+        "pathname": "c1c-pir",
+        "downloadId": "7uSiuBvi3IBLcJJhJ6h-A",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C1C PIR",
+        "pathname": "C1C-PIR",
+        "downloadId": "M7wBfu3JiD9zT2KTEf1D5",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C1C-B",
+        "pathname": "C1C-B",
+        "downloadId": "8mjI3n-OGhYKALVjnDfp1",
+        "state": 1,
+        "updatedAt": "2024-05-23 09:44:26",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C1HC",
+        "pathname": "C1HC",
+        "downloadId": "4ScX5V7vhh8sIeZ02l7dh",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C1HC H.265",
+        "pathname": "C1HC-H.265",
+        "downloadId": "hO3q9o4dmLdJs6Cm7y-dp",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C1T",
+        "pathname": "C1T",
+        "downloadId": "pxl9srgo_3KbUh1LqDQwa",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C2C (Mini O 180)",
+        "pathname": "C2C-(Mini-O-180)",
+        "downloadId": "nMWDi8R83ue4D_lre3Vlm",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C2C (Mini O Plus)",
+        "pathname": "C2C-(Mini-O-Plus)",
+        "downloadId": "KnlhBAwyV-o_oXrq2fd6X",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C2C (Mini O)",
+        "pathname": "C2C-(Mini-O)",
+        "downloadId": "OpUTHci8E_LvgNyiUu4FJ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C2C 720P",
+        "pathname": "C2C-720P",
+        "downloadId": "PRIotUGbPQklCuR3hUQSP",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C2C H.265",
+        "pathname": "C2C-H.265",
+        "downloadId": "-uNXguDmxczyL5c-zNBlX",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3A",
+        "pathname": "C3A",
+        "downloadId": "Naq0alxJheigqQV27lXqy",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3A Dual Slot Charger",
+        "pathname": "C3A-Dual-Slot-Charger",
+        "downloadId": "CSapkVFBf7mgSYPnzBz4X",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3A W2D (US Version)",
+        "pathname": "C3A-W2D-(US-Version)",
+        "downloadId": "aaxpSXq7bDAvNDyNdH1qU",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3A+W2D Hub",
+        "pathname": "C3A+W2D-Hub",
+        "downloadId": "i8LS_taXQZPuuhhKrYgjE",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3A+WLB 4G Hub",
+        "pathname": "C3A+WLB-4G-Hub",
+        "downloadId": "lfM3OUIXDRKKW-dnPTqsv",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3C",
+        "pathname": "C3C",
+        "downloadId": "ouCcFNQVbF0_z7NejWbMA",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3N",
+        "pathname": "C3N",
+        "downloadId": "GDb-gaUIE4FJNyWgZymqK",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3S",
+        "pathname": "C3S",
+        "downloadId": "quoorarqtpgEkWqodKnfG",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3T POE",
+        "pathname": "C3T-POE",
+        "downloadId": "cQwIvQQhJUCbzFvvua30N",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3T WIFI",
+        "pathname": "C3T-WIFI",
+        "downloadId": "P0DuajFYnmMiGKLXckYBU",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3TN 2MP",
+        "pathname": "C3TN-2MP",
+        "downloadId": "7_2vYN1abiFkYFJxns7sZ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3TN 3MP",
+        "pathname": "C3TN-3MP",
+        "downloadId": "VBPQE_w88maHXttcs_uH0",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3TN Color",
+        "pathname": "C3TN-Color",
+        "downloadId": "iD3yu7r04rek6DEJEAgkJ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3W (ezGuard)",
+        "pathname": "C3W-(ezGuard)",
+        "downloadId": "H8hGiRhbyCp6ag7QYq2e9",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3W Color Night Vision",
+        "pathname": "C3W-Color-Night-Vision",
+        "downloadId": "Junj4XyFnFuPyWbQ6dxLE",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3W Pro",
+        "pathname": "C3W-Pro",
+        "downloadId": "hzLwxxM33BJrGmhcYpj98",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3W Pro (4MP)",
+        "pathname": "C3W-Pro-(4MP)",
+        "downloadId": "HicMAMUF5PMhjRiZu4HxA",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3WN",
+        "pathname": "C3WN",
+        "downloadId": "kZxVbrA0KVhUluZMKaVrq",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3X",
+        "pathname": "C3X",
+        "downloadId": "HLDGYNah9X57CpdUARqyH",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C3X 2K⁺",
+        "pathname": "C3X-2K",
+        "downloadId": "Iw_3wG85Ge-nWm4dUulXp",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C4S",
+        "pathname": "C4S",
+        "downloadId": "SLHXUjGP-wAN0WAN_GkYx",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C4W",
+        "pathname": "C4W",
+        "downloadId": "XYv1flBWj2m--stJ1eLyO",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6",
+        "pathname": "C6",
+        "downloadId": "u1rtXt4mciqjooK8wOeFn",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C60p Dual Mix 2K",
+        "pathname": "C60p-Dual-Mix-2K",
+        "downloadId": "3av1P74JkpHIcJgJlW5Wp",
+        "state": 1,
+        "updatedAt": "2025-01-13 10:49:08",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6B",
+        "pathname": "C6B",
+        "downloadId": "tx4Q6FM25QycYBu2u0mjE",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6C (ez360)",
+        "pathname": "C6C-(ez360)",
+        "downloadId": "dmm5N50UbjsGIYkyF3CB8",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6c 2K",
+        "pathname": "C6c-2K",
+        "downloadId": "3YzYXLFhf_TplaVyz_eWe",
+        "state": 1,
+        "updatedAt": "2024-09-11 14:08:07",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6c 4K",
+        "pathname": "C6c-4K",
+        "downloadId": "2Ba5RhSlqaG0IHZp9jIvZ",
+        "state": 1,
+        "updatedAt": "2024-09-18 15:48:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6CN",
+        "pathname": "C6CN",
+        "downloadId": "Ka3v8kVh3Bt1vGf81f-cy",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6N",
+        "pathname": "C6N",
+        "downloadId": "UjvHdzlbJJy8BtkITg0io",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6N 3MP",
+        "pathname": "C6N-3MP",
+        "downloadId": "gkzx_nEK-U4ilRBf8gC91",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6N 4MP",
+        "pathname": "C6N-4MP",
+        "downloadId": "-hDOjns-0bkMC4Xx5Xb0T",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6N G1 2K",
+        "pathname": "C6N-G1-2K",
+        "downloadId": "ntKg2JQtF8HlTuzkkisnd",
+        "state": 1,
+        "updatedAt": "2026-01-29 18:45:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6N G1 3K",
+        "pathname": "C6N-G1-3K",
+        "downloadId": "3-lbX7bsaBCRlKCGQ_s-O",
+        "state": 1,
+        "updatedAt": "2025-08-05 18:28:06",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6N G1 4K",
+        "pathname": "C6N-G1",
+        "downloadId": "xpLbiGvrW3lV1T6PzSEnu",
+        "state": 1,
+        "updatedAt": "2025-05-20 18:39:33",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6N Pro 2K",
+        "pathname": "C6N-Pro-2K",
+        "downloadId": "e4kiRhrYToDzTvC-a-f-7",
+        "state": 1,
+        "updatedAt": "2024-06-23 16:11:22",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6P (ez360 Pano)",
+        "pathname": "C6P-(ez360-Pano)",
+        "downloadId": "fGydrEd1OH0Gh8sSzCjAT",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6TC",
+        "pathname": "C6TC",
+        "downloadId": "3-r2axcTEPgrs8oatdIdM",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C6W",
+        "pathname": "C6W",
+        "downloadId": "9PmCKULqTIQGfQs95CUyJ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C7",
+        "pathname": "C7",
+        "downloadId": "DJnfJj2zyraJ_T8D7KpGz",
+        "state": 1,
+        "updatedAt": "2024-08-05 09:19:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8C",
+        "pathname": "C8C",
+        "downloadId": "HUb9x9seLSctaldCnU94N",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8c 1080p",
+        "pathname": "C8c-1080p",
+        "downloadId": "R2Wmy5PYroxoGVA-ly_Q4",
+        "state": 1,
+        "updatedAt": "2024-08-13 16:44:35",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8c 2K⁺",
+        "pathname": "C8c-2K",
+        "downloadId": "x6_WHb2ilYpK4ugkYhuW3",
+        "state": 1,
+        "updatedAt": "2024-08-13 16:43:46",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8c 3K",
+        "pathname": "C8c-3K",
+        "downloadId": "-YIo3b27jRoJdivEdYGSS",
+        "state": 1,
+        "updatedAt": "2024-08-13 16:43:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8c 4K",
+        "pathname": "C8c-4K",
+        "downloadId": "LIOdELdKp0mF5sUBT8u8W",
+        "state": 1,
+        "updatedAt": "2024-08-27 14:20:48",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8c 4K (R210)",
+        "pathname": "C8c-4K-(R210)",
+        "downloadId": "wImXKFD0Z1uNuH1V76Zfl",
+        "state": 1,
+        "updatedAt": "2026-03-24 19:10:23",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8C Lite",
+        "pathname": "C8C-Lite",
+        "downloadId": "jceNgtQirlQEO7W8-YFPQ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8PF",
+        "pathname": "C8PF",
+        "downloadId": "uGG42t_anWhfSAD6zCjno",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8W",
+        "pathname": "C8W",
+        "downloadId": "LyZ818nDt-a4SAEJYB7Pq",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8W Pro 2K",
+        "pathname": "C8W-Pro-2K",
+        "downloadId": "iADKj4FJC8h5tRloXRpIK",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C8W Pro 3K",
+        "pathname": "C8W-Pro-3K",
+        "downloadId": "YobTWS-t7ZA89qwCgGbwR",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C90 Dual",
+        "pathname": "C90-Dual",
+        "downloadId": "ZQSo1uJEuC90t29E-TNZ6",
+        "state": 1,
+        "updatedAt": "2025-03-05 00:15:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C9c Dual 2K",
+        "pathname": "C9c-Dual-2K",
+        "downloadId": "jap_yLKpP_5pLMmIfjAYM",
+        "state": 1,
+        "updatedAt": "2026-03-23 03:45:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "C9c Dual 3K",
+        "pathname": "C9c-Dual-3K",
+        "downloadId": "1LwlO_y-UDfirODQMWGkC",
+        "state": 1,
+        "updatedAt": "2026-03-23 03:42:47",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB1",
+        "pathname": "CB1",
+        "downloadId": "7pD4eBpT0Hyt4GuEClJ7K",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB2",
+        "pathname": "CB2",
+        "downloadId": "kovN3QTB4_SDHMaeiBaEV",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB2 4G",
+        "pathname": "CB2-4G",
+        "downloadId": "y2qpNuMrZrq_nkpPB88mt",
+        "state": 1,
+        "updatedAt": "2024-10-21 10:21:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB2 4G Kit",
+        "pathname": "CB2-4G-Kit",
+        "downloadId": "XiR6f3Bw6mbYvWUfzC_rB",
+        "state": 1,
+        "updatedAt": "2024-12-12 17:31:13",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB3",
+        "pathname": "CB3",
+        "downloadId": "9WK7soqGNuLpVwbqfHTx4",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB3 (AOV Version)",
+        "pathname": "CB3-(AOV-Version)",
+        "downloadId": "_o7jG5-cTOQz_oQl6weh_",
+        "state": 1,
+        "updatedAt": "2024-09-08 11:19:20",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB3 4G",
+        "pathname": "CB3-4G",
+        "downloadId": "JTWyQrFLLb4UlZqLCF_e4",
+        "state": 1,
+        "updatedAt": "2024-12-03 14:41:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB3 4G Kit",
+        "pathname": "CB3-4G-Kit",
+        "downloadId": "p-eGvFu8xTnPunv9Jvmcj",
+        "state": 1,
+        "updatedAt": "2025-04-17 23:15:48",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB3 Kit",
+        "pathname": "CB3-Kit",
+        "downloadId": "rEKV6rQMtXQsOHVq6hHom",
+        "state": 1,
+        "updatedAt": "2025-06-17 22:03:21",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB5 4K",
+        "pathname": "CB5-4K",
+        "downloadId": "Phjwk9n-L2QF9slyZ_qyJ",
+        "state": 1,
+        "updatedAt": "2025-01-19 16:02:47",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8",
+        "pathname": "CB8",
+        "downloadId": "4SMuVQkS9T4cFQGU2x8xw",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite",
+        "pathname": "CB8-Lite",
+        "downloadId": "tXDurwVJAX0vk_egXbNmI",
+        "state": 1,
+        "updatedAt": "2025-03-10 00:28:18",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite 3K+",
+        "pathname": "CB8-Lite-3K+",
+        "downloadId": "-4Yj3301hsck39mN2v4jB",
+        "state": 1,
+        "updatedAt": "2026-05-11 01:45:52",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite 3K⁺ Kit",
+        "pathname": "CB8-Lite-3K-Kit",
+        "downloadId": "D8SjtqH2DrHR2RCVzIFwQ",
+        "state": 1,
+        "updatedAt": "2026-05-13 22:35:51",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite 4G",
+        "pathname": "CB8-Lite-4G",
+        "downloadId": "v9Yv3GCWdypo7nnCgkyFK",
+        "state": 1,
+        "updatedAt": "2025-06-25 19:39:32",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite 4G Kit",
+        "pathname": "CB8-Lite-4G-Kit",
+        "downloadId": "MIBvlFec7JnOp8E5rMabz",
+        "state": 1,
+        "updatedAt": "2025-08-28 21:39:45",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite 4K",
+        "pathname": "CB8-Lite-4K",
+        "downloadId": "2LVydlPBAFd_A27Bb7m92",
+        "state": 1,
+        "updatedAt": "2026-04-09 01:15:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite 4K Kit",
+        "pathname": "CB8-Lite-4K-Kit",
+        "downloadId": "lksR2aJ3cOOMJBL8LZDYv",
+        "state": 1,
+        "updatedAt": "2026-05-27 04:13:31",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB8 Lite Kit",
+        "pathname": "CB8-Lite-Kit",
+        "downloadId": "V66UXaqAcTTSS8JvDS4qz",
+        "state": 1,
+        "updatedAt": "2025-04-26 21:58:41",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB90 Dual Kit",
+        "pathname": "CB90-Dual-Kit",
+        "downloadId": "IURUWlpF5BSRC3v8NuSnt",
+        "state": 1,
+        "updatedAt": "2025-05-08 18:59:00",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB90f Triple Kit",
+        "pathname": "CB90f-Triple-Kit",
+        "downloadId": "R7ToRkk1oCjesYplmRH0Q",
+        "state": 1,
+        "updatedAt": "2026-08-02 22:44:38",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CB90x Dual 4G Kit",
+        "pathname": "CB90x-Dual-4G-Kit",
+        "downloadId": "QNyOHRgbAdw9WhIpmavtJ",
+        "state": 1,
+        "updatedAt": "2025-08-06 00:23:27",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP1 3MP",
+        "pathname": "CP1-3MP",
+        "downloadId": "s5UBGfix-7BPRvLfX4EZf",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP1 4MP",
+        "pathname": "CP1-4MP",
+        "downloadId": "Ld9jtYe3cJMUuH0tabB-U",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP1 Pro",
+        "pathname": "CP1-Pro",
+        "downloadId": "ahpIiV4pUYsh8TzzAguoO",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP1 Pro 2K",
+        "pathname": "CP1-Pro-2K",
+        "downloadId": "-PbqM_09P8gG76mJDqia3",
+        "state": 1,
+        "updatedAt": "2024-08-12 16:19:42",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP1 Pro 2K+",
+        "pathname": "CP1-Pro-2K+",
+        "downloadId": "RZjfGlXlWS5SYTt-r2Ot0",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP1 Pro 4K",
+        "pathname": "CP1-Pro-4K",
+        "downloadId": "ZS9UMl7IFGVYDME8gTvgI",
+        "state": 1,
+        "updatedAt": "2024-12-19 10:30:56",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP2",
+        "pathname": "CP2",
+        "downloadId": "aFR4hz5UGthTb6Esgzc9F",
+        "state": 1,
+        "updatedAt": "2024-08-05 14:47:02",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP3",
+        "pathname": "CP3",
+        "downloadId": "1wTGeh9HIR8MRgOs63B1g",
+        "state": 1,
+        "updatedAt": "2024-08-21 11:30:32",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP3 Pro",
+        "pathname": "CP3-Pro",
+        "downloadId": "enefxTlG5uK_yq5LFGQ52",
+        "state": 1,
+        "updatedAt": "2024-11-20 16:52:53",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP4",
+        "pathname": "CP4",
+        "downloadId": "NCGWqX0TntvOOp3E72L2T",
+        "state": 1,
+        "updatedAt": "2025-08-04 21:44:48",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP5",
+        "pathname": "CP5",
+        "downloadId": "u1RBFEXrK2RGR_iKFTOQc",
+        "state": 1,
+        "updatedAt": "2024-12-24 10:04:12",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP7",
+        "pathname": "CP7",
+        "downloadId": "7t8u0-rYvrcX4yHlJyfK8",
+        "state": 1,
+        "updatedAt": "2024-04-02 16:50:51",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "CP8",
+        "pathname": "CP8",
+        "downloadId": "RXTHORBWubDH1w25Y6W_f",
+        "state": 1,
+        "updatedAt": "2026-06-04 22:58:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB250A Air Purifier",
+        "pathname": "EB250A-Air-Purifier",
+        "downloadId": "7fooWOe6WDEvln-0aQaHw",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB3",
+        "pathname": "EB3",
+        "downloadId": "qamGpChz_5qmotryPXMev",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB3 (AOV Version)",
+        "pathname": "EB3-(AOV-Version)",
+        "downloadId": "sQ46YO_UvgvZhTmDpXT6f",
+        "state": 1,
+        "updatedAt": "2024-01-31 17:41:29",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB3 4G",
+        "pathname": "EB3-4G",
+        "downloadId": "BRCA2v3OjqYafTCLpdym4",
+        "state": 1,
+        "updatedAt": "2024-09-22 14:21:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB3 4G Kit",
+        "pathname": "EB3-4G-Kit",
+        "downloadId": "s7AKoCkzC1IxVxhY-aet0",
+        "state": 1,
+        "updatedAt": "2025-04-26 21:57:52",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB3 Kit",
+        "pathname": "EB3-Kit",
+        "downloadId": "MvX2dM2SKr4-Tgwm64UV1",
+        "state": 1,
+        "updatedAt": "2025-06-19 22:56:23",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB350A Air Purifier",
+        "pathname": "EB350A-Air-Purifier",
+        "downloadId": "aIVORKOs207rm04pYz0QW",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB5 4K",
+        "pathname": "EB5-4K",
+        "downloadId": "uxVdGBoQts_5yzMJG7XGB",
+        "state": 1,
+        "updatedAt": "2025-01-14 15:12:07",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB8 4G",
+        "pathname": "EB8-4G",
+        "downloadId": "qY89I0lwq5Se8otiqD7ov",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB8 Pro 4G",
+        "pathname": "EB8-Pro-4G",
+        "downloadId": "VbFz7fNXofWj2_zDOZw48",
+        "state": 1,
+        "updatedAt": "2025-08-21 23:24:46",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB8 Pro 4G Kit",
+        "pathname": "EB8-Pro-4G-Kit",
+        "downloadId": "dqD9-7e1VOwH7-Dwz2ADg",
+        "state": 1,
+        "updatedAt": "2025-11-11 00:51:16",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EB8 Pro Ranger Kit",
+        "pathname": "EB8-Pro-Ranger-Kit",
+        "downloadId": "ffOnVV0YKUvL9QPhW1owE",
+        "state": 1,
+        "updatedAt": "2025-11-30 22:21:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "EL3",
+        "pathname": "EL3",
+        "downloadId": "2qYnW090eZOtg_3PP6-qe",
+        "state": 1,
+        "updatedAt": "2024-02-26 16:58:49",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H1c",
+        "pathname": "H1c",
+        "downloadId": "nF5Bk_0k14mxP5bxj45su",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3 2K",
+        "pathname": "H3-2K",
+        "downloadId": "YPzIWczFCdPvihF95z8zy",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3 3K",
+        "pathname": "H3-3K",
+        "downloadId": "AjYXHeXDxF0EdrhUsV0CP",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3c",
+        "pathname": "H3c",
+        "downloadId": "TkUYfw3EdzfvRtNQcq5C6",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3c 2K",
+        "pathname": "H3c-2K",
+        "downloadId": "lDq7IdgVBlDakBx2WQskV",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3c 2K⁺",
+        "pathname": "H3c-2K",
+        "downloadId": "D9Py8JjScVnLwHECOBiPS",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3c 3K",
+        "pathname": "H3c-3K",
+        "downloadId": "D6LvLhCww12y8FjXgaCIL",
+        "state": 1,
+        "updatedAt": "2024-05-27 14:38:31",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3c Color",
+        "pathname": "H3c-Color",
+        "downloadId": "WaxEfEv8_kEROlYmlauud",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3K PoE 4K",
+        "pathname": "H3K-PoE-4K",
+        "downloadId": "3eE7kHQa9hx1kZl_u_Sel",
+        "state": 1,
+        "updatedAt": "2024-12-24 10:11:29",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H3K PoE 4K Kit",
+        "pathname": "H3K-PoE-4K-Kit",
+        "downloadId": "y0hEMLxWCU6m89rv9yvpf",
+        "state": 1,
+        "updatedAt": "2024-11-25 16:33:38",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H4",
+        "pathname": "H4",
+        "downloadId": "mV5-oAKSG7bcB-pLf8cnp",
+        "state": 1,
+        "updatedAt": "2024-07-03 15:41:19",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H4 PoE",
+        "pathname": "H4-PoE",
+        "downloadId": "1m3jk69eObdlYoxUARiWm",
+        "state": 1,
+        "updatedAt": "2024-10-17 13:41:36",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H5 4G",
+        "pathname": "H5-4G",
+        "downloadId": "Jkw4HHcK6XSek4DyHdXul",
+        "state": 1,
+        "updatedAt": "2024-07-18 17:33:27",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H5 PoE",
+        "pathname": "H5-PoE",
+        "downloadId": "tmM6SS76eAQGWGvsmDkwo",
+        "state": 1,
+        "updatedAt": "2024-09-23 14:15:41",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6",
+        "pathname": "H6",
+        "downloadId": "OoxEMBKWcCL3_Yr4cLCsC",
+        "state": 1,
+        "updatedAt": "2024-05-30 13:40:18",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c",
+        "pathname": "H6c",
+        "downloadId": "T_6GG7FFWWlyGRdspmsPk",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c 2K (EU Exclusive)",
+        "pathname": "H6c-2K-(EU-Exclusive)",
+        "downloadId": "r4fwr9WXzD5YpeokdQEVW",
+        "state": 1,
+        "updatedAt": "2025-01-21 17:04:51",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c 2K⁺",
+        "pathname": "H6c-2K",
+        "downloadId": "L6sDJe7bk5VqxwDmGsD0x",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c G1 3K",
+        "pathname": "H6c-G1-3K",
+        "downloadId": "FfJTMukRZn12DVQooPjp_",
+        "state": 1,
+        "updatedAt": "2025-08-04 23:50:55",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c G1 4K",
+        "pathname": "H6c-G1",
+        "downloadId": "ue0gY2GsZmq_zipmRfv_d",
+        "state": 1,
+        "updatedAt": "2025-05-26 18:57:46",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c Pro",
+        "pathname": "H6c-Pro",
+        "downloadId": "TaEYdl84Hyd5e_nsryJuD",
+        "state": 1,
+        "updatedAt": "2024-05-23 14:44:13",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c Pro 2K",
+        "pathname": "H6c-Pro-2K",
+        "downloadId": "85oscQWn0sl1-OO89CPZx",
+        "state": 1,
+        "updatedAt": "2024-05-23 16:01:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c Pro 3K",
+        "pathname": "H6c-Pro-3K",
+        "downloadId": "N2fgJI0MwF50HDpX8023W",
+        "state": 1,
+        "updatedAt": "2024-05-23 16:01:16",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H6c Pro 4K",
+        "pathname": "H6c-Pro-4K",
+        "downloadId": "awT3_qDXLbj0WxkjF00E7",
+        "state": 1,
+        "updatedAt": "2024-12-25 15:19:37",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H7c Dual 2K⁺",
+        "pathname": "H7c-Dual-2K",
+        "downloadId": "pntbJP3EK_BGQ3kIsEWCH",
+        "state": 1,
+        "updatedAt": "2024-03-13 17:08:05",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8 Pro 2K",
+        "pathname": "H8-Pro-2K",
+        "downloadId": "gbm4H82HsCGuu_ix8Qf-Z",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8 Pro 3K",
+        "pathname": "H8-Pro-3K",
+        "downloadId": "-rTzsoBN2XPTRVbtn-O4v",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H80f Multi",
+        "pathname": "H80f-Multi",
+        "downloadId": "w2NLTx7_MtWnBs8dL-7We",
+        "state": 1,
+        "updatedAt": "2025-01-15 17:06:23",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H80x Dual",
+        "pathname": "H80x-Dual",
+        "downloadId": "aTk8QhCcSWD69l7SI-6ja",
+        "state": 1,
+        "updatedAt": "2025-02-13 15:30:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c",
+        "pathname": "H8c",
+        "downloadId": "jT_A8s3hCssH5FzhEAFoh",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c 2K",
+        "pathname": "H8c-2K",
+        "downloadId": "7FxDcezv7xY6vPXswdw1k",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c 2K⁺",
+        "pathname": "H8c-2K",
+        "downloadId": "W50qhagHOf9PsLlLugnAW",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c 4G",
+        "pathname": "H8c-4G",
+        "downloadId": "VsC-TZv8vgLc3SrUQKuKU",
+        "state": 1,
+        "updatedAt": "2025-02-13 15:57:53",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c PoE",
+        "pathname": "H8c-PoE",
+        "downloadId": "0NnzQRw4sZWZy5U3EnjWL",
+        "state": 1,
+        "updatedAt": "2024-04-16 18:26:22",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c Pro 2K",
+        "pathname": "H8c-Pro-2K",
+        "downloadId": "emSRcmlh5QCnZuAnS04Id",
+        "state": 1,
+        "updatedAt": "2024-04-22 15:43:05",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c Pro 2K (R210)",
+        "pathname": "H8c-Pro-2K-(R210)",
+        "downloadId": "6jvX62dOiMG2l9yl-QdAx",
+        "state": 1,
+        "updatedAt": "2026-04-27 23:25:08",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c Pro 2K⁺",
+        "pathname": "H8c-Pro-2K",
+        "downloadId": "lFlONryjz8phTy6reEhUU",
+        "state": 1,
+        "updatedAt": "2024-04-10 11:30:22",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c Pro 3K",
+        "pathname": "H8c-Pro-3K",
+        "downloadId": "C-W-G5XD7JUtgZW_Xf_q2",
+        "state": 1,
+        "updatedAt": "2024-04-10 11:29:43",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c Pro 4K",
+        "pathname": "H8c-Pro-4K",
+        "downloadId": "Gc-JQQBM3G9GTdGDWfH-c",
+        "state": 1,
+        "updatedAt": "2024-07-09 17:34:36",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8c SE 2K",
+        "pathname": "H8c-SE-2K",
+        "downloadId": "U877wte9HSBE8XTepDSdi",
+        "state": 1,
+        "updatedAt": "2024-05-10 13:41:57",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H8x",
+        "pathname": "H8x",
+        "downloadId": "XFkgk7RXXFR8JQVcx7c2O",
+        "state": 1,
+        "updatedAt": "2024-11-24 10:47:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H90 Dual",
+        "pathname": "H90-Dual",
+        "downloadId": "QyygblXWsFgT-cKM8dbFa",
+        "state": 1,
+        "updatedAt": "2025-03-05 00:09:27",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H9c Dual 2K",
+        "pathname": "H9c-Dual-2K",
+        "downloadId": "9t67Dh5xFeT9ncO1Y7hWI",
+        "state": 1,
+        "updatedAt": "2024-03-17 14:01:31",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H9c Dual 2K (R105)",
+        "pathname": "H9c-Dual-2K-(R105)",
+        "downloadId": "jpKusH6dAhOf3aePZkQZd",
+        "state": 1,
+        "updatedAt": "2025-11-20 22:49:24",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H9c Dual 3K",
+        "pathname": "H9c-Dual-3K",
+        "downloadId": "Y1XceKi9tEnlUQmocc61I",
+        "state": 1,
+        "updatedAt": "2024-03-17 14:00:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H9c Dual 3K (R105)",
+        "pathname": "H9c-Dual-3K-(R105)",
+        "downloadId": "8EhnQWh2FEQEytRTU0-47",
+        "state": 1,
+        "updatedAt": "2025-08-31 18:22:48",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "H9c Dual 4G",
+        "pathname": "H9c-Dual-4G",
+        "downloadId": "bXljQPlMOzpv-vJtS3qWX",
+        "state": 1,
+        "updatedAt": "2025-11-11 18:09:51",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB3-Add-On Datasheet",
+        "pathname": "HB3-Add-On-Datasheet",
+        "downloadId": "SOyzjn0D3ngS3tQkDC6-N",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB3-B1 Datasheet",
+        "pathname": "HB3-B1-Datasheet",
+        "downloadId": "QplC_IbRIbtleV_wuakMP",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB3-B2 Datasheet",
+        "pathname": "HB3-B2-Datasheet",
+        "downloadId": "GZrtAr75vNyySdP1p2Xmi",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8",
+        "pathname": "HB8",
+        "downloadId": "m5MXsn00Wjo8GlZYhVT9l",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite",
+        "pathname": "HB8-Lite",
+        "downloadId": "su3ALBV2npvYqw5xVyMB7",
+        "state": 1,
+        "updatedAt": "2025-03-04 17:38:20",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite 3K⁺",
+        "pathname": "HB8-Lite-3K",
+        "downloadId": "GoPh6JMnZU_ttkbwgxKmn",
+        "state": 1,
+        "updatedAt": "2026-05-14 01:08:22",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite 3K⁺ Kit",
+        "pathname": "HB8-Lite-3K-Kit",
+        "downloadId": "J9S6KC8Apr0GEQh1osQsO",
+        "state": 1,
+        "updatedAt": "2026-05-13 23:01:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite 4G",
+        "pathname": "HB8-Lite-4G",
+        "downloadId": "vLuzVUo3_tIjKjUBbmxe6",
+        "state": 1,
+        "updatedAt": "2025-06-17 22:04:07",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite 4G Kit",
+        "pathname": "HB8-Lite-4G-Kit",
+        "downloadId": "RAfODH3mwwqvnYYJ06u67",
+        "state": 1,
+        "updatedAt": "2025-08-25 23:21:58",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite 4K",
+        "pathname": "HB8-Lite-4K",
+        "downloadId": "rfcOn2GOiueikH4U8DlrX",
+        "state": 1,
+        "updatedAt": "2026-04-15 23:08:29",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite 4K Kit",
+        "pathname": "HB8-Lite-4K-Kit",
+        "downloadId": "SEhjwpTLkkOW79tvEhUBz",
+        "state": 1,
+        "updatedAt": "2026-05-27 04:15:28",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Lite Kit",
+        "pathname": "HB8-Lite-Kit",
+        "downloadId": "kZpJwwSJJx_uFW_vuTpMa",
+        "state": 1,
+        "updatedAt": "2025-03-31 18:13:48",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB8 Pro",
+        "pathname": "HB8-Pro",
+        "downloadId": "lcRubQSHSPeluDKV6v9_M",
+        "state": 1,
+        "updatedAt": "2025-03-13 01:11:22",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB90 Dual 3K Kit",
+        "pathname": "HB90-Dual-3K-Kit",
+        "downloadId": "8M6enIwhZZ2z5rmfu5HTl",
+        "state": 1,
+        "updatedAt": "2026-08-06 01:26:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB90 Dual Kit",
+        "pathname": "HB90-Dual-Kit",
+        "downloadId": "9z7G0lPt9kOWY9hmPMsXx",
+        "state": 1,
+        "updatedAt": "2025-04-10 23:23:17",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "HB90x Dual 4G Kit",
+        "pathname": "HB90x-Dual-4G-Kit",
+        "downloadId": "SPfusM2LOOU2N03rO_4PL",
+        "state": 1,
+        "updatedAt": "2025-07-31 00:26:36",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "LC1",
+        "pathname": "LC1",
+        "downloadId": "LUKxd7RfhhIw_u1EtlKOb",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "LC1",
+        "pathname": "LC1",
+        "downloadId": "K9t_voXUWzN-sY-7pq7eY",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "LC1C",
+        "pathname": "LC1C",
+        "downloadId": "eA19fl1gaz3kO00xdK22w",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "LC1C",
+        "pathname": "LC1C",
+        "downloadId": "WxkGoKN_6p2ddOuv3dN4m",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "LC3",
+        "pathname": "LC3",
+        "downloadId": "IXPibXnQDBk2ln2lYSkKB",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "Mounting Bracket",
+        "pathname": "Mounting-Bracket",
+        "downloadId": "Ym_4RxFyvD7e2w8YloklM",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "Solar Panel 5W",
+        "pathname": "5W-Battery-Solar-Panel",
+        "downloadId": "FTrVjahOJsYJb4RQ5tJsy",
+        "state": 1,
+        "updatedAt": "2025-09-02 17:50:10",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "Solar Panel 8W",
+        "pathname": "Solar-Panel-8W",
+        "downloadId": "-ksOIZS4SctWGTnYRTKdd",
+        "state": 1,
+        "updatedAt": "2025-09-14 22:08:44",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 1080P",
+        "pathname": "TY1-1080P",
+        "downloadId": "fmzMVvd2pDuIoHLMfGXIK",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 3MP",
+        "pathname": "TY1-3MP",
+        "downloadId": "6oO3qgHO60WASUh9px6tE",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 4MP",
+        "pathname": "TY1-4MP",
+        "downloadId": "ju8c7B8_1at1lJVkOrOTF",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 G1 2K",
+        "pathname": "TY1-G1-2K",
+        "downloadId": "2JPuaVyUyCnCXjiBnMA0i",
+        "state": 1,
+        "updatedAt": "2026-05-24 19:20:23",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 Pro",
+        "pathname": "TY1-Pro",
+        "downloadId": "2oI2YyzVsRn2yHpUN4KJV",
+        "state": 1,
+        "updatedAt": "2024-03-12 17:51:05",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 Pro 2K",
+        "pathname": "TY1-Pro-2K",
+        "downloadId": "q-PADxiIhcLWvygvlgdvB",
+        "state": 1,
+        "updatedAt": "2024-05-29 14:32:16",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 Pro 2K+",
+        "pathname": "TY1-Pro-2K+",
+        "downloadId": "3GJ0HWdMmFbtBSd48-uBx",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 Pro 3K",
+        "pathname": "TY1-Pro-3K",
+        "downloadId": "BcQWFEKsC_sEMYu-9UT5N",
+        "state": 1,
+        "updatedAt": "2024-05-29 14:33:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY1 Pro 4K",
+        "pathname": "TY1-Pro-4K",
+        "downloadId": "BBC2FcdMefijH9v3Sm2m6",
+        "state": 1,
+        "updatedAt": "2025-01-01 14:20:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY2",
+        "pathname": "TY2",
+        "downloadId": "icZejk2jnFiSk8K7t6-XB",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "TY7 Dual 2K⁺",
+        "pathname": "TY7-Dual-2K",
+        "downloadId": "1PtqAcib9j7O8YF-5U1xI",
+        "state": 1,
+        "updatedAt": "2024-06-26 15:43:41",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "Wall Mount Bracket",
+        "pathname": "Wall-Mount-Bracket",
+        "downloadId": "13TFFyzLNH1iCBYaGnJPd",
+        "state": 1,
+        "updatedAt": "2025-12-24 23:49:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "security camera",
+        "title": "Wall Mount Bracket",
+        "pathname": "Wall-Mount-Bracket",
+        "downloadId": "VEJkfEnSPpZxJSqEeGUFk",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      }
+    ],
+    "uncertain": [
+      {
+        "category": "uncertain",
+        "title": "Akiitu Magnetic Series",
+        "pathname": "Akiitu-Magnetic-Series",
+        "downloadId": "oaeDEXMf8Dbg_43EIbec6",
+        "state": 1,
+        "updatedAt": "2026-03-30 22:48:17",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Pro 35W Charger (UK Plug)",
+        "pathname": "Akiitu-Pro-35W-Charger-(UK-Plug)",
+        "downloadId": "nm5rS_VdHUtiG4GkOuSHW",
+        "state": 1,
+        "updatedAt": "2025-11-23 22:09:28",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Pro 35W Charger (US Plug)",
+        "pathname": "Akiitu-Pro-35W-Charger-(US-Plug)",
+        "downloadId": "5MdDbJWy0YTctVR3_4dZl",
+        "state": 1,
+        "updatedAt": "2025-12-22 19:16:11",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Pro 65W Charger",
+        "pathname": "Akiitu-Pro-65W-Charger",
+        "downloadId": "i3jdsrOfEZLTrwoMAtmHr",
+        "state": 1,
+        "updatedAt": "2025-11-04 23:49:47",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Pro 65W Charger (EU Plug)",
+        "pathname": "Akiitu-Pro-65W-Charger-(EU-Plug)",
+        "downloadId": "GV2m1xHSZprrc6peGpkBx",
+        "state": 1,
+        "updatedAt": "2025-12-02 00:39:33",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Pro 65W Charger (US Plug)",
+        "pathname": "Akiitu-Pro-65W-Charger-(US-Plug)",
+        "downloadId": "YoNIcZB-BsSi6VkAlbgd3",
+        "state": 1,
+        "updatedAt": "2025-11-27 19:16:49",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Pro Series Charge Cable",
+        "pathname": "Akiitu-Pro-Series-Charge-Cable",
+        "downloadId": "UpCFbYLVF9IM7HXMdEJn3",
+        "state": 1,
+        "updatedAt": "2025-12-23 21:38:53",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Supersoft Series (C-C)",
+        "pathname": "Akiitu-Supersoft-Series-(C-C)",
+        "downloadId": "N5ot21TbjiRWC9gyDQJVf",
+        "state": 1,
+        "updatedAt": "2025-11-21 00:54:49",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Akiitu Supersoft Series (C-L)",
+        "pathname": "Akiitu-Supersoft-Series-(C-L)",
+        "downloadId": "Oty4Y5hKuowCbT67iIK8m",
+        "state": 1,
+        "updatedAt": "2026-07-09 02:55:30",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Alarm Light",
+        "pathname": "Alarm-Light",
+        "downloadId": "WsFJgNcN13jrGpJJcgQxF",
+        "state": 1,
+        "updatedAt": "2026-04-16 00:33:43",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "CH1",
+        "pathname": "CH1",
+        "downloadId": "03_ZfilwGBQOygdPozvkQ",
+        "state": 1,
+        "updatedAt": "2024-03-10 15:00:59",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "CH1",
+        "pathname": "CH1",
+        "downloadId": "ZzOeJz-I4RRZcNzNxtwi9",
+        "state": 1,
+        "updatedAt": "2024-03-10 14:59:32",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "E4P",
+        "pathname": "E4P",
+        "downloadId": "bH2EU29fulXwCRCEYZFQB",
+        "state": 1,
+        "updatedAt": "2025-07-22 23:33:50",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "E6",
+        "pathname": "E6",
+        "downloadId": "tVTjfEKQea9-YHepTR-3Z",
+        "state": 1,
+        "updatedAt": "2024-06-16 10:53:49",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EP4",
+        "pathname": "EP4",
+        "downloadId": "E_jMHoHm0BSc4gDzb5sMf",
+        "state": 1,
+        "updatedAt": "2026-02-01 23:25:32",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EP7",
+        "pathname": "EP7",
+        "downloadId": "7RsieNiaLrQxrxQ7SuC-5",
+        "state": 1,
+        "updatedAt": "2024-11-07 16:59:39",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EP8 Ultra",
+        "pathname": "EP8-Ultra",
+        "downloadId": "M1iz8nIaKWCfLHPn4-tNZ",
+        "state": 1,
+        "updatedAt": "2026-03-08 19:00:48",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "ezCube",
+        "pathname": "ezCube",
+        "downloadId": "W9G3rXLTRBs-xvm0d9CyX",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EZVIZ 400W Solar Starter Kit",
+        "pathname": "EZVIZ-400W-Solar-Starter-Kit",
+        "downloadId": "JnATBdR6-7gDK_CrfOmI4",
+        "state": 1,
+        "updatedAt": "2024-07-28 16:04:14",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EZVIZ eLife",
+        "pathname": "EZVIZ-eLife",
+        "downloadId": "BtDhR396CxcwD5OtEdDcj",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EZVIZ eLife 2K+",
+        "pathname": "EZVIZ-eLife-2K+",
+        "downloadId": "u4-XnsS9mzYetwd4aTXjM",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EZVIZ MicroSD Cards",
+        "pathname": "EZVIZ-MicroSD-Cards",
+        "downloadId": "7f-d3k25FCDFvzESsOTdK",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EZVIZ Smart MicroSD Card D Series",
+        "pathname": "EZVIZ-Smart-MicroSD-Card-D-Series",
+        "downloadId": "eAs9Jn0-bE6S5s8EjlE_-",
+        "state": 1,
+        "updatedAt": "2024-03-12 09:58:54",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "EZVIZ Smart MicroSD Card Pro Series",
+        "pathname": "EZVIZ-Smart-MicroSD-Card-Pro-Series",
+        "downloadId": "Qzw4fXFSWMrg1SRgmOBIT",
+        "state": 1,
+        "updatedAt": "2024-01-15 14:58:47",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "ezWireless Kit",
+        "pathname": "ezWireless-Kit",
+        "downloadId": "xZQ4Sv4SZS6dsK4KLWk3X",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HG2 400",
+        "pathname": "HG2-400",
+        "downloadId": "uFh4WyF_MFZIpTiFtFums",
+        "state": 1,
+        "updatedAt": "2025-10-29 22:09:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HG2 600",
+        "pathname": "HG2-600",
+        "downloadId": "NdSwuvfRuH0o1dTQ7ZB_s",
+        "state": 1,
+        "updatedAt": "2026-03-24 02:13:57",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HG2 600 Pro",
+        "pathname": "HG2-600-Pro",
+        "downloadId": "eMrq-KhtAVn8m2oZ_EiV7",
+        "state": 1,
+        "updatedAt": "2025-08-17 22:03:28",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HGD2 Photocells",
+        "pathname": "HGD2",
+        "downloadId": "0BKplOjY_orAojeWW_g1C",
+        "state": 1,
+        "updatedAt": "2026-03-22 19:22:20",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HGR2",
+        "pathname": "HGR2",
+        "downloadId": "CDuv32acqSTSxpzbyFzck",
+        "state": 1,
+        "updatedAt": "2026-03-23 00:40:43",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HGT2",
+        "pathname": "HGT2",
+        "downloadId": "BTAu8aV959VuXf2Y7etig",
+        "state": 1,
+        "updatedAt": "2026-03-20 00:13:04",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HP2",
+        "pathname": "HP2",
+        "downloadId": "0f2wmmdi8N910zzQlReBQ",
+        "state": 1,
+        "updatedAt": "2024-07-08 09:56:12",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HP3 Pro",
+        "pathname": "HP3-Pro",
+        "downloadId": "IPSO4Gws5VyV4SHJPOp6W",
+        "state": 1,
+        "updatedAt": "2024-09-25 11:05:41",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HP4",
+        "pathname": "HP4",
+        "downloadId": "lGvF2qDTiEnktNDZO1w6J",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HP5",
+        "pathname": "HP5",
+        "downloadId": "j2fi8bhsHd894Rs9Ouxpj",
+        "state": 1,
+        "updatedAt": "2024-06-02 15:46:31",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "HP8",
+        "pathname": "HP8",
+        "downloadId": "fQRmUPdbFGx2JX-9a8Ot-",
+        "state": 1,
+        "updatedAt": "2026-06-10 23:38:49",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Mini Plus",
+        "pathname": "Mini-Plus",
+        "downloadId": "YrXzugzzQN0MW8pRFqS1q",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "PCBA",
+        "pathname": "PCBA",
+        "downloadId": "EI4_3o_DxlojlWFrsq4H8",
+        "state": 1,
+        "updatedAt": "2026-03-23 23:01:20",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Rechargeable Battery",
+        "pathname": "Rechargeable-Battery",
+        "downloadId": "BJiXGArqOLWmL3nmcLneQ",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "S10",
+        "pathname": "S10",
+        "downloadId": "IrYhpnygcFx_-uBOaWTIM",
+        "state": 1,
+        "updatedAt": "2025-06-08 19:19:29",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "SD7",
+        "pathname": "SD7",
+        "downloadId": "uHEK2twhApiAr6zcKkvQN",
+        "state": 1,
+        "updatedAt": "2023-12-27 11:24:53",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Security Cameras",
+        "pathname": "Security-Cameras",
+        "downloadId": "jSsTS1LyX712C5hpSJfBL",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Solar Charging Panel",
+        "pathname": "Solar-Charging-Panel",
+        "downloadId": "TnuYpiGbgM7u6vRk4QBmK",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Solar Charging Panel-D",
+        "pathname": "Solar-Charging-Panel-D",
+        "downloadId": "EoC8_woeDXY0xF_Eed8g8",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Solar Charging Panel-E",
+        "pathname": "Solar-Charging-Panel-E",
+        "downloadId": "cR-Pm9rzQ949WNTVzMsw3",
+        "state": 1,
+        "updatedAt": "2025-01-06 13:42:01",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Solar Charging Panel-F",
+        "pathname": "Solar-Charging-Panel-F",
+        "downloadId": "_H7LfHj01uq7swa3jpmNJ",
+        "state": 1,
+        "updatedAt": "2025-01-06 13:42:21",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Upgraded C6CN",
+        "pathname": "Upgraded-C6CN",
+        "downloadId": "Po9lkxjU4xVv5RXo2MM_1",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "X3C (ezNAS) Datasheet",
+        "pathname": "X3C-(ezNAS)-Datasheet",
+        "downloadId": "Kup5IFLG9oXadcChIdbux",
+        "state": 1,
+        "updatedAt": "2023-11-13 15:53:15",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Y2000",
+        "pathname": "Y2000",
+        "downloadId": "QImIrDCBG77yYK3rtjEXo",
+        "state": 1,
+        "updatedAt": "2025-02-07 16:48:47",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Y2000 (6068)",
+        "pathname": "Y2000-(6068)",
+        "downloadId": "iUkyitKZqSn45yJ0pUDRM",
+        "state": 1,
+        "updatedAt": "2026-04-16 00:50:00",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Y2000FVS",
+        "pathname": "Y2000FVS",
+        "downloadId": "CdwS8tUhuQbfEuK5o_n19",
+        "state": 1,
+        "updatedAt": "2025-12-11 18:01:43",
+        "typeTitle": "Product Datasheet"
+      },
+      {
+        "category": "uncertain",
+        "title": "Y3000FVP PLUS",
+        "pathname": "Y3000FVP-PLUS",
+        "downloadId": "GruRkzDaR-YHpiuc3tBVy",
+        "state": 1,
+        "updatedAt": "2025-07-22 23:31:18",
+        "typeTitle": "Product Datasheet"
+      }
+    ]
+  }
+}

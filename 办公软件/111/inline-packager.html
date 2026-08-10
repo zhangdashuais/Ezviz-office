@@ -80,29 +80,17 @@
           <h3>内联配置</h3>
           <p class="desc">批量处理 HTML、CSS 和 JS 资源，生成单文件离线包。支持图片上传、CDN 替换或接口同步。</p>
 
-          <div class="row">
-            <label>业务版本</label>
-            <select id="versionSelect">
-              <option value="src/main-default.js">默认 (Standard)</option>
-              <option value="src/main-akiitu.js">Akiitu (Custom)</option>
-              <option value="src/main-beanview.js">Beanview (Lite)</option>
-            </select>
-
-            <label>图片处理</label>
-            <select id="imageModeSelect">
-              <option value="upload">远程接口上传</option>
-              <option value="prefix">CDN 静态前缀</option>
-            </select>
-          </div>
+          <select id="versionSelect" hidden>
+            <option value="src/main-default.js" selected>Standard</option>
+          </select>
+          <select id="imageModeSelect" hidden>
+            <option value="upload" selected>Upload Assets</option>
+          </select>
+          <input id="uploadApiInput" type="hidden" value="https://fs.ezvizlife.com/upload.php">
 
           <div class="row">
             <label>资源地址</label>
             <input id="imageBaseInput" type="text" value="https://mfs.ezvizlife.com/" style="flex: 1;">
-          </div>
-
-          <div class="row">
-            <label>上传接口</label>
-            <input id="uploadApiInput" type="text" value="https://fs.ezvizlife.com/upload.php" style="flex: 1;">
           </div>
 
           <div class="row">
@@ -111,9 +99,9 @@
           </div>
 
           <div class="row" style="margin-bottom: 0;">
-            <label>执行处理</label>
+            <label>HTML</label>
             <select id="htmlSelect" style="width: 200px;"></select>
-            <button id="runBtn">开始一键内联</button>
+            <button id="runBtn" class="transform el-button mt-4 mb-4 el-button--danger el-button--mini" type="button">Transform</button>
           </div>
         </div>
 
@@ -169,7 +157,7 @@
       <div id="tab-text-comparison" class="tab-content">
         <div class="card">
           <h3>PDF / HTML 文字对比</h3>
-          <p class="desc">上传电子版 PDF 与 HTML 后，由服务器直接提取可见文字并完成核验，不读取或对比图片。系统会忽略大小写、空格、换行、连字符、乘号和常见 PDF 连字差异，并针对缺失、修改以及数值或单位问题提出处理建议。</p>
+          <p class="desc">上传电子版 PDF 与 HTML 后，先汇总 HTML 全部可见文字，再逐条检查 PDF 正文片段是否包含。PDF 从 Specification / Specifications 标题页开始到文件末尾全部排除；HTML 可以有额外内容，只有未匹配的 PDF 正文片段会提示风险。</p>
           <div class="form-grid">
             <label for="textComparePdfInput">PDF 文件</label>
             <input id="textComparePdfInput" type="file" accept=".pdf,application/pdf">
@@ -194,15 +182,13 @@
 
         <div id="textCompareFilters" class="card text-compare-results" hidden>
           <div class="row text-compare-toolbar">
-            <h3>文字差异明细</h3>
+            <h3>PDF 片段包含检查</h3>
             <label for="textCompareTypeFilter">显示</label>
             <select id="textCompareTypeFilter">
-              <option value="differences" selected>仅差异</option>
+              <option value="differences" selected>仅风险</option>
               <option value="critical">仅数值/单位风险</option>
-              <option value="changed">文字有修改</option>
-              <option value="missing">HTML 缺少</option>
-              <option value="extra">HTML 多出</option>
-              <option value="match">一致</option>
+              <option value="missing">HTML 未包含</option>
+              <option value="match">已包含</option>
               <option value="all">全部</option>
             </select>
             <label for="textCompareSearchInput">搜索</label>
@@ -214,9 +200,10 @@
                 <tr>
                   <th>结果</th>
                   <th>PDF 位置</th>
+                  <th>HTML Section</th>
                   <th>PDF 文字</th>
                   <th>HTML 文字</th>
-                  <th>相似度</th>
+                  <th>包含结果</th>
                   <th>处理建议</th>
                 </tr>
               </thead>

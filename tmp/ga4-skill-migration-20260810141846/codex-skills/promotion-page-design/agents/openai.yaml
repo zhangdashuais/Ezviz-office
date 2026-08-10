@@ -1,0 +1,4 @@
+interface:
+  display_name: "促销页与活动页设计规范"
+  short_description: "品牌促销活动页的信息结构、优惠表达与交互设计。"
+  default_prompt: "使用 $promotion-page-design，为促销活动页规划信息结构、优惠表达和交互设计。"

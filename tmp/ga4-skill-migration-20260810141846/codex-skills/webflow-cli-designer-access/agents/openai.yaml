@@ -1,0 +1,15 @@
+interface:
+  display_name: "Webflow MCP Access Preflight"
+  short_description: "自动检查并修复 Webflow MCP 与 Designer 连接"
+  default_prompt: "Use $webflow-cli-designer-access to preflight my Webflow MCP connection, recover authorization if needed, and then continue safely."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "webflow"
+      description: "Official Webflow MCP server for sites, pages, styles, elements, components, CMS, and Designer sessions"
+      transport: "streamable_http"
+      url: "https://mcp.webflow.com/mcp"
+
+policy:
+  allow_implicit_invocation: true

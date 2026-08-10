@@ -16,4 +16,5 @@ outputs/
 *账号密码*.xlsx
 credentials/*.xls
 credentials/*.xlsx
+credentials/*.json
 ~$*

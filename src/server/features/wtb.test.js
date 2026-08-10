@@ -259,3 +259,40 @@ test("WTB 前台复查地址只接受后台返回且属于所选站点的产品�
   ]);
   assert.equal(candidates[0].source, "backend-product-list-primary");
 });
+
+test("WTB forces the legacy shop backend before opening product editor", async () => {
+  const visited = [];
+  const page = {
+    currentUrl: "https://new-vn-shop.ezvizlife.com/goods/index",
+    url() {
+      return this.currentUrl;
+    },
+    async goto(url) {
+      visited.push(url);
+      this.currentUrl = url;
+    },
+    async waitForTimeout() {}
+  };
+  const feature = createWtbFeature({
+    fs,
+    path,
+    readCampaignConfig: () => ({
+      sites: [
+        { name: "Viet Nam", siteCode: "vn", url: "https://www.ezviz.com/vn", enabled: true }
+      ]
+    }),
+    requireSingleCampaignSite(currentConfig) {
+      return currentConfig.sites[0];
+    },
+    openProductEditorByName(openPage, productName) {
+      assert.equal(productName, "H8c");
+      assert.equal(openPage.url(), "https://shop.ezvizlife.com/goods/index");
+      return { productName, editUrl: "https://shop.ezvizlife.com/goods/add?id=123" };
+    }
+  });
+
+  const result = await feature._test.findAndOpenProductEdit(page, "H8c", []);
+
+  assert.deepEqual(visited, ["https://shop.ezvizlife.com/goods/index"]);
+  assert.equal(result.editUrl, "https://shop.ezvizlife.com/goods/add?id=123");
+});

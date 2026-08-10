@@ -42,6 +42,21 @@ test("shop account comparison ignores display punctuation and casing", () => {
   );
 });
 
+test("shop account comparison accepts concrete login when target site code matches", () => {
+  assert.equal(
+    shopAccountLooksCompatible("tr114514 Exit", "website@example.com", {
+      credentialDomain: "www.ezviz.com/tr"
+    }),
+    true
+  );
+  assert.equal(
+    shopAccountLooksCompatible("tr114514 Exit", "website@example.com", {
+      credentialDomain: "www.ezviz.com/nl"
+    }),
+    false
+  );
+});
+
 test("shop account comparison rejects an empty expected account", () => {
   assert.equal(shopAccountLooksCompatible("website-vn@example.com", ""), false);
 });
@@ -75,6 +90,17 @@ test("shop account verifier rejects a different concrete site login as an alias"
     /不一致的登录账号/
   );
   assert.equal(verifier.matches("nl114514", "jp114514"), false);
+});
+
+test("shop account verifier accepts a concrete login for the credential domain site", () => {
+  const verifier = createShopAccountIdentityVerifier();
+  const options = { credentialDomain: "https://www.ezviz.com/tr" };
+  assert.equal(verifier.remember("tr114514", "website@example.com", options), true);
+  assert.equal(verifier.matches("tr114514 Exit", "website@example.com", options), true);
+  assert.equal(
+    verifier.matches("nl114514", "website@example.com", { credentialDomain: "https://www.ezviz.com/tr" }),
+    false
+  );
 });
 
 test("shop account verifier ignores a previously poisoned concrete-login alias", () => {

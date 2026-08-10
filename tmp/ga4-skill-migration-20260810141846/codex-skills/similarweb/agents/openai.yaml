@@ -1,0 +1,4 @@
+interface:
+  display_name: "Similarweb"
+  short_description: "Query Similarweb MCP data safely"
+  default_prompt: "Use Similarweb to answer a website, search, app, or market intelligence question."

@@ -302,36 +302,48 @@
         });
       }
 
-      async function replaceHtmlImageUrlsByUpload(htmlText, fileBlobMap, indexDir, uploadApi) {
+      async function replaceHtmlImageUrlsByUpload(htmlText, fileBlobMap, indexDir, uploadApi, existingMapping, referenceMapping) {
         const candidates = collectImageCandidates(htmlText);
-        const mapping = {};
+        const mapping = existingMapping || {};
         const warnings = [];
+        const uploadTasks = [];
 
         for (const rawUrl of candidates) {
-          if (!isRelativeLocalUrl(rawUrl)) {
-            continue;
-          }
+          if (Object.prototype.hasOwnProperty.call(mapping, rawUrl)) continue;
+          if (!isRelativeLocalUrl(rawUrl)) continue;
 
           const split = splitUrlSuffix(rawUrl);
-          if (!looksLikeImagePath(split.pathPart)) {
-            continue;
-          }
+          if (!looksLikeImagePath(split.pathPart)) continue;
 
           const fileBlob = findFileBlob(fileBlobMap, indexDir, split.pathPart);
           if (!fileBlob) {
-            warnings.push("跳过图片(文件不存在): " + rawUrl);
+            warnings.push("Skip image(missing file): " + rawUrl);
             continue;
           }
 
-          try {
-            const uploaded = await uploadImage(fileBlob, uploadApi);
-            mapping[rawUrl] = uploaded + split.suffix;
-          } catch (err) {
-            const msg = err && err.message ? err.message : String(err);
-            warnings.push("跳过图片(上传失败): " + rawUrl + "，原因: " + msg);
-          }
+          uploadTasks.push({ rawUrl, fileBlob, suffix: split.suffix });
         }
 
+        const concurrency = 8;
+        let cursor = 0;
+        async function uploadNext() {
+          while (cursor < uploadTasks.length) {
+            const task = uploadTasks[cursor++];
+            try {
+              const uploaded = await uploadImage(task.fileBlob, uploadApi);
+              mapping[task.rawUrl] = uploaded + task.suffix;
+            } catch (err) {
+              const msg = err && err.message ? err.message : String(err);
+              if (referenceMapping && referenceMapping[task.rawUrl]) {
+                mapping[task.rawUrl] = referenceMapping[task.rawUrl];
+                warnings.push("Image upload failed, using store.html reference: " + task.rawUrl + ", reason: " + msg);
+              } else {
+                warnings.push("Skip image(upload failed): " + task.rawUrl + ", reason: " + msg);
+              }
+            }
+          }
+        }
+        await Promise.all(Array.from({ length: Math.min(concurrency, uploadTasks.length) }, uploadNext));
         let replaced = replaceAttrUrls(htmlText, mapping);
         replaced = replaceSrcsetUrls(replaced, mapping);
         replaced = replaceCssUrl(replaced, mapping);
@@ -339,6 +351,7 @@
         return {
           content: replaced,
           replaceCount: Object.keys(mapping).length,
+          mapping,
           warnings
         };
       }
@@ -420,19 +433,45 @@
         };
       }
 
-      function buildResult(inputHtml, fileMap, indexPath) {
+      function findStoreReferenceAssets(fileMap) {
+        const storeEntry = [...fileMap.entries()].find(([key]) => key.endsWith("/store.html") || key === "store.html");
+        const htmlText = storeEntry ? String(storeEntry[1] || "") : "";
+        const cssUrl = htmlText.match(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/i)?.[1]
+          || htmlText.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*rel=["']stylesheet["']/i)?.[1]
+          || "";
+        const scriptUrls = [...htmlText.matchAll(/<script\b[^>]*src=["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
+        const webflowJsUrl = scriptUrls.find((url) => /mfs\.ezvizlife\.com\/.*\.js(?:[?#].*)?$/i.test(url))
+          || scriptUrls.find((url) => /webflow\.js(?:[?#].*)?$/i.test(url))
+          || "";
+        return { cssUrl, webflowJsUrl };
+      }
+
+      function buildStoreReferenceImageMapping(inputHtml, fileMap) {
+        const storeEntry = [...fileMap.entries()].find(([key]) => key.endsWith("/store.html") || key === "store.html");
+        if (!storeEntry) return {};
+
+        const sourceUrls = collectImageCandidates(inputHtml)
+          .filter((url) => isRelativeLocalUrl(url) && looksLikeImagePath(splitUrlSuffix(url).pathPart));
+        const storeUrls = collectImageCandidates(String(storeEntry[1] || ""))
+          .filter((url) => {
+            const split = splitUrlSuffix(url);
+            return /^https:\/\/mfs\.ezvizlife\.com\//i.test(url) && looksLikeImagePath(split.pathPart);
+          });
+        const mapping = {};
+        sourceUrls.forEach((url, index) => {
+          if (storeUrls[index]) mapping[url] = storeUrls[index];
+        });
+        return mapping;
+      }
+
+      function buildResult(inputHtml, fileMap, fileBlobMap, indexPath) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(inputHtml, "text/html");
-        const imgStats = ensureLazyloadClassForImages(doc.body);
-        const listStats = ensureSectionListDecimalStyle(doc.body);
 
         const indexDir = dirname(indexPath);
         const cssBlocks = [];
-        const inlinedScripts = [];
-        const keptRemoteScripts = [];
-        const jqueryScripts = [];
-        const localScriptSources = [];
-        const remoteScriptSources = [];
+        let webflowScriptFile = null;
+        let webflowScriptType = "";
         const warnings = [];
 
         const head = doc.head;
@@ -472,16 +511,6 @@
           const isJquery = /^jquery(?:[-.].*)?\.js$/.test(scriptFileName);
 
           if (isJquery) {
-            if (isRemote(src)) {
-              jqueryScripts.push(scriptEl.outerHTML);
-            } else {
-              const jqueryText = findFileContent(fileMap, indexDir, src);
-              if (jqueryText == null) {
-                warnings.push("Missing jQuery file: " + src);
-              } else {
-                jqueryScripts.push(`<script>\n${escapeScriptClose(jqueryText)}\n</script>`);
-              }
-            }
             return;
           }
 
@@ -491,65 +520,56 @@
           }
 
           if (isRemote(src)) {
-            keptRemoteScripts.push(scriptEl.outerHTML);
-            remoteScriptSources.push(src);
+            webflowScriptFile = null;
             return;
           }
 
-          const jsText = findFileContent(fileMap, indexDir, src);
-          if (jsText == null) {
+          const raw = src.split("?")[0].split("#")[0];
+          webflowScriptFile = findFileBlob(fileBlobMap, indexDir, raw);
+          if (!webflowScriptFile) {
             warnings.push("未找到 JS 文件: " + src);
             return;
           }
 
-          const typeAttr = scriptEl.getAttribute("type");
-          const typePart = typeAttr ? ` type="${typeAttr}"` : "";
-          const closeScriptTag = "</" + "script>";
-          inlinedScripts.push(`<script${typePart}>\n${escapeScriptClose(jsText)}\n${closeScriptTag}`);
-          localScriptSources.push(src);
+          webflowScriptType = scriptEl.getAttribute("type") || "text/javascript";
         });
 
         allScripts.forEach((node) => node.remove());
 
-        const bodyInner = `<div class="product-content-webflow">\n${doc.body.innerHTML.trim()}\n</div>`;
+        const bodyInner = `<div class="page page-webflow"><link rel="stylesheet" href="__EZVIZ_REMOTE_CSS__">\n${doc.body.innerHTML.trim()}`;
 
-        const baseStyle = "img{\n  width: auto !important;\n}";
-        const rawStyleContent = [baseStyle, ...cssBlocks].join("\n\n");
+        const rawStyleContent = cssBlocks.join("\n\n");
         const cssStats = sanitizeGeneratedCss(rawStyleContent);
         if (!window.EzvizCssScope?.scopeCss) {
           throw new Error("CSS scope module is not loaded.");
         }
-        const styleContent = window.EzvizCssScope.scopeCss(cssStats.css, ".page.page-webflow");
-        const styleTag = `<style>\n${styleContent}\n</style>`;
-
-        const webflowScripts = [...inlinedScripts, ...keptRemoteScripts];
-        const scriptBlock = jqueryScripts.length && webflowScripts.length
-          ? [
-              "<script>var jq_1 = $.noConflict(true); window.$ = window.jQuery = jq_1;</script>",
-              ...jqueryScripts,
-              "<script>var jq_3 = $.noConflict(true); window.$ = window.jQuery = jq_3;</script>",
-              ...webflowScripts,
-              "<script>window.$ = window.jQuery = jq_1;</script>"
-            ].join("\n\n")
-          : [...jqueryScripts, ...webflowScripts].join("\n\n");
+        const cssContent = window.EzvizCssScope.scopeCss(cssStats.css, ".page.page-webflow");
+        const jqueryUrl = "https://ovsmall-statics.ezvizlife.com/ovs_mall/web/js/widget/jquery/3.5.1/jquery.js";
+        const scriptBlock = [
+          "<script>var jq_1 = $.noConflict(true);window.$ = window.jQuery = jq_1;</script>",
+          `<script src="${jqueryUrl}"></script>`,
+          "<script>var jq_3 = $.noConflict(true);window.$ = window.jQuery = jq_3;</script>",
+          `<script src="__EZVIZ_REMOTE_WEBFLOW_JS__" type="${webflowScriptType || "text/javascript"}"></script>`,
+          "<script>window.$ = window.jQuery = jq_1;</script></div>"
+        ].join("\n");
 
         const resultRaw = [
           "<!-- product detail webflow -->",
-          styleTag,
           bodyInner,
           scriptBlock
         ]
           .filter(Boolean)
-          .join("\n\n");
+          .join("\n");
 
-        warnings.push(`JS upload pending (local): ${localScriptSources.length ? localScriptSources.join(", ") : "none"}`);
-        warnings.push(`JS remote references: ${remoteScriptSources.length ? remoteScriptSources.join(", ") : "none"}`);
+        if (!webflowScriptFile) {
+          warnings.push("Webflow JS upload pending: missing local js/webflow.js");
+        }
 
         return {
           resultRaw,
+          cssContent,
+          webflowScriptFile,
           warnings,
-          imgStats,
-          listStats,
           cssStats
         };
       }
@@ -600,41 +620,91 @@
           }
 
           const indexHtml = fileMap.get(indexEntry) || "";
-          const { resultRaw, warnings, imgStats, listStats, cssStats } = buildResult(indexHtml, fileMap, indexEntry);
+          const { resultRaw, cssContent, webflowScriptFile, warnings, cssStats } = buildResult(indexHtml, fileMap, fileBlobMap, indexEntry);
           const normalizedImagePathResult = normalizeDotDotImagePaths(resultRaw);
           const normalizedResultRaw = normalizedImagePathResult.content;
+          const normalizedCssPathResult = normalizeDotDotImagePaths(cssContent);
+          let normalizedCssContent = normalizedCssPathResult.content;
 
           const imageConfig = typeof window.getImageProcessConfig === "function"
             ? window.getImageProcessConfig()
-            : { mode: "prefix", baseUrl: "https://mfs.ezvizlife.com/", uploadApi: "https://fs.ezvizlife.com/upload.php" };
+            : { mode: "upload", baseUrl: "https://mfs.ezvizlife.com/", uploadApi: "https://fs.ezvizlife.com/upload.php" };
 
           const indexDir = dirname(indexEntry);
           let result = resultRaw;
+          let cssUrl = "";
+          let webflowJsUrl = "";
           let replaceMessage = "";
           const imageWarnings = [];
+          const uploadApi = String(imageConfig.uploadApi || "").trim() || "https://fs.ezvizlife.com/upload.php";
+          const referenceAssets = findStoreReferenceAssets(fileMap);
+          const referenceImageMapping = buildStoreReferenceImageMapping(indexHtml, fileMap);
 
           if (imageConfig.mode === "upload") {
             const uploaded = await replaceHtmlImageUrlsByUpload(
               normalizedResultRaw,
               fileBlobMap,
               indexDir,
-              String(imageConfig.uploadApi || "").trim() || "https://fs.ezvizlife.com/upload.php"
+              uploadApi,
+              {},
+              referenceImageMapping
             );
             result = uploaded.content;
             imageWarnings.push(...uploaded.warnings);
+            const uploadedCssImages = await replaceHtmlImageUrlsByUpload(
+              normalizedCssContent,
+              fileBlobMap,
+              indexDir,
+              uploadApi,
+              uploaded.mapping,
+              referenceImageMapping
+            );
+            normalizedCssContent = uploadedCssImages.content;
+            imageWarnings.push(...uploadedCssImages.warnings);
+            const cssFile = new File([normalizedCssContent], "webflow.css", { type: "text/css" });
+            try {
+              cssUrl = await uploadImage(cssFile, uploadApi);
+            } catch (err) {
+              cssUrl = referenceAssets.cssUrl || "";
+              imageWarnings.push("CSS upload failed, using store.html stylesheet reference: " + (err?.message || String(err)));
+            }
+            if (webflowScriptFile) {
+              try {
+                webflowJsUrl = await uploadImage(webflowScriptFile, uploadApi);
+              } catch (err) {
+                webflowJsUrl = referenceAssets.webflowJsUrl || "";
+                imageWarnings.push("Webflow JS upload failed, using store.html script reference: " + (err?.message || String(err)));
+              }
+            }
             replaceMessage = [
-              "图片上传替换完成:",
-              `成功替换: ${uploaded.replaceCount} 处`
+              "Asset upload replacement completed:",
+              `Images replaced: ${Object.keys(uploaded.mapping).length}`,
+              `CSS: ${cssUrl || "not generated"}`,
+              `Webflow JS: ${webflowJsUrl || "not generated"}`
             ].join("\n");
           } else {
             const replaced = replaceImageBasePaths(normalizedResultRaw, imageConfig.baseUrl);
+            const replacedCss = replaceImageBasePaths(normalizedCssContent, imageConfig.baseUrl);
             result = replaced.content;
+            normalizedCssContent = replacedCss.content;
             replaceMessage = [
-              "图片前缀替换完成:",
-              `../images/ -> ${normalizeBaseUrl(imageConfig.baseUrl)} : ${replaced.parentCount} 处`,
-              `images/ -> ${normalizeBaseUrl(imageConfig.baseUrl)} : ${replaced.localCount} 处`
+              "Image prefix replacement completed:",
+              `../images/ -> ${normalizeBaseUrl(imageConfig.baseUrl)} : ${replaced.parentCount}`,
+              `images/ -> ${normalizeBaseUrl(imageConfig.baseUrl)} : ${replaced.localCount}`,
+              `CSS images/ -> ${normalizeBaseUrl(imageConfig.baseUrl)} : ${replacedCss.localCount}`
             ].join("\n");
           }
+
+          if (!cssUrl) {
+            cssUrl = "data:text/css;charset=utf-8," + encodeURIComponent(normalizedCssContent);
+          }
+          if (!webflowJsUrl) {
+            webflowJsUrl = "js/webflow.js";
+          }
+
+          result = result
+            .replace("__EZVIZ_REMOTE_CSS__", cssUrl)
+            .replace("__EZVIZ_REMOTE_WEBFLOW_JS__", webflowJsUrl);
 
           outputEl.value = result;
 
@@ -643,7 +713,7 @@
 
           const a = document.createElement("a");
           a.href = url;
-          a.download = "index.inlined.html";
+          a.download = "store.html";
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -651,20 +721,18 @@
           URL.revokeObjectURL(url);
 
           const summaryMessage = [
-            `预处理替换 ../images/ -> images/ : ${normalizedImagePathResult.replaceCount} 处`,
+            `Normalized ../images/ -> images/: HTML ${normalizedImagePathResult.replaceCount}, CSS ${normalizedCssPathResult.replaceCount}`,
             replaceMessage,
-            `img lazyload 补充: ${imgStats.addedCount}/${imgStats.totalCount}`,
-            `section 内 ul/ol 样式补充: ${listStats.updatedCount}/${listStats.totalListCount}`,
-            `移除 font-family: Arial, sans-serif; : ${cssStats.removedArialCount} 处`,
-            `移除 ul, ol 默认块: ${cssStats.removedUlOlRuleCount} 处`
+            `Removed font-family Arial/sans-serif: ${cssStats.removedArialCount + cssStats.removedSansSerifCount}`,
+            `Removed ul/ol default reset blocks: ${cssStats.removedUlOlRuleCount}`
           ].join("\n");
 
           const allWarnings = [...warnings, ...imageWarnings];
 
           if (allWarnings.length) {
-            setStatus("处理完成，已下载 index.inlined.html\n" + summaryMessage + "\n" + allWarnings.join("\n"), "warn");
+            setStatus("Completed, downloaded store.html\n" + summaryMessage + "\n" + allWarnings.join("\n"), "warn");
           } else {
-            setStatus("处理完成，已下载 index.inlined.html\n" + summaryMessage, "ok");
+            setStatus("Completed, downloaded store.html\n" + summaryMessage, "ok");
           }
         } catch (err) {
           setStatus("处理失败: " + (err && err.message ? err.message : String(err)), "warn");

@@ -117,6 +117,27 @@ function extractHtmlSegments(html) {
     "div", "section", "article", "header", "footer", "main", "aside"
   ]);
   const groups = new Map();
+  const sectionDetails = new Map();
+  $("section").toArray().forEach((section, index) => {
+    const element = $(section);
+    sectionDetails.set(section, {
+      index: index + 1,
+      id: String(element.attr("id") || "").trim(),
+      className: String(element.attr("class") || "").trim(),
+      heading: normalizeDisplayText(element.find("h1,h2,h3,h4,h5,h6").first().text())
+    });
+  });
+
+  function sectionFor(node) {
+    let current = node;
+    while (current && current.type !== "root") {
+      if (String(current.name || "").toLowerCase() === "section") {
+        return sectionDetails.get(current) || null;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
 
   function ownerFor(node) {
     let parent = node.parent;
@@ -138,6 +159,7 @@ function extractHtmlSegments(html) {
         if (!groups.has(owner)) {
           groups.set(owner, {
             tag: String(owner?.name || "body").toLowerCase(),
+            section: sectionFor(owner),
             parts: []
           });
         }
@@ -153,7 +175,8 @@ function extractHtmlSegments(html) {
   const segments = Array.from(groups.values())
     .map((item) => ({
       tag: item.tag,
-      text: normalizeDisplayText(item.parts.join(" "))
+      text: normalizeDisplayText(item.parts.join(" ")),
+      ...(item.section ? { section: item.section } : {})
     }))
     .filter((item) => item.text && /[\p{L}\p{N}]/u.test(item.text));
 

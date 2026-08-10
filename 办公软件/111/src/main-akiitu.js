@@ -511,7 +511,7 @@
 
         allScripts.forEach((node) => node.remove());
 
-        const bodyInner = `<div class="product-content-webflow">\n${doc.body.innerHTML.trim()}\n</div>`;
+        const bodyInner = `<div class="page page-webflow">\n<div class="product-content-webflow">\n${doc.body.innerHTML.trim()}\n</div>\n</div>`;
 
         const baseStyle = "img{\n  width: auto !important;\n}";
         const rawStyleContent = [baseStyle, ...cssBlocks].join("\n\n");

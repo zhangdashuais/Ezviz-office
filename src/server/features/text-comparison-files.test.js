@@ -30,3 +30,16 @@ test("HTML extraction includes visible text and excludes images and hidden conte
     { tag: "p", text: "Up to 12x Mixed Zoom" }
   ]);
 });
+
+test("HTML extraction records the containing section position", () => {
+  const segments = extractHtmlSegments(`
+    <section id="overview"><h2>Overview</h2><p>Camera introduction</p></section>
+    <section id="features"><h2>Features</h2><p>3K clear video</p></section>
+  `);
+  assert.deepEqual(segments[2].section, {
+    index: 2,
+    id: "features",
+    className: "",
+    heading: "Features"
+  });
+});

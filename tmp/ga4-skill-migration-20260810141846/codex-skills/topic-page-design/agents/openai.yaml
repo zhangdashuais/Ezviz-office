@@ -1,0 +1,4 @@
+﻿interface:
+  display_name: "专题信息页设计规范"
+  short_description: "专题信息页、产品家族页与解决方案页的信息架构和交互设计。"
+  default_prompt: "使用 $topic-page-design，为多产品专题信息页规划内容、产品选择和交互设计。"

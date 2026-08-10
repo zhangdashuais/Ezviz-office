@@ -2,10 +2,42 @@ function normalizeShopAccountText(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function shopAccountLooksCompatible(accountText, expectedAccount) {
+function normalizeShopSiteCode(value) {
+  const normalized = normalizeShopAccountText(value);
+  if (!normalized || normalized === "www" || normalized === "com") return "";
+  return /^[a-z]{2,3}$/.test(normalized) ? normalized : "";
+}
+
+function shopAccountSiteCode(accountText) {
+  const normalized = normalizeShopAccountText(accountText);
+  const match = normalized.match(/^([a-z]{2,3})\d{3,}/);
+  return match ? match[1] : "";
+}
+
+function siteCodeFromCredentialDomain(rawDomain) {
+  const value = String(rawDomain || "").trim();
+  if (!value) return "";
+  try {
+    const url = new URL(/^[a-z]+:\/\//i.test(value) ? value : "https://" + value);
+    const segments = url.pathname.split("/").map(normalizeShopSiteCode).filter(Boolean);
+    return segments[0] || "";
+  } catch {
+    const match = value.match(/(?:^|\/)([a-z]{2,3})(?:\/|$)/i);
+    return match ? normalizeShopSiteCode(match[1]) : "";
+  }
+}
+
+function shopAccountLooksCompatible(accountText, expectedAccount, options = {}) {
   const normalizedExpected = normalizeShopAccountText(expectedAccount);
+  const normalizedAccount = normalizeShopAccountText(accountText);
   if (!normalizedExpected) return false;
-  return normalizeShopAccountText(accountText).includes(normalizedExpected);
+  if (normalizedAccount.includes(normalizedExpected)) return true;
+
+  const expectedSiteCode = normalizeShopSiteCode(options.siteCode)
+    || siteCodeFromCredentialDomain(options.credentialDomain)
+    || shopAccountSiteCode(expectedAccount);
+  const accountSiteCode = shopAccountSiteCode(accountText);
+  return Boolean(expectedSiteCode && accountSiteCode && expectedSiteCode === accountSiteCode);
 }
 
 const SHOP_BACKEND_HOSTNAMES = new Set([
@@ -33,8 +65,8 @@ function shopAccountLooksLikeConcreteLogin(accountText) {
 function createShopAccountIdentityVerifier() {
   const aliasesByAccount = new Map();
 
-  function matches(accountText, expectedAccount) {
-    if (shopAccountLooksCompatible(accountText, expectedAccount)) return true;
+  function matches(accountText, expectedAccount, options = {}) {
+    if (shopAccountLooksCompatible(accountText, expectedAccount, options)) return true;
     // The new shop may show a human-readable site alias (for example "Japan")
     // instead of the submitted login. A different account-like value such as
     // "nl114514" is not an alias and must never be accepted through the alias map.
@@ -44,12 +76,12 @@ function createShopAccountIdentityVerifier() {
     return Boolean(expectedKey && accountAlias && aliasesByAccount.get(expectedKey) === accountAlias);
   }
 
-  function remember(accountText, expectedAccount) {
+  function remember(accountText, expectedAccount, options = {}) {
     const expectedKey = normalizeShopAccountText(expectedAccount);
     const accountAlias = normalizeShopAccountText(accountText);
     if (!expectedKey || !accountAlias) return false;
     if (shopAccountLooksLikeConcreteLogin(accountText)
-      && !shopAccountLooksCompatible(accountText, expectedAccount)) {
+      && !shopAccountLooksCompatible(accountText, expectedAccount, options)) {
       throw new Error("商城后台返回了与目标站点不一致的登录账号，已阻止将该账号记录为站点别名。");
     }
     for (const [knownAccount, knownAlias] of aliasesByAccount.entries()) {
@@ -282,11 +314,12 @@ function createBrowserAuth(deps) {
       logLine(logs, "已从网站账号密码表读取目标站点账号：" + payload.credentialDomain);
     }
 
+    const identityOptions = { credentialDomain: payload.credentialDomain };
     const forceShopRelogin = normalizeBool(payload.forceShopRelogin);
     const currentAccount = forceShopRelogin
       ? null
       : await currentShopBackendAccount(page);
-    if (currentAccount && shopAccountVerifier.matches(currentAccount, username)) {
+    if (currentAccount && shopAccountVerifier.matches(currentAccount, username, identityOptions)) {
       logLine(logs, "检测到商城后台已登录，复用当前账号：" + currentAccount);
       return page;
     }
@@ -300,7 +333,7 @@ function createBrowserAuth(deps) {
     }
 
     if (forceShopRelogin
-      || (currentAccount && !shopAccountVerifier.matches(currentAccount, username))) {
+      || (currentAccount && !shopAccountVerifier.matches(currentAccount, username, identityOptions))) {
       logLine(logs, "清理商城专用浏览器的旧账号会话，直接登录目标站点。");
       await page.context().clearCookies();
     }
@@ -391,11 +424,11 @@ function createBrowserAuth(deps) {
     }
 
     const authenticatedAccount = await currentShopBackendAccount(backendPage);
-    if (!shopAccountVerifier.matches(authenticatedAccount, username) && submittedCredentials) {
-      shopAccountVerifier.remember(authenticatedAccount, username);
+    if (!shopAccountVerifier.matches(authenticatedAccount, username, identityOptions) && submittedCredentials) {
+      shopAccountVerifier.remember(authenticatedAccount, username, identityOptions);
       logLine(logs, "新版后台显示账号与登录账号格式不同，已验证并记录本次会话身份映射。");
     }
-    if (!shopAccountVerifier.matches(authenticatedAccount, username)) {
+    if (!shopAccountVerifier.matches(authenticatedAccount, username, identityOptions)) {
       throw new Error(
         "商城后台登录账号与目标站点账号不一致。目标凭据："
         + (payload.credentialDomain || "页面输入账号")

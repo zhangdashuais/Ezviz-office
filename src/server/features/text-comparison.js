@@ -62,12 +62,24 @@ function splitLongText(value) {
   return chunks;
 }
 
-function preparePdfSegments(pdfPages) {
+function isSpecificationPage(page) {
+  const lines = Array.isArray(page?.lines)
+    ? page.lines
+    : String(page?.text || "").split(/\r?\n/);
+  const firstLine = lines.map(normalizeDisplayText).find(Boolean) || "";
+  return /^specifications?\b/i.test(firstLine);
+}
+
+function preparePdfSegments(pdfPages, options = {}) {
   if (!Array.isArray(pdfPages) || !pdfPages.length) {
     throw new Error("PDF 没有提取到可比较的文字。");
   }
   const segments = [];
+  const specificationStartIndex = options.excludeSpecifications === false
+    ? -1
+    : pdfPages.findIndex(isSpecificationPage);
   pdfPages.forEach((page, pageIndex) => {
+    if (specificationStartIndex >= 0 && pageIndex >= specificationStartIndex) return;
     const pageNumber = Number(page?.page) || pageIndex + 1;
     const lines = Array.isArray(page?.lines)
       ? page.lines
@@ -98,7 +110,8 @@ function prepareHtmlSegments(htmlSegments) {
       if (text.length >= 2 && /[\p{L}\p{N}]/u.test(text)) {
         segments.push({
           text,
-          tag: typeof item === "object" ? String(item?.tag || "") : ""
+          tag: typeof item === "object" ? String(item?.tag || "") : "",
+          section: typeof item === "object" ? item?.section || null : null
         });
       }
     });
@@ -260,65 +273,127 @@ function buildCandidates(pdfSegments, htmlSegments, changedThreshold) {
   return candidates;
 }
 
+function htmlContainsPdfText(htmlText, pdfText, options = {}) {
+  const htmlComparable = compactComparableText(htmlText, options);
+  const pdfComparable = compactComparableText(pdfText, options);
+  return Boolean(pdfComparable && htmlComparable.includes(pdfComparable));
+}
+
+function formatHtmlSection(section, blockStart, blockEnd) {
+  if (!section) return "";
+  const parts = [`Section ${section.index}`];
+  if (section.id) parts.push(`#${section.id}`);
+  if (section.className) {
+    parts.push(section.className.split(/\s+/).filter(Boolean).map((name) => `.${name}`).join(""));
+  }
+  if (section.heading) parts.push(section.heading);
+  if (blockStart) {
+    parts.push(blockStart === blockEnd ? `块 ${blockStart}` : `块 ${blockStart}-${blockEnd}`);
+  }
+  return parts.join(" · ");
+}
+
+function findHtmlContainment(htmlSegments, pdfText, options = {}) {
+  const needle = compactComparableText(pdfText, options);
+  if (!needle) return null;
+
+  const blockCounts = new Map();
+  let offset = 0;
+  const searchable = htmlSegments.map((candidate) => {
+    const sectionIndex = candidate.section?.index || 0;
+    const block = sectionIndex ? (blockCounts.get(sectionIndex) || 0) + 1 : 0;
+    if (sectionIndex) blockCounts.set(sectionIndex, block);
+    const comparable = compactComparableText(candidate.text, options);
+    const item = {
+      ...candidate,
+      block,
+      start: offset,
+      end: offset + comparable.length,
+      comparable
+    };
+    offset = item.end;
+    return item;
+  }).filter((candidate) => candidate.comparable);
+  const completeHtmlText = searchable.map((candidate) => candidate.comparable).join("");
+  const matchStart = completeHtmlText.indexOf(needle);
+  if (matchStart < 0) return null;
+  const matchEnd = matchStart + needle.length;
+  const matched = searchable.filter((candidate) =>
+    candidate.end > matchStart && candidate.start < matchEnd
+  );
+  if (!matched.length) return null;
+
+  const locations = [];
+  for (const candidate of matched) {
+    const previous = locations.at(-1);
+    if (previous && previous.section?.index === candidate.section?.index) {
+      previous.endBlock = candidate.block;
+    } else {
+      locations.push({
+        section: candidate.section,
+        startBlock: candidate.block,
+        endBlock: candidate.block
+      });
+    }
+  }
+  return {
+    text: matched.map((candidate) => candidate.text).join(" "),
+    tag: matched.length === 1 ? matched[0].tag : "document",
+    section: matched[0].section,
+    sectionText: locations
+      .map((location) => formatHtmlSection(
+        location.section,
+        location.startBlock,
+        location.endBlock
+      ) || "HTML 文档")
+      .join(" → ")
+  };
+}
+
 function compareTextContent(input = {}) {
-  const pdfSegments = preparePdfSegments(input.pdfPages);
+  const pdfSegments = preparePdfSegments(input.pdfPages, input.options);
   const htmlSegments = prepareHtmlSegments(input.htmlSegments);
-  const requestedMatchThreshold = Number(input.options?.matchThreshold);
-  const matchThreshold = Number.isFinite(requestedMatchThreshold)
-    ? Math.min(0.98, Math.max(0.65, requestedMatchThreshold))
-    : DEFAULT_MATCH_THRESHOLD;
-  const changedThreshold = Math.min(DEFAULT_CHANGED_THRESHOLD, matchThreshold - 0.1);
-
-  const pdfMatches = new Map();
-  const htmlMatches = new Set();
-  const candidates = buildCandidates(pdfSegments, htmlSegments, changedThreshold);
-  candidates.forEach((candidate) => {
-    if (pdfMatches.has(candidate.pdfIndex) || htmlMatches.has(candidate.htmlIndex)) return;
-    pdfMatches.set(candidate.pdfIndex, candidate);
-    htmlMatches.add(candidate.htmlIndex);
-  });
-
-  const items = [];
-  pdfSegments.forEach((pdfSegment, pdfIndex) => {
-    const candidate = pdfMatches.get(pdfIndex);
-    if (!candidate) {
-      items.push({
-        type: "missing",
+  const excludedSpecificationPages = input.options?.excludeSpecifications === false
+    ? []
+    : (() => {
+      const startIndex = input.pdfPages.findIndex(isSpecificationPage);
+      return startIndex >= 0 ? input.pdfPages.slice(startIndex) : [];
+    })();
+  const excludedSpecificationSegments = excludedSpecificationPages.reduce((total, page) => {
+    const lines = Array.isArray(page?.lines)
+      ? page.lines
+      : String(page?.text || "").split(/\r?\n/);
+    return total + lines.reduce((count, line) => count + splitLongText(line)
+      .filter((text) => text.length >= 2 && /[\p{L}\p{N}]/u.test(text)).length, 0);
+  }, 0);
+  const items = pdfSegments.map((pdfSegment) => {
+    const htmlSegment = findHtmlContainment(htmlSegments, pdfSegment.text, input.options);
+    if (htmlSegment) {
+      return {
+        type: "match",
         page: pdfSegment.page,
         pdfText: pdfSegment.text,
-        htmlText: "",
-        similarity: 0,
-        critical: extractFacts(pdfSegment.text).length > 0
-      });
-      return;
+        htmlText: htmlSegment.text,
+        htmlTag: htmlSegment.tag,
+        htmlSection: htmlSegment.sectionText,
+        similarity: 1,
+        critical: false,
+        suggestion: "HTML 已包含该 PDF 文字片段，无需修改。"
+      };
     }
-    const htmlSegment = htmlSegments[candidate.htmlIndex];
-    const type = candidate.score >= matchThreshold ? "match" : "changed";
-    items.push({
-      type,
+    const critical = extractFacts(pdfSegment.text).length > 0;
+    return {
+      type: "missing",
       page: pdfSegment.page,
       pdfText: pdfSegment.text,
-      htmlText: htmlSegment.text,
-      htmlTag: htmlSegment.tag,
-      similarity: candidate.score,
-      critical: type === "changed" && factsDiffer(pdfSegment.text, htmlSegment.text)
-    });
-  });
-
-  htmlSegments.forEach((htmlSegment, htmlIndex) => {
-    if (htmlMatches.has(htmlIndex)) return;
-    items.push({
-      type: "extra",
-      page: null,
-      pdfText: "",
-      htmlText: htmlSegment.text,
-      htmlTag: htmlSegment.tag,
+      htmlText: "",
+      htmlSection: "",
       similarity: 0,
-      critical: extractFacts(htmlSegment.text).length > 0
-    });
-  });
-  items.forEach((item) => {
-    item.suggestion = suggestionForItem(item);
+      critical,
+      suggestion: critical
+        ? "HTML 未包含该 PDF 数值或单位片段，请优先核对风险。"
+        : "HTML 未包含该 PDF 文字片段，请人工确认风险。"
+    };
   });
 
   const counts = items.reduce((summary, item) => {
@@ -326,26 +401,22 @@ function compareTextContent(input = {}) {
     if (item.critical) summary.critical += 1;
     return summary;
   }, { match: 0, changed: 0, missing: 0, extra: 0, critical: 0 });
-  const pdfCompared = counts.match + counts.changed + counts.missing;
+  const pdfCompared = counts.match + counts.missing;
   const matchRate = pdfCompared
     ? Number(((counts.match / pdfCompared) * 100).toFixed(1))
     : 0;
-  const differenceCount = counts.changed + counts.missing + counts.extra;
-  const verdict = counts.critical
-    ? "fail"
-    : differenceCount
-      ? "warning"
-      : "pass";
-  const verdictText = verdict === "fail"
-    ? "存在数值或单位风险，建议修正后再发布。"
-    : verdict === "warning"
-      ? "存在文字差异，请人工确认后再发布。"
-      : "文本核验通过。";
+  const differenceCount = counts.missing;
+  const verdict = differenceCount ? "warning" : "pass";
+  const verdictText = verdict === "warning"
+    ? "HTML 未包含部分 PDF 已提取文字，请人工确认风险。"
+    : "PDF 已提取文字均包含在 HTML 中，核验通过。";
   const summary = {
     ...counts,
     pdfPages: new Set(pdfSegments.map((item) => item.page)).size,
     pdfSegments: pdfSegments.length,
     htmlSegments: htmlSegments.length,
+    excludedSpecificationPages: excludedSpecificationPages.length,
+    excludedSpecificationSegments,
     matchRate,
     differenceCount,
     verdict,
@@ -358,8 +429,13 @@ function compareTextContent(input = {}) {
       html: String(input.files?.html || "")
     },
     summary,
-    recommendations: buildRecommendations(summary),
-    options: { matchThreshold },
+    recommendations: differenceCount
+      ? [{ level: counts.critical ? "high" : "medium", message: `HTML 未包含 ${differenceCount} 条 PDF 已提取文字，请逐条确认。` }]
+      : [{ level: "pass", message: "HTML 已包含全部 PDF 已提取文字；HTML 的其他补充内容不参与风险判断。" }],
+    options: {
+      mode: "pdf-fragment-contained-in-html",
+      excludeSpecifications: input.options?.excludeSpecifications !== false
+    },
     items
   };
 }
@@ -371,5 +447,8 @@ module.exports = {
   textSimilarity,
   extractFacts,
   factsDiffer,
+  isSpecificationPage,
+  htmlContainsPdfText,
+  findHtmlContainment,
   compareTextContent
 };

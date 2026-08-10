@@ -54,12 +54,11 @@
   function renderSummary(summary) {
     elements.summary.replaceChildren(
       summaryCard("PDF 页数", summary.pdfPages),
-      summaryCard("完全/近似一致", summary.match, "is-match"),
-      summaryCard("文字有修改", summary.changed, "is-changed"),
-      summaryCard("HTML 缺少", summary.missing, "is-missing"),
-      summaryCard("HTML 多出", summary.extra, "is-extra"),
+      summaryCard("已排除 Specification", `${summary.excludedSpecificationPages || 0} 页 / ${summary.excludedSpecificationSegments || 0} 条`),
+      summaryCard("HTML 已包含", summary.match, "is-match"),
+      summaryCard("HTML 未包含", summary.missing, "is-missing"),
       summaryCard("数值/单位风险", summary.critical, "is-critical"),
-      summaryCard("PDF 匹配率", `${summary.matchRate}%`),
+      summaryCard("PDF 包含率", `${summary.matchRate}%`),
       summaryCard("核验结论", {
         pass: "通过",
         warning: "需确认",
@@ -88,10 +87,8 @@
   function typeLabel(item) {
     if (item.critical) return "数值/单位风险";
     return {
-      match: "一致",
-      changed: "文字有修改",
-      missing: "HTML 缺少",
-      extra: "HTML 多出"
+      match: "HTML 已包含",
+      missing: "HTML 未包含"
     }[item.type] || item.type;
   }
 
@@ -121,6 +118,9 @@
       const pageCell = document.createElement("td");
       pageCell.textContent = item.page ? `第 ${item.page} 页` : "-";
 
+      const sectionCell = document.createElement("td");
+      sectionCell.textContent = item.htmlSection || "-";
+
       const pdfCell = document.createElement("td");
       pdfCell.textContent = item.pdfText || "-";
 
@@ -133,14 +133,13 @@
       }
 
       const similarityCell = document.createElement("td");
-      similarityCell.textContent = item.similarity
-        ? `${Math.round(item.similarity * 100)}%`
-        : "-";
+      similarityCell.textContent = item.type === "match" ? "包含" : "未包含";
       const suggestionCell = document.createElement("td");
       suggestionCell.textContent = item.suggestion || "-";
       row.append(
         typeCell,
         pageCell,
+        sectionCell,
         pdfCell,
         htmlCell,
         similarityCell,
@@ -189,11 +188,9 @@
       elements.search.value = "";
       renderTable();
       elements.download.disabled = false;
-      const differenceCount = lastResult.summary.changed
-        + lastResult.summary.missing
-        + lastResult.summary.extra;
+      const differenceCount = lastResult.summary.missing;
       setStatus(
-        `${lastResult.summary.verdictText} 共发现 ${differenceCount} 条文字差异，其中 ${lastResult.summary.critical} 条包含数值或单位风险。`,
+        `${lastResult.summary.verdictText} 共发现 ${differenceCount} 条未包含片段，其中 ${lastResult.summary.critical} 条包含数值或单位风险。`,
         lastResult.summary.verdict === "pass" ? "ok" : "warn"
       );
     } catch (error) {

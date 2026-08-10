@@ -205,6 +205,28 @@ button:hover,
 .button:hover { background: var(--accent-hover); }
 button:disabled { background: #cbd5e1; cursor: not-allowed; }
 
+.el-button.transform,
+.el-button--danger.transform {
+  background: #f56c6c;
+  border-color: #f56c6c;
+  color: #fff;
+}
+
+.el-button--danger.transform:hover {
+  background: #f78989;
+  border-color: #f78989;
+}
+
+.el-button--mini.transform {
+  padding: 7px 15px;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.mt-4.transform { margin-top: 16px; }
+.mb-4.transform { margin-bottom: 16px; }
+
 .status { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; padding: 10px; border-radius: 6px; border: 1px solid transparent; }
 .status.ok { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
 .status.warn { background: #fffbeb; border-color: #fef3c7; color: #92400e; }

@@ -39,18 +39,21 @@
   });
 
   // 版本切换
-  versionSelect.addEventListener('change', function() {
-    loadScript(this.value);
-  });
+  if (versionSelect) {
+    versionSelect.addEventListener('change', function() {
+      loadScript(this.value);
+    });
+  }
 
   // 默认加载
-  loadScript(versionSelect.value);
+  loadScript((versionSelect && versionSelect.value) || 'src/main-default.js');
 
   // 挂载全局工具方法供 main-*.js 调用
   window.getSelectedHtmlFile = () => htmlSelect.value;
   window.getImageProcessConfig = () => ({
-    mode: imageModeSelect.value,
-    baseUrl: imageBaseInput.value,
-    uploadApi: uploadApiInput.value
+    mode: (imageModeSelect && imageModeSelect.value) || 'upload',
+    baseUrl: (imageBaseInput && imageBaseInput.value) || 'https://mfs.ezvizlife.com/',
+    uploadApi: (uploadApiInput && uploadApiInput.value) || 'https://fs.ezvizlife.com/upload.php'
   });
+
 })();

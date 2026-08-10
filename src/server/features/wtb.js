@@ -1,5 +1,16 @@
 const XLSX = require("xlsx");
 
+const LEGACY_SHOP_PRODUCT_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
+
+function isLegacyShopBackendUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === "https:" && url.hostname.toLowerCase() === "shop.ezvizlife.com";
+  } catch {
+    return false;
+  }
+}
+
 function normalizeWtbHeader(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s_\-（）()：:]+/g, "");
 }
@@ -306,11 +317,15 @@ function resolveWtbSite(config, body, rows) {
 }
 
 async function findAndOpenProductEdit(page, productName, logs) {
+  await page.goto(LEGACY_SHOP_PRODUCT_INDEX_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(1800);
+  if (!isLegacyShopBackendUrl(page.url())) {
+    throw new Error("WTB 必须使用老商城后台 shop.ezvizlife.com，当前页面为：" + page.url());
+  }
   if (typeof openProductEditorByName === "function") {
     return openProductEditorByName(page, productName, logs);
   }
-  await page.goto("https://shop.ezvizlife.com/goods/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(1200);
 
   async function clickMatchingRow() {
     const match = await page.evaluate((targetName) => {
@@ -1369,7 +1384,10 @@ async function restoreWtbLink(body, logs) {
       classifyWtbProductError,
       openWtbBuyModal,
       inspectWtbRetailerModal,
-      clickWtbRetailer
+      clickWtbRetailer,
+      findAndOpenProductEdit,
+      isLegacyShopBackendUrl,
+      legacyShopProductIndexUrl: LEGACY_SHOP_PRODUCT_INDEX_URL
     },
     getReportPath(filename) {
       const safeName = path.basename(String(filename || ""));
@@ -1386,5 +1404,6 @@ module.exports = {
   normalizeWtbPlatform,
   resolveWtbPlatformKey,
   applyWtbLinksToMap,
-  parseWtbWorkbook
+  parseWtbWorkbook,
+  isLegacyShopBackendUrl
 };

@@ -1,6 +1,28 @@
 const INT_GOODS_COPY_URL = "https://shop.ezvizlife.com/goods/save-cite";
 const INT_GOODS_CATEGORY_PRIORITY = ["WiFi Cameras", "For Home"];
 const INT_GOODS_SOURCE_SITE_VALUE = "0";
+const LEGACY_SHOP_HOSTNAME = "shop.ezvizlife.com";
+const LEGACY_GOODS_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
+
+function isLegacyShopPath(rawUrl, pathName) {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === "https:"
+      && url.hostname.toLowerCase() === LEGACY_SHOP_HOSTNAME
+      && url.pathname === pathName;
+  } catch {
+    return false;
+  }
+}
+
+function isLegacyShopUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === "https:" && url.hostname.toLowerCase() === LEGACY_SHOP_HOSTNAME;
+  } catch {
+    return false;
+  }
+}
 
 function orderedIntGoodsCategories(options = []) {
   const usable = options
@@ -45,17 +67,15 @@ function createProductManagement({ logLine, normalizeBool }) {
       // validate backend state instead of re-reading the mutated in-page Angular model.
       await page.goto(cached.editUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(1200);
-      if (/shop\.ezvizlife\.com/i.test(page.url()) && !/signin|login/i.test(page.url())) {
+      if (isLegacyShopUrl(page.url()) && !/signin|login/i.test(page.url())) {
         logLine(logs, "已复用产品编辑地址缓存：" + targetName);
         return { ...cached, cacheHit: true };
       }
       productEditCache.delete(cacheKey);
     }
 
-    let currentPath = "";
-    try { currentPath = new URL(page.url()).pathname; } catch {}
-    if (currentPath !== "/goods/index") {
-      await page.goto("https://shop.ezvizlife.com/goods/index", {
+    if (!isLegacyShopPath(page.url(), "/goods/index")) {
+      await page.goto(LEGACY_GOODS_INDEX_URL, {
         waitUntil: "domcontentloaded",
         timeout: 60000
       }).catch(() => {});
@@ -595,6 +615,9 @@ module.exports = {
   INT_GOODS_COPY_URL,
   INT_GOODS_CATEGORY_PRIORITY,
   INT_GOODS_SOURCE_SITE_VALUE,
+  LEGACY_GOODS_INDEX_URL,
+  isLegacyShopPath,
+  isLegacyShopUrl,
   orderedIntGoodsCategories,
   createProductManagement
 };

@@ -1,0 +1,4 @@
+interface:
+  display_name: "详情页信息与交互设计"
+  short_description: "基于 EZVIZ 的产品详情页信息与交互设计。"
+  default_prompt: "使用 $ecommerce-page-patterns，为智能家居产品详情页规划信息展示与交互设计，并以 EZVIZ 国际站风格为基底。"
