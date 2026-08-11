@@ -118,6 +118,16 @@ test("address replacement validates and de-duplicates product input", () => {
     }),
     /不能互相包含/
   );
+  assert.deepEqual(validateRequest({
+    productNames: "CP8",
+    oldUrl: 'src="/old/image.jpg"',
+    newUrl: 'src="/new/image.jpg"'
+  }).items[0].operations[0], {
+    type: "replace",
+    label: "地址替换",
+    targetText: 'src="/old/image.jpg"',
+    replacementText: 'src="/new/image.jpg"'
+  });
 });
 
 test("code-block deletion preserves the exact target and replaces it with empty text", () => {

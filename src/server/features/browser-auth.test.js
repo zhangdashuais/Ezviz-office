@@ -58,6 +58,21 @@ test("shop account comparison accepts concrete login when target site code match
   );
 });
 
+test("shop account comparison accepts the global concrete login for root site", () => {
+  assert.equal(
+    shopAccountLooksCompatible("global114514 l", "website@example.com", {
+      credentialDomain: "www.ezviz.com"
+    }),
+    true
+  );
+  assert.equal(
+    shopAccountLooksCompatible("vn114514", "website@example.com", {
+      credentialDomain: "www.ezviz.com"
+    }),
+    false
+  );
+});
+
 test("shop account comparison rejects an empty expected account", () => {
   assert.equal(shopAccountLooksCompatible("website-vn@example.com", ""), false);
 });
@@ -153,6 +168,57 @@ test("shop login reuse jumps back to the legacy shop root before returning", asy
   });
 
   const result = await auth.ensureShopLoggedIn(page, { username: "website-tr@example.com", password: "ok" }, []);
+
+  assert.equal(result, page);
+  assert.deepEqual(visited, ["https://shop.ezvizlife.com/"]);
+  assert.equal(page.url(), "https://shop.ezvizlife.com/");
+});
+
+test("shop account check jumps from new shop to legacy root before reading username", async () => {
+  const visited = [];
+  const page = {
+    currentUrl: "https://new-shop.ezvizlife.com/templates/list?pageNum=1&pageSize=20",
+    isClosed() {
+      return false;
+    },
+    url() {
+      return this.currentUrl;
+    },
+    locator() {
+      return {
+        first() {
+          return {
+            async isVisible() {
+              return false;
+            }
+          };
+        }
+      };
+    },
+    async evaluate() {
+      return this.currentUrl.startsWith("https://shop.ezvizlife.com/")
+        ? "website@example.com"
+        : "new-shop-display";
+    },
+    async goto(url) {
+      visited.push(url);
+      this.currentUrl = url;
+    },
+    async waitForTimeout() {}
+  };
+  const auth = createBrowserAuth({
+    chromium: {},
+    PROFILE_DIR: "",
+    SHOP_PROFILE_DIR: "",
+    SHOP_DASHBOARD_URL: "https://shop.ezvizlife.com/templates/index",
+    SHOP_LOGIN_URL: "https://usauth.ezvizlife.com/signIn",
+    SHOP_LOGOUT_URL: "",
+    shopCredentials: { read() { throw new Error("should not read credentials"); } },
+    logLine() {},
+    normalizeBool: Boolean
+  });
+
+  const result = await auth.ensureShopLoggedIn(page, { username: "website@example.com", password: "ok" }, []);
 
   assert.equal(result, page);
   assert.deepEqual(visited, ["https://shop.ezvizlife.com/"]);

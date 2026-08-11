@@ -59,9 +59,6 @@ function validateAddressPair(oldAddress, newAddress, label) {
   if (!targetText || !replacementText) {
     throw new Error(`${label}必须同时填写替换前地址和替换后地址。`);
   }
-  if (!/^https?:\/\//i.test(targetText) || !/^https?:\/\//i.test(replacementText)) {
-    throw new Error(`${label}的新旧地址都必须以 http:// 或 https:// 开头。`);
-  }
   if (targetText === replacementText) throw new Error(`${label}的新旧地址不能相同。`);
   if (targetText.includes(replacementText) || replacementText.includes(targetText)) {
     throw new Error(`${label}的新旧地址不能互相包含，以免重复替换。`);

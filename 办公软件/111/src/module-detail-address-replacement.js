@@ -76,12 +76,6 @@
         ? "请填写要删除的完整代码块。"
         : "请填写被替换地址。");
     }
-    if (operation === "replace" && !/^https?:\/\//i.test(oldUrl)) {
-      throw new Error("被替换地址必须以 http:// 或 https:// 开头。");
-    }
-    if (operation === "replace" && !/^https?:\/\//i.test(newUrl)) {
-      throw new Error("替换后地址必须以 http:// 或 https:// 开头。");
-    }
     if (operation === "replace" && oldUrl === newUrl) {
       throw new Error("两个地址不能相同。");
     }

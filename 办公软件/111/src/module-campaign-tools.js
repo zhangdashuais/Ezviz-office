@@ -1,5 +1,5 @@
 ﻿(function () {
-  const serviceBase = "http://localhost:3217";
+  const serviceBase = location.origin && location.origin !== "null" ? location.origin : "http://localhost:3217";
   const ids = {
     sites: "campaignSites",
     reload: "campaignReloadSitesBtn",
@@ -469,11 +469,17 @@
   }
 
   async function postForm(url, formData) {
-    const response = await fetch(serviceBase + url, {
-      method: "POST",
-      body: formData
-    });
-    const payload = await response.json();
+    let response;
+    try {
+      response = await fetch(serviceBase + url, {
+        method: "POST",
+        body: formData
+      });
+    } catch (error) {
+      throw new Error("无法连接本地服务 " + serviceBase + "，请确认项目已启动并用 http://localhost:3217/inline-packager.html 打开页面。原始错误：" + (error.message || error));
+    }
+    const payload = await response.json().catch(() => null);
+    if (!payload) throw new Error("接口没有返回 JSON，HTTP " + response.status);
     if (!response.ok || payload.ok === false) throw new Error(payload.error || "鎺ュ彛鎵ц澶辫触");
     return payload;
   }

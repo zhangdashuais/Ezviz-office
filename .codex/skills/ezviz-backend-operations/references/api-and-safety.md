@@ -96,9 +96,9 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 
 产品 Detail 读取只返回 PC `Overview` 和名称严格匹配 `Specifications` 的自定义字段。字段不存在时记录单项失败，不回退到其他 Detail 字段。
 
-Detail 内容操作递归处理 `vm.pcView` 的字符串值，适用于 Overview、自定义 Specifications 等 PC Details 内容。`operation: "replace"` 精确替换完整 HTTP/HTTPS 地址；`operation: "delete"` 精确删除 `targetText` 指定的完整代码块（替换为空字符串）。先调用 `preview`；输入未变化且存在命中时才能调用 `submit`。无命中不保存，提交后必须回读并确认目标内容剩余为 0。它不修改 Mobile Details 或其他产品标签。
+Detail 内容操作递归处理 `vm.pcView` 的字符串值，适用于 Overview、自定义 Specifications 等 PC Details 内容。`operation: "replace"` 精确替换用户填写的文本，可为完整 URL、相对路径或地址片段，不要求 HTTP/HTTPS 协议；`operation: "delete"` 精确删除 `targetText` 指定的完整代码块（替换为空字符串）。先调用 `preview`；输入未变化且存在命中时才能调用 `submit`。无命中不保存，提交后必须回读并确认目标内容剩余为 0。它不修改 Mobile Details 或其他产品标签。
 
-“临时功能”优先从 `.xlsx/.xls` 导入。读取第一个工作表，表头固定为：`Product_Name`、`Old_Address_1`、`New_Address_1`、`Old_Address_2`、`New_Address_2`、`Delete_Code_Block`。每行对应一个产品，最多两组完整地址替换，并可同时删除一个代码块；空操作跳过，每行至少一项操作，产品名不得重复，一次最多 50 个产品。每个产品按“删除代码块、地址 1、地址 2”的顺序计算，全部操作只保存一次，再逐项回读。优先让用户通过页面的“下载信息模板”取得标准文件。
+“临时功能”优先从 `.xlsx/.xls` 导入。读取第一个工作表，表头固定为：`Product_Name`、`Old_Address_1`、`New_Address_1`、`Old_Address_2`、`New_Address_2`、`Delete_Code_Block`。每行对应一个产品，最多两组精确文本替换，并可同时删除一个代码块；空操作跳过，每行至少一项操作，产品名不得重复，一次最多 50 个产品。每个产品按“删除代码块、地址 1、地址 2”的顺序计算，全部操作只保存一次，再逐项回读。优先让用户通过页面的“下载信息模板”取得标准文件。
 
 删除请求示例：
 
