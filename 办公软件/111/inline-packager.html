@@ -38,7 +38,7 @@
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
         <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
         <div class="nav-item" data-target="tab-product-revision-sync" data-operation="publish-batch">产品上架 / 下架</div>
-        <div class="nav-item" data-target="tab-product-revision-sync" data-operation="revision">产品修订</div>
+        <div class="nav-item" data-target="tab-product-direct-revision">产品修订</div>
         <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换/删除</div>
       </div>
     </div>
@@ -435,6 +435,48 @@
         <div class="card">
           <h3>预览与执行结果</h3>
           <textarea id="revisionSyncOutput" placeholder="源站点图片信息、Detail / Specification / 语言包变更项和回读结果会显示在这里..."></textarea>
+        </div>
+      </div>
+
+      <div id="tab-product-direct-revision" class="tab-content">
+        <div class="card">
+          <h3>产品局部修订</h3>
+          <p class="desc">先选择国家站点和产品，再单独执行 Detail 或 Specification 修订。两种操作互不依赖。</p>
+          <div class="form-grid">
+            <label for="directRevisionSite">国家站点</label>
+            <select id="directRevisionSite"><option value="">正在加载站点...</option></select>
+            <label for="directRevisionProduct">产品名称</label>
+            <input id="directRevisionProduct" type="text" placeholder="例如 CP8">
+          </div>
+        </div>
+        <div class="card">
+          <h3>Detail 整体替换</h3>
+          <p class="desc">仅替换该产品的完整 Detail HTML，不修改 Specification。</p>
+          <textarea id="directRevisionDetail" rows="12" placeholder="粘贴完整的替换后 Detail HTML"></textarea>
+          <div class="row">
+            <button id="directRevisionDetailPreview" type="button">预览 Detail 替换</button>
+            <button id="directRevisionDetailSubmit" type="button" disabled>确认替换 Detail</button>
+          </div>
+          <div id="directRevisionDetailStatus" class="status">请填写替换后的 Detail 代码。</div>
+          <textarea id="directRevisionDetailOutput" rows="10" readonly></textarea>
+        </div>
+        <div class="card">
+          <h3>Specification 局部修改</h3>
+          <p class="desc">仅对 Specification 中精确匹配的内容执行删除或替换，不修改 Detail。</p>
+          <div class="form-grid">
+            <label for="directRevisionSpecType">Specification 操作</label>
+            <select id="directRevisionSpecType"><option value="delete">删除</option><option value="replace">替换</option></select>
+            <label for="directRevisionSpecTarget">目标内容</label>
+            <textarea id="directRevisionSpecTarget" rows="8" placeholder="粘贴需要删除或替换的完整内容"></textarea>
+            <label id="directRevisionSpecReplacementLabel" for="directRevisionSpecReplacement" hidden>替换后内容</label>
+            <textarea id="directRevisionSpecReplacement" rows="8" placeholder="粘贴替换后的内容" hidden></textarea>
+          </div>
+          <div class="row">
+            <button id="directRevisionSpecPreview" type="button">预览 Specification 修改</button>
+            <button id="directRevisionSpecSubmit" type="button" disabled>确认修改 Specification</button>
+          </div>
+          <div id="directRevisionSpecStatus" class="status">请填写 Specification 操作内容。</div>
+          <textarea id="directRevisionSpecOutput" rows="10" readonly></textarea>
         </div>
       </div>
 
@@ -932,6 +974,7 @@
   <script src="src/module-language-package.js"></script>
   <script src="src/module-product-replacement.js"></script>
   <script src="src/module-product-revision-sync.js?v=20260807-1"></script>
+  <script src="src/module-product-direct-revision.js?v=20260812-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260811-1"></script>
   <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260724-4"></script>

@@ -467,6 +467,44 @@ function resolveProductDescription(parsedDatasheet, target, options = {}) {
   };
 }
 
+function validateDirectRevision(body) {
+  const productName = String(body?.productName || "").trim();
+  const siteCode = String(body?.siteCode || "").trim();
+  const revisionType = body?.revisionType === "specification" ? "specification" : "detail";
+  const detailHtml = String(body?.detailHtml ?? "");
+  let operations = body?.specificationOperations || [];
+  if (typeof operations === "string") {
+    try { operations = JSON.parse(operations); } catch { throw new Error("Specification 操作必须是有效 JSON。"); }
+  }
+  if (!siteCode) throw new Error("请选择国家站点。");
+  if (!productName) throw new Error("请填写产品名称。");
+  if (revisionType === "detail" && !detailHtml.trim()) throw new Error("请填写替换后的 Detail 代码。");
+  if (revisionType === "specification" && (!Array.isArray(operations) || !operations.length)) throw new Error("请至少填写一条 Specification 操作。");
+  if (revisionType === "detail") operations = [];
+  operations = operations.map((item, index) => {
+    const type = item?.type === "delete" ? "delete" : item?.type === "replace" ? "replace" : "";
+    const targetText = String(item?.targetText ?? "");
+    const replacementText = type === "replace" ? String(item?.replacementText ?? "") : "";
+    if (!type) throw new Error(`第 ${index + 1} 条 Specification 操作类型无效。`);
+    if (!targetText) throw new Error(`第 ${index + 1} 条 Specification 操作缺少目标内容。`);
+    if (type === "replace" && !replacementText) throw new Error(`第 ${index + 1} 条 Specification 替换操作缺少替换内容。`);
+    if (type === "replace" && targetText === replacementText) throw new Error(`第 ${index + 1} 条 Specification 新旧内容不能相同。`);
+    return { type, targetText, replacementText };
+  });
+  return { siteCode, productName, revisionType, detailHtml, operations };
+}
+
+function applySpecificationOperations(source, operations) {
+  let value = source;
+  const results = operations.map((operation) => {
+    const matchCount = value.split(operation.targetText).length - 1;
+    if (!matchCount) throw new Error("Specification 中未找到目标内容，已停止操作。");
+    value = value.split(operation.targetText).join(operation.replacementText);
+    return { ...operation, matchCount };
+  });
+  return { value, results };
+}
+
 function createProductRevisionSyncFeature(deps) {
   const {
     logLine,
@@ -691,6 +729,67 @@ function createProductRevisionSyncFeature(deps) {
       skippedBlankCount: plan.skippedBlankCount,
       missing: plan.missing.slice(0, 50),
       sourceMismatches: plan.sourceMismatches.slice(0, 50)
+    };
+  }
+
+  async function prepareDirectRevision(body, logs) {
+    const request = validateDirectRevision(body);
+    const site = getCampaignSites(readCampaignConfig()).find((item) => item.siteCode === request.siteCode);
+    if (!site || site.enabled === false) throw new Error("所选国家站点不存在或未启用。");
+    const session = await prepareSiteSession(site, body, logs);
+    const before = await readProductSnapshot(session.page, request.productName, logs);
+    const specification = request.revisionType === "specification"
+      ? applySpecificationOperations(before.detail.specifications, request.operations)
+      : { value: before.detail.specifications, results: [] };
+    const fingerprint = hashValue(JSON.stringify({
+      goodsId: before.goodsId,
+      detail: before.detail.overview,
+      specifications: before.detail.specifications
+    }));
+    return { request, site, session, before, specification, fingerprint };
+  }
+
+  async function previewDirectRevision(body, logs) {
+    const prepared = await prepareDirectRevision(body, logs);
+    return {
+      mode: "product-direct-revision-preview",
+      site: prepared.site,
+      productName: prepared.request.productName,
+      goodsId: prepared.before.goodsId,
+      fingerprint: prepared.fingerprint,
+      revisionType: prepared.request.revisionType,
+      detailChanged: prepared.request.revisionType === "detail"
+        && prepared.before.detail.overview !== prepared.request.detailHtml,
+      specificationChanged: prepared.before.detail.specifications !== prepared.specification.value,
+      specificationOperations: prepared.specification.results
+    };
+  }
+
+  async function submitDirectRevision(body, logs) {
+    const prepared = await prepareDirectRevision(body, logs);
+    if (!body?.fingerprint || body.fingerprint !== prepared.fingerprint) {
+      throw new Error("产品内容在预览后发生变化，请重新预览后再提交。");
+    }
+    const payload = await buildSavePayload(
+      prepared.session.page,
+      prepared.request.revisionType === "detail"
+        ? prepared.request.detailHtml : prepared.before.detail.overview,
+      prepared.specification.value,
+      prepared.before.productDescription
+    );
+    const save = await postProductUpdate(prepared.session.page, payload);
+    const after = await readProductSnapshot(prepared.session.page, prepared.request.productName, logs);
+    if ((prepared.request.revisionType === "detail" && after.detail.overview !== prepared.request.detailHtml)
+      || after.detail.specifications !== prepared.specification.value) {
+      throw new Error("保存后回读不一致：Detail 或 Specification 未正确更新。");
+    }
+    return {
+      mode: "product-direct-revision-submit",
+      site: prepared.site,
+      productName: prepared.request.productName,
+      goodsId: after.goodsId,
+      save,
+      backendCheck: { status: "passed", detail: "passed", specification: "passed" }
     };
   }
 
@@ -1233,7 +1332,7 @@ function createProductRevisionSyncFeature(deps) {
   const submitPublishing = (body, excelFile, languageDatasheetFile, logs) =>
     submit(body, excelFile, languageDatasheetFile, logs, { publishing: true });
 
-  return { preview, submit, previewPublishing, submitPublishing };
+  return { preview, submit, previewPublishing, submitPublishing, previewDirectRevision, submitDirectRevision };
 }
 
 module.exports = {
@@ -1255,5 +1354,7 @@ module.exports = {
   normalizeInternationalImageUrl,
   internationalListSource,
   resolveProductDescription,
+  validateDirectRevision,
+  applySpecificationOperations,
   createProductRevisionSyncFeature
 };

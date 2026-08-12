@@ -79,6 +79,8 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | --- | --- | --- |
 | POST | `/api/product-replacement/detail` | 单产品 Detail 只读 |
 | POST | `/api/product-replacement/details` | 最多 50 个产品批量只读 |
+| POST | `/api/product-revision/preview` | 单产品 Detail 整体替换与 Specification 删除/替换预览 |
+| POST | `/api/product-revision/submit` | 携带预览指纹保存单产品修订并回读验证 |
 | POST | `/api/detail-address-replacement/preview` | 读取多个产品 PC Details，返回旧地址命中路径和次数 |
 | POST | `/api/detail-address-replacement/submit` | 精确替换命中地址，保存后逐产品回读 |
 | GET | `/api/detail-address-replacement/template` | 下载“临时功能”六列表格模板 |

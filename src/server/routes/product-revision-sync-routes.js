@@ -34,6 +34,8 @@ function registerProductRevisionSyncRoutes(app, deps) {
   [
     ["/api/product-revision-sync/preview", excelUpload, feature.preview, "产品修订同步预览", excelArgs, true],
     ["/api/product-revision-sync/submit", excelUpload, feature.submit, "产品修订同步", excelArgs, true],
+    ["/api/product-revision/preview", upload.none(), feature.previewDirectRevision, "产品局部修订预览", delistingArgs, true],
+    ["/api/product-revision/submit", upload.none(), feature.submitDirectRevision, "产品局部修订", delistingArgs, true],
     ["/api/product-publishing/preview", excelUpload, feature.previewPublishing, "产品上架预览", excelArgs, true],
     ["/api/product-publishing/submit", excelUpload, feature.submitPublishing, "产品上架", excelArgs, true],
     ["/api/product-publishing/batch-preview", upload.array("productFiles", 40), batchFeature.preview, "批量产品上架预览", batchArgs],

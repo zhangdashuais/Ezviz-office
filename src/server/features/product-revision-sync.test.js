@@ -11,11 +11,44 @@ const {
   normalizeInternationalImageUrl,
   internationalListSource,
   validateRevisionRequest,
+  validateDirectRevision,
+  applySpecificationOperations,
   resolveProductDescription,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
   specificationTitleForSite
 } = require("./product-revision-sync");
+
+test("direct product revision validates Detail and applies delete/replace operations", () => {
+  const request = validateDirectRevision({
+    revisionType: "specification",
+    siteCode: "de",
+    productName: "CP8",
+    detailHtml: "<section>new detail</section>",
+    specificationOperations: [
+      { type: "delete", targetText: "REMOVE" },
+      { type: "replace", targetText: "OLD", replacementText: "NEW" }
+    ]
+  });
+  assert.equal(request.productName, "CP8");
+  const result = applySpecificationOperations("A REMOVE B OLD", request.operations);
+  assert.equal(result.value, "A  B NEW");
+  assert.deepEqual(result.results.map((item) => item.matchCount), [1, 1]);
+});
+
+test("Detail and Specification direct revisions validate independently", () => {
+  const detail = validateDirectRevision({
+    revisionType: "detail", siteCode: "de", productName: "CP8", detailHtml: "<main>new</main>"
+  });
+  assert.equal(detail.revisionType, "detail");
+  assert.deepEqual(detail.operations, []);
+  const specification = validateDirectRevision({
+    revisionType: "specification", siteCode: "de", productName: "CP8",
+    specificationOperations: [{ type: "delete", targetText: "obsolete" }]
+  });
+  assert.equal(specification.revisionType, "specification");
+  assert.equal(specification.detailHtml, "");
+});
 
 test("reads both singular and plural Specification custom field names", () => {
   const singular = readDetailFromPcView({
