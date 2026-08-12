@@ -8,6 +8,16 @@ const {
   planDetailOperations
 } = require("./detail-address-replacement");
 
+test("Detail replacement accepts a relative path or fragment as address 1", () => {
+  const request = validateRequest({
+    productName: "CP8",
+    targetText: "/images/cp8.jpg",
+    replacementText: "https://mfs.ezvizlife.com/images/cp8.jpg"
+  });
+  assert.equal(request.targetText, "/images/cp8.jpg");
+  assert.equal(request.replacementText, "https://mfs.ezvizlife.com/images/cp8.jpg");
+});
+
 test("Detail replacement recursively updates exact matches in PC Detail strings", () => {
   const oldUrl = "https://old.example/image.png";
   const newUrl = "https://new.example/image.png";
@@ -109,14 +119,6 @@ test("address replacement validates and de-duplicates product input", () => {
       newUrl: "https://same.example/a.jpg"
     }),
     /不能相同/
-  );
-  assert.throws(
-    () => validateRequest({
-      productNames: "CP8",
-      oldUrl: "https://same.example/a.jpg",
-      newUrl: "https://same.example/a.jpg?v=2"
-    }),
-    /不能互相包含/
   );
   assert.deepEqual(validateRequest({
     productNames: "CP8",
