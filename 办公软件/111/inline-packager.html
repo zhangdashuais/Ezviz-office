@@ -37,7 +37,8 @@
         <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
         <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
-        <div class="nav-item" data-target="tab-product-revision-sync">产品上架 / 修订 / 下架</div>
+        <div class="nav-item" data-target="tab-product-revision-sync" data-operation="publish-batch">产品上架 / 下架</div>
+        <div class="nav-item" data-target="tab-product-revision-sync" data-operation="revision">产品修订</div>
         <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换/删除</div>
       </div>
     </div>
@@ -696,8 +697,8 @@
         <div class="card">
           <h3>Banner 数据</h3>
           <div class="form-grid">
-            <label>标题 Headline</label>
-            <input id="bannerHeadlineInput" type="text" placeholder="例如 EP8 Ultra">
+            <label for="bannerHeadlineInput">标题 Headline（必填）</label>
+            <input id="bannerHeadlineInput" type="text" placeholder="例如 EP8 Ultra" required>
             <label>链接 Link</label>
             <input id="bannerLinkInput" type="text" placeholder="https://www.ezviz.com/...">
             <label>副标题 Slogan</label>

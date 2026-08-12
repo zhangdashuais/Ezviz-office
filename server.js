@@ -357,11 +357,14 @@ function buildBannerPlan(body, files) {
   const sites = selectedCampaignSites(config, parseSelectedSites(body.sites));
   if (!sites.length) throw new Error("请至少勾选一个站点。");
 
+  const headline = String(body.headline || "").trim();
+  if (!headline) throw new Error("Banner Headline 为必填项。");
+
   const rawLink = String(body.link || "").trim();
   const pcImage = files?.pcImage?.[0] || null;
   const mobileImage = files?.mobileImage?.[0] || null;
   const commonFields = {
-    headline: String(body.headline || "").trim(),
+    headline,
     slogan: String(body.slogan || "").trim(),
     model: String(body.model || "").trim(),
     introduction: String(body.introduction || "").trim(),

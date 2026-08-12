@@ -27,6 +27,13 @@
       const activeContent = document.getElementById(target);
       if (activeContent) activeContent.classList.add('active');
 
+      const operation = item.getAttribute('data-operation');
+      const operationSelect = document.getElementById('revisionSyncOperation');
+      if (operation && operationSelect) {
+        operationSelect.value = operation;
+        operationSelect.dispatchEvent(new Event('change'));
+      }
+
       // 更新标题
       if (pageTitle) {
         pageTitle.textContent = item.textContent.trim();
