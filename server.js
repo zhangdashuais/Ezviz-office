@@ -19,6 +19,7 @@ const { createShopCredentials } = require("./src/server/features/shop-credential
 const { createProductManagement } = require("./src/server/features/product-management");
 const { createBannerManagement } = require("./src/server/features/banner-management");
 const { createPopupManagement } = require("./src/server/features/popup-management");
+const { createDtcCampaign } = require("./src/server/features/dtc-campaign");
 const { createBrowserAuth, isShopBackendUrl } = require("./src/server/features/browser-auth");
 const { createSpecificationTranslationFeature } = require("./src/server/features/specification-translation");
 const { registerSpecificationTranslationRoutes } = require("./src/server/routes/specification-translation-routes");
@@ -242,6 +243,10 @@ const popupManagement = createPopupManagement({
   readCampaignConfig, requireSingleCampaignSite,
   getShopContext: browserAuth.getShopContext, getOpenPage: browserAuth.getOpenPage,
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn, credentialDomainForSite, buildPopupPlan
+});
+const dtcCampaign = createDtcCampaign({
+  buildBannerPlan, buildPopupPlan,
+  banner: bannerManagement, popup: popupManagement, logLine
 });
 const specificationTranslationFeature = createSpecificationTranslationFeature({
   logLine,
@@ -784,6 +789,7 @@ registerCampaignRoutes(app, {
     copy: productManagement.copy
   },
   popup: popupManagement,
+  dtc: dtcCampaign,
   wtbProbe: productManagement.probeWhereToBuySettings,
   languagePackageFeature, campaignLinkInspector, buildBannerPlan, buildPopupPlan, runCampaignAudit,
   campaignAuditIssues, startCampaignAuditJob, campaignAuditJobs

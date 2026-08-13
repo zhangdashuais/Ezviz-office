@@ -223,6 +223,39 @@ function createPopupManagement(deps) {
     return !rows.some((row) => String(popupConfigNo(row)) === String(configNo));
   }
 
+  async function deleteExistingPopup(body, logs) {
+    const site = requireSingleCampaignSite(readCampaignConfig(), body);
+    let page = await getOpenPage(await getShopContext());
+    page.setDefaultTimeout(25000);
+    page = await ensureShopLoggedIn(page, {
+      ...body,
+      credentialDomain: credentialDomainForSite(site),
+      credentialGroup: "Website"
+    }, logs);
+    await page.goto(NEW_SHOP_POPUP_EDIT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    const rows = (await listPopupConfigs(page)).filter((row) => popupConfigNo(row));
+    if (rows.length !== 1) {
+      throw new Error(`为避免误删，Popup 删除要求后台恰好存在 1 条配置；当前数量：${rows.length}。`);
+    }
+    const row = rows[0];
+    const configNo = popupConfigNo(row);
+    const previous = {
+      configNo,
+      name: popupNameOf(row) || "未命名 Popup",
+      endTime: popupEndTimeOf(row),
+      enabled: popupRowIsEnabled(row)
+    };
+    logLine(logs, `准备删除现有 Popup：${previous.name}，编号：${configNo}。`);
+    await newShopApiPost(page, "/shop-config/delete", { configNo, moduleType: "popup" });
+    if (!(await verifyPopupDeleted(page, configNo))) {
+      throw new Error(`Popup 删除请求已发送，但回读仍存在：${configNo}。`);
+    }
+    logLine(logs, `Popup 已删除并回读确认：${configNo}。`);
+    return { site, deleted: previous, backendCheck: { status: "passed", remaining: 0 } };
+  }
+
   async function clearExpiredPopupSlot(page, logs, now = new Date()) {
     const rows = (await listPopupConfigs(page)).filter((row) => popupConfigNo(row));
     if (!rows.length) {
@@ -400,7 +433,7 @@ function createPopupManagement(deps) {
     return submitPopupDirectToBackend(body, files, logs);
   }
 
-  return { submit: submitPopupToBackend };
+  return { submit: submitPopupToBackend, deleteExisting: deleteExistingPopup };
 }
 
 module.exports = { createPopupManagement };

@@ -129,6 +129,89 @@ function validateAddressPair(oldAddress, newAddress, label) {
   };
 }
 
+function isAlbumPath(path) {
+  return /(?:^|\.)(?:[^.[\]]*(?:album|gallery)[^.[\]]*)(?=$|[.\[])/i.test(String(path || ""))
+    && !/(?:^|[.\[])pcView(?:$|[.\]])/i.test(String(path || ""));
+}
+
+function collectAlbumImageMatches(value, target, path = "vm", matches = []) {
+  if (!target) return matches;
+  if (typeof value === "string") {
+    const count = isAlbumPath(path) ? countOccurrences(value, target) : 0;
+    if (count) matches.push({ path, count });
+    return matches;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectAlbumImageMatches(item, target, `${path}[${index}]`, matches));
+    return matches;
+  }
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, item]) =>
+      collectAlbumImageMatches(item, target, `${path}.${key}`, matches));
+  }
+  return matches;
+}
+
+function replaceAlbumImage(value, targetText, replacementText, path = "vm") {
+  if (typeof value === "string") {
+    return isAlbumPath(path) ? value.split(targetText).join(replacementText) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item, index) =>
+      replaceAlbumImage(item, targetText, replacementText, `${path}[${index}]`));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        replaceAlbumImage(item, targetText, replacementText, `${path}.${key}`)
+      ])
+    );
+  }
+  return value;
+}
+
+function buildAlbumImageReplacement(viewModel, targetText, replacementText) {
+  const oldMatches = collectAlbumImageMatches(viewModel, targetText);
+  const existingNewMatches = collectAlbumImageMatches(viewModel, replacementText);
+  return {
+    oldMatches,
+    existingNewMatches,
+    matchCount: oldMatches.reduce((sum, item) => sum + item.count, 0),
+    existingNewCount: existingNewMatches.reduce((sum, item) => sum + item.count, 0),
+    updatedViewModel: replaceAlbumImage(viewModel, targetText, replacementText)
+  };
+}
+
+function validateAlbumReplacement(albumReplacement, productName) {
+  const targetText = String(
+    albumReplacement?.oldAddress ?? albumReplacement?.Old_Album_Image ?? ""
+  ).trim();
+  const replacementText = String(
+    albumReplacement?.newAddress ?? albumReplacement?.New_Album_Image ?? ""
+  ).trim();
+  const rawIndex = String(
+    albumReplacement?.index ?? albumReplacement?.Album_Image_Index ?? ""
+  ).trim();
+  if (!targetText && !replacementText && !rawIndex) return null;
+  if (!targetText || !replacementText) {
+    throw new Error(`${productName} 的 Product Album 高清图必须同时填写替换前和替换后地址。`);
+  }
+  if (targetText === replacementText) throw new Error(`${productName} 的 Product Album 高清图新旧地址不能相同。`);
+  const imageIndex = rawIndex ? Number(rawIndex) : 0;
+  if (rawIndex && (!Number.isInteger(imageIndex) || imageIndex < 1)) {
+    throw new Error(`${productName} 的 Album_Image_Index 必须是大于 0 的整数。`);
+  }
+  return {
+    type: "replace-album-image",
+    label: "Product Album 高清图",
+    targetText,
+    replacementText,
+    imageIndex
+  };
+}
+
 function validateOperationConflicts(operations, productName) {
   const replacements = operations.filter((operation) => operation.type === "replace");
   for (let leftIndex = 0; leftIndex < replacements.length; leftIndex += 1) {
@@ -193,6 +276,11 @@ function normalizeBatchItem(item, index) {
     );
     if (operation) operations.push(operation);
   });
+  const albumOperation = validateAlbumReplacement(
+    item?.albumReplacement ?? item,
+    productName
+  );
+  if (albumOperation) operations.push(albumOperation);
   if (!operations.length) {
     throw new Error(`${productName} 没有填写地址替换或待删除代码块。`);
   }
@@ -311,6 +399,42 @@ function planDetailOperations(pcView, operations) {
   };
 }
 
+function planAlbumOperations(viewModel, operations) {
+  let updatedViewModel = viewModel;
+  const steps = operations.map((operation) => {
+    const analysis = buildAlbumImageReplacement(
+      updatedViewModel,
+      operation.targetText,
+      operation.replacementText
+    );
+    updatedViewModel = analysis.updatedViewModel;
+    return {
+      ...operation,
+      matchingMode: "album-path",
+      matchCount: analysis.matchCount,
+      matches: analysis.oldMatches,
+      existingNewCount: analysis.existingNewCount,
+      expectedNewCount: analysis.existingNewCount + analysis.matchCount
+    };
+  });
+  return {
+    steps,
+    updatedViewModel,
+    matchCount: steps.reduce((sum, step) => sum + step.matchCount, 0)
+  };
+}
+
+function planProductOperations(snapshot, operations) {
+  const detailOperations = operations.filter((operation) => operation.type !== "replace-album-image");
+  const albumOperations = operations.filter((operation) => operation.type === "replace-album-image");
+  const detailPlan = planDetailOperations(snapshot.pcView, detailOperations);
+  const albumPlan = planAlbumOperations(snapshot.viewModel, albumOperations);
+  return {
+    steps: [...detailPlan.steps, ...albumPlan.steps],
+    matchCount: detailPlan.matchCount + albumPlan.matchCount
+  };
+}
+
 function isTransientShopLogoutMessage(message) {
   return /账号.*退出|退出.*刷新|重新刷新|登录.*失效|未登录/.test(String(message || ""));
 }
@@ -375,6 +499,7 @@ function createDetailAddressReplacementFeature(deps) {
       (scope.$root || scope).$applyAsync?.();
       return {
         goodsId: String(scope.goodsId),
+        viewModel: JSON.parse(JSON.stringify(scope.vm || {})),
         pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {}))
       };
     });
@@ -402,14 +527,34 @@ function createDetailAddressReplacementFeature(deps) {
           }
           return value;
         }
-        update(scope.vm.pcView);
+        function updateAlbum(value, path = "vm") {
+          const isAlbumPath = /(?:^|\.)(?:[^.[\]]*(?:album|gallery)[^.[\]]*)(?=$|[.\[])/i.test(path)
+            && !/(?:^|[.\[])pcView(?:$|[.\]])/i.test(path);
+          if (typeof value === "string") {
+            if (!isAlbumPath) return value;
+            const count = value.split(operation.targetText).length - 1;
+            replaced += count;
+            return value.split(operation.targetText).join(operation.replacementText);
+          }
+          if (Array.isArray(value)) {
+            value.forEach((item, index) => { value[index] = updateAlbum(item, `${path}[${index}]`); });
+            return value;
+          }
+          if (value && typeof value === "object") {
+            Object.keys(value).forEach((key) => { value[key] = updateAlbum(value[key], `${path}.${key}`); });
+          }
+          return value;
+        }
+        if (operation.type === "replace-album-image") updateAlbum(scope.vm);
+        else update(scope.vm.pcView);
         replacedCounts.push(replaced);
       }
       operationList.forEach(applyOperation);
       const data = scope.md.toModel(scope.vm);
       data.goods_id = scope.goodsId;
       return { payload: data, replacedCounts };
-    }, operations.map(({ targetText, replacementText }) => ({
+    }, operations.map(({ type, targetText, replacementText }) => ({
+      type,
       targetText,
       replacementText
     })));
@@ -456,7 +601,7 @@ function createDetailAddressReplacementFeature(deps) {
       logLine(logs, "检查 Detail 临时操作：" + item.productName);
       try {
         const snapshot = await readProductPcView(session.page, item.productName, logs);
-        const plan = planDetailOperations(snapshot.pcView, item.operations);
+        const plan = planProductOperations(snapshot, item.operations);
         results.push({
           status: plan.matchCount ? "ready" : "no-match",
           productName: item.productName,
@@ -498,7 +643,7 @@ function createDetailAddressReplacementFeature(deps) {
       logLine(logs, "开始执行 Detail 临时操作：" + item.productName);
       try {
         const before = await readProductPcView(session.page, item.productName, logs);
-        const plan = planDetailOperations(before.pcView, item.operations);
+        const plan = planProductOperations(before, item.operations);
         if (!plan.matchCount) {
           results.push({
             status: "no-match",
@@ -523,13 +668,15 @@ function createDetailAddressReplacementFeature(deps) {
         const save = await postProductUpdate(session.page, update.payload);
         const after = await readProductPcView(session.page, item.productName, logs);
         const operationChecks = plan.steps.map((step) => {
-          const remainingTargetCount = collectDetailAddressMatches(
-            after.pcView,
-            step.targetText
+          const remainingTargetCount = (step.type === "replace-album-image"
+            ? collectAlbumImageMatches(after.viewModel, step.targetText)
+            : collectDetailAddressMatches(after.pcView, step.targetText)
           ).reduce((sum, match) => sum + match.count, 0);
           const finalReplacementCount = step.replacementText
-            ? collectDetailAddressMatches(after.pcView, step.replacementText)
-              .reduce((sum, match) => sum + match.count, 0)
+            ? (step.type === "replace-album-image"
+              ? collectAlbumImageMatches(after.viewModel, step.replacementText)
+              : collectDetailAddressMatches(after.pcView, step.replacementText)
+            ).reduce((sum, match) => sum + match.count, 0)
             : 0;
           const passed = remainingTargetCount === 0
             && (!step.replacementText || finalReplacementCount >= step.expectedNewCount);
@@ -605,11 +752,15 @@ module.exports = {
   replaceDetailAddress,
   collectWhitespaceFlexibleMatches,
   collectGuidElementMatches,
+  collectAlbumImageMatches,
+  buildAlbumImageReplacement,
   buildDetailAddressReplacement,
   validateAddressPair,
+  validateAlbumReplacement,
   normalizeBatchItem,
   validateRequest,
   planDetailOperations,
+  planProductOperations,
   isTransientShopLogoutMessage,
   createDetailAddressReplacementFeature
 };

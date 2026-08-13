@@ -6,6 +6,8 @@ const {
   buildDetailAddressReplacement,
   validateRequest,
   planDetailOperations,
+  planProductOperations,
+  collectAlbumImageMatches,
   collectWhitespaceFlexibleMatches,
   collectGuidElementMatches,
   isTransientShopLogoutMessage
@@ -14,6 +16,31 @@ const {
 test("Detail save treats the shop logout refresh message as readback-required", () => {
   assert.equal(isTransientShopLogoutMessage("账号退出，请重新刷新"), true);
   assert.equal(isTransientShopLogoutMessage("保存参数错误"), false);
+});
+
+test("Product Album replacement only touches album/gallery fields", () => {
+  const oldUrl = "https://old.example/hd.jpg";
+  const newUrl = "https://new.example/hd.jpg";
+  const plan = planProductOperations({
+    pcView: { summary: `<img src="${oldUrl}">` },
+    viewModel: {
+      pcView: { summary: `<img src="${oldUrl}">` },
+      productAlbum: [{ imageUrl: oldUrl }],
+      gallery: { hd: oldUrl }
+    }
+  }, [{
+    type: "replace-album-image",
+    label: "Product Album 高清图",
+    targetText: oldUrl,
+    replacementText: newUrl
+  }]);
+
+  assert.equal(plan.matchCount, 2);
+  assert.deepEqual(plan.steps[0].matches.map((match) => match.path), [
+    "vm.productAlbum[0].imageUrl",
+    "vm.gallery.hd"
+  ]);
+  assert.equal(collectAlbumImageMatches({ pcView: { summary: oldUrl } }, oldUrl).length, 0);
 });
 
 test("Detail replacement accepts a relative path or fragment as address 1", () => {

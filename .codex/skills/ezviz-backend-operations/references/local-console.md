@@ -14,6 +14,7 @@
 | 产品资料处理 | PDF 上传转地址 | 上传 PDF 并返回线上地址 | 写入文件服务 |
 | 产品资料处理 | Spec 参数解析 | Excel 转 PC/Mobile Specifications HTML | 本地处理 |
 | 产品资料处理 | Datasheet 生成 Spec 表 | 从 PDF/文本生成 Spec Excel | 本地生成 |
+| 产品资料处理 | 网站翻译表精简 | 自动识别 Datasheet 与 Specification 的语言列；选择目标语言后分别导出仅含英文和目标语言的工作簿，并保留原模板及字体颜色 | 本地生成 |
 | 产品上架与维护 | Specification 翻译上架 | 预览翻译结果或提交后台 | `preview` 只读；`submit` 写后台 |
 | 产品上架与维护 | 语言包上传 | 上传 `.xls/.xlsx` 到 Language Management | 写后台 |
 | 产品上架与维护 | WTB 产品购买链接 | 下拉框单选站点，计划、提交、回读、往返测试和恢复购买链接 | `plan` 只读；其他接口可写后台 |

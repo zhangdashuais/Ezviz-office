@@ -1,0 +1,99 @@
+﻿{
+    "operation":  "batch",
+    "items":  [
+                  {
+                      "replacements":  [
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qhx5024.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/mall/da61e8943db6f72a2123580b3995bebb.jpg"
+                                           },
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qhwk396.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/mall/78b9435c43cb3473dfdc128a3fe80569.jpg"
+                                           }
+                                       ],
+                      "productName":  "CB90 Dual Kit"
+                  },
+                  {
+                      "replacements":  [
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qi1j6gs.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/nryuut2.jpg"
+                                           },
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qi0ia3a.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/nrz3ecp.jpg"
+                                           }
+                                       ],
+                      "productName":  "HB90 Dual Kit"
+                  },
+                  {
+                      "replacements":  [
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qi39e74.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/ns42028.jpg"
+                                           },
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qi2s9hw.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/ns4afnd.jpg"
+                                           }
+                                       ],
+                      "productName":  "HB90x Dual 4G Kit"
+                  },
+                  {
+                      "replacements":  [
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qhyipyc.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/ns4jkko.jpg"
+                                           },
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qhy2630.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/ns4tdt6.jpg"
+                                           }
+                                       ],
+                      "productName":  "CB90x Dual 4G Kit"
+                  },
+                  {
+                      "replacements":  [
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qi02vit.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/ns781gq.jpg"
+                                           },
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qhza65l.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/mall/57c1a8d2d7956232d30f3f305b0b3bcf.jpg"
+                                           }
+                                       ],
+                      "productName":  "EP7"
+                  },
+                  {
+                      "replacements":  [
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qi471ul.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/ns8rbl4.jpg"
+                                           },
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qi4zqiq.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/service/20260810/ns90vlt.jpg"
+                                           }
+                                       ],
+                      "productName":  "RS20 Max"
+                  },
+                  {
+                      "replacements":  [
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qhw08rb.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/mall/3829f2b6733f2b82afc24f905aef8c94.jpg"
+                                           },
+                                           {
+                                               "newAddress":  "https://mfs.ezvizlife.com/mall/static/20260813/qhuzfif.jpg",
+                                               "oldAddress":  "https://mfs.ezvizlife.com/mall/c92ff5af6b9fa10172eee677eb707813.jpg"
+                                           }
+                                       ],
+                      "productName":  "EZVIZ 400W Solar Starter Kit"
+                  }
+              ],
+    "sites":  [
+                  "hq"
+              ]
+}

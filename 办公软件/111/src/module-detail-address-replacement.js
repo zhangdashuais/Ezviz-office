@@ -25,7 +25,10 @@
     "New_Address_1",
     "Old_Address_2",
     "New_Address_2",
-    "Delete_Code_Block"
+    "Delete_Code_Block",
+    "Album_Image_Index",
+    "Old_Album_Image",
+    "New_Album_Image"
   ];
   let importedItems = null;
   let validatedPreview = null;
@@ -148,11 +151,27 @@
         }
       });
       const deleteCodeBlock = readCell(row, indexes, "Delete_Code_Block");
+      const albumImageIndex = readCell(row, indexes, "Album_Image_Index").trim();
+      const oldAlbumImage = readCell(row, indexes, "Old_Album_Image").trim();
+      const newAlbumImage = readCell(row, indexes, "New_Album_Image").trim();
+      if (Boolean(oldAlbumImage) !== Boolean(newAlbumImage)) {
+        throw new Error(`${productName} 的 Product Album 高清图必须同时填写替换前和替换后地址。`);
+      }
       if (!replacements.some((replacement) => replacement.oldAddress)
-        && !deleteCodeBlock.trim()) {
+        && !deleteCodeBlock.trim()
+        && !oldAlbumImage) {
         throw new Error(`${productName} 没有填写任何地址替换或待删除代码块。`);
       }
-      items.push({ productName, replacements, deleteCodeBlock });
+      items.push({
+        productName,
+        replacements,
+        deleteCodeBlock,
+        albumReplacement: {
+          index: albumImageIndex,
+          oldAddress: oldAlbumImage,
+          newAddress: newAlbumImage
+        }
+      });
     });
     if (!items.length) throw new Error("Excel 中没有可执行的产品数据。");
     if (items.length > 50) {
@@ -169,6 +188,7 @@
       0
     );
     const codeCount = items.filter((item) => item.deleteCodeBlock.trim()).length;
+    const albumCount = items.filter((item) => item.albumReplacement.oldAddress).length;
     setStatus(
       `已导入 ${items.length} 个产品、${addressCount} 组地址替换、`
       + `${codeCount} 个代码块删除任务。将以 Excel 数据为准。`,
@@ -182,7 +202,8 @@
       "",
       ...items.map((item) => {
         const operationCount = item.replacements.filter((pair) => pair.oldAddress).length
-          + (item.deleteCodeBlock.trim() ? 1 : 0);
+          + (item.deleteCodeBlock.trim() ? 1 : 0)
+          + (item.albumReplacement.oldAddress ? 1 : 0);
         return `- ${item.productName}：${operationCount} 项操作`;
       })
     ].join("\n");

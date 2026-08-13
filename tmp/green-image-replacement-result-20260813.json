@@ -1,0 +1,546 @@
+﻿{
+    "ok":  true,
+    "logs":  [
+                 "已从网站账号密码表读取目标站点账号：www.ezviz.com",
+                 "检测到商城后台已登录，复用当前账号：global114514",
+                 "后台登录态已建立，跳转一次旧版商城根地址以恢复旧后台读取逻辑：https://shop.ezvizlife.com/",
+                 "Detail 临时操作后台身份：global114514",
+                 "开始执行 Detail 临时操作：CB90 Dual Kit",
+                 "已复用产品编辑地址缓存：CB90 Dual Kit",
+                 "已复用产品编辑地址缓存：CB90 Dual Kit",
+                 "Detail 临时操作并回读通过：CB90 Dual Kit / 4 处。",
+                 "开始执行 Detail 临时操作：HB90 Dual Kit",
+                 "已复用产品编辑地址缓存：HB90 Dual Kit",
+                 "已复用产品编辑地址缓存：HB90 Dual Kit",
+                 "Detail 临时操作并回读通过：HB90 Dual Kit / 2 处。",
+                 "开始执行 Detail 临时操作：HB90x Dual 4G Kit",
+                 "已复用产品编辑地址缓存：HB90x Dual 4G Kit",
+                 "已复用产品编辑地址缓存：HB90x Dual 4G Kit",
+                 "Detail 临时操作并回读通过：HB90x Dual 4G Kit / 4 处。",
+                 "开始执行 Detail 临时操作：CB90x Dual 4G Kit",
+                 "已复用产品编辑地址缓存：CB90x Dual 4G Kit",
+                 "已复用产品编辑地址缓存：CB90x Dual 4G Kit",
+                 "Detail 临时操作并回读通过：CB90x Dual 4G Kit / 4 处。",
+                 "开始执行 Detail 临时操作：EP7",
+                 "已复用产品编辑地址缓存：EP7",
+                 "已复用产品编辑地址缓存：EP7",
+                 "Detail 临时操作并回读通过：EP7 / 2 处。",
+                 "开始执行 Detail 临时操作：RS20 Max",
+                 "已复用产品编辑地址缓存：RS20 Max",
+                 "已复用产品编辑地址缓存：RS20 Max",
+                 "Detail 临时操作并回读通过：RS20 Max / 2 处。",
+                 "开始执行 Detail 临时操作：EZVIZ 400W Solar Starter Kit",
+                 "已复用产品编辑地址缓存：EZVIZ 400W Solar Starter Kit",
+                 "已复用产品编辑地址缓存：EZVIZ 400W Solar Starter Kit",
+                 "Detail 临时操作并回读通过：EZVIZ 400W Solar Starter Kit / 2 处。"
+             ],
+    "result":  {
+                   "mode":  "authenticated-detail-temporary-operation",
+                   "operation":  "batch",
+                   "site":  {
+                                "name":  "Global",
+                                "url":  "https://www.ezviz.com/inter",
+                                "siteCode":  "hq",
+                                "campaignCode":  "hq",
+                                "enabled":  true
+                            },
+                   "authenticatedIdentity":  "global114514",
+                   "productCount":  7,
+                   "completedCount":  7,
+                   "noMatchCount":  0,
+                   "failedCount":  0,
+                   "replacementCount":  20,
+                   "results":  [
+                                   {
+                                       "status":  "completed",
+                                       "productName":  "CB90 Dual Kit",
+                                       "goodsId":  "67433",
+                                       "editUrl":  "https://shop.ezvizlife.com/goods/add?id=67433",
+                                       "matchCount":  4,
+                                       "operations":  [
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 1",
+                                                              "targetText":  "https://mfs.ezvizlife.com/mall/da61e8943db6f72a2123580b3995bebb.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qhx5024.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  2,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  2
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  2
+                                                          },
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 2",
+                                                              "targetText":  "https://mfs.ezvizlife.com/mall/78b9435c43cb3473dfdc128a3fe80569.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qhwk396.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  2,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  2
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  2
+                                                          }
+                                                      ],
+                                       "save":  {
+                                                    "requestUrl":  "https://shop.ezvizlife.com/goods/do-edit-goods",
+                                                    "responseStatus":  200,
+                                                    "backendStatus":  1,
+                                                    "redirect":  "https://shop.ezvizlife.com/goods/index"
+                                                },
+                                       "backendCheck":  {
+                                                            "status":  "passed",
+                                                            "operations":  [
+                                                                               {
+                                                                                   "label":  "地址 1",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  2,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  2,
+                                                                                   "expectedNewCount":  2
+                                                                               },
+                                                                               {
+                                                                                   "label":  "地址 2",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  2,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  2,
+                                                                                   "expectedNewCount":  2
+                                                                               }
+                                                                           ]
+                                                        }
+                                   },
+                                   {
+                                       "status":  "completed",
+                                       "productName":  "HB90 Dual Kit",
+                                       "goodsId":  "62742",
+                                       "editUrl":  "https://shop.ezvizlife.com/goods/add?id=62742",
+                                       "matchCount":  2,
+                                       "operations":  [
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 1",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/nryuut2.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qi1j6gs.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          },
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 2",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/nrz3ecp.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qi0ia3a.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          }
+                                                      ],
+                                       "save":  {
+                                                    "requestUrl":  "https://shop.ezvizlife.com/goods/do-edit-goods",
+                                                    "responseStatus":  200,
+                                                    "backendStatus":  1,
+                                                    "redirect":  "https://shop.ezvizlife.com/goods/index"
+                                                },
+                                       "backendCheck":  {
+                                                            "status":  "passed",
+                                                            "operations":  [
+                                                                               {
+                                                                                   "label":  "地址 1",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               },
+                                                                               {
+                                                                                   "label":  "地址 2",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               }
+                                                                           ]
+                                                        }
+                                   },
+                                   {
+                                       "status":  "completed",
+                                       "productName":  "HB90x Dual 4G Kit",
+                                       "goodsId":  "67438",
+                                       "editUrl":  "https://shop.ezvizlife.com/goods/add?id=67438",
+                                       "matchCount":  4,
+                                       "operations":  [
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 1",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/ns42028.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qi39e74.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  2,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  2
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  2
+                                                          },
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 2",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/ns4afnd.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qi2s9hw.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  2,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  2
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  2
+                                                          }
+                                                      ],
+                                       "save":  {
+                                                    "requestUrl":  "https://shop.ezvizlife.com/goods/do-edit-goods",
+                                                    "responseStatus":  200,
+                                                    "backendStatus":  1,
+                                                    "redirect":  "https://shop.ezvizlife.com/goods/index"
+                                                },
+                                       "backendCheck":  {
+                                                            "status":  "passed",
+                                                            "operations":  [
+                                                                               {
+                                                                                   "label":  "地址 1",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  2,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  2,
+                                                                                   "expectedNewCount":  2
+                                                                               },
+                                                                               {
+                                                                                   "label":  "地址 2",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  2,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  2,
+                                                                                   "expectedNewCount":  2
+                                                                               }
+                                                                           ]
+                                                        }
+                                   },
+                                   {
+                                       "status":  "completed",
+                                       "productName":  "CB90x Dual 4G Kit",
+                                       "goodsId":  "62756",
+                                       "editUrl":  "https://shop.ezvizlife.com/goods/add?id=62756",
+                                       "matchCount":  4,
+                                       "operations":  [
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 1",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/ns4jkko.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qhyipyc.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  2,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  2
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  2
+                                                          },
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 2",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/ns4tdt6.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qhy2630.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  2,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  2
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  2
+                                                          }
+                                                      ],
+                                       "save":  {
+                                                    "requestUrl":  "https://shop.ezvizlife.com/goods/do-edit-goods",
+                                                    "responseStatus":  200,
+                                                    "backendStatus":  1,
+                                                    "redirect":  "https://shop.ezvizlife.com/goods/index"
+                                                },
+                                       "backendCheck":  {
+                                                            "status":  "passed",
+                                                            "operations":  [
+                                                                               {
+                                                                                   "label":  "地址 1",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  2,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  2,
+                                                                                   "expectedNewCount":  2
+                                                                               },
+                                                                               {
+                                                                                   "label":  "地址 2",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  2,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  2,
+                                                                                   "expectedNewCount":  2
+                                                                               }
+                                                                           ]
+                                                        }
+                                   },
+                                   {
+                                       "status":  "completed",
+                                       "productName":  "EP7",
+                                       "goodsId":  "49351",
+                                       "editUrl":  "https://shop.ezvizlife.com/goods/add?id=49351",
+                                       "matchCount":  2,
+                                       "operations":  [
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 1",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/ns781gq.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qi02vit.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          },
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 2",
+                                                              "targetText":  "https://mfs.ezvizlife.com/mall/57c1a8d2d7956232d30f3f305b0b3bcf.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qhza65l.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          }
+                                                      ],
+                                       "save":  {
+                                                    "requestUrl":  "https://shop.ezvizlife.com/goods/do-edit-goods",
+                                                    "responseStatus":  200,
+                                                    "backendStatus":  1,
+                                                    "redirect":  "https://shop.ezvizlife.com/goods/index"
+                                                },
+                                       "backendCheck":  {
+                                                            "status":  "passed",
+                                                            "operations":  [
+                                                                               {
+                                                                                   "label":  "地址 1",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               },
+                                                                               {
+                                                                                   "label":  "地址 2",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               }
+                                                                           ]
+                                                        }
+                                   },
+                                   {
+                                       "status":  "completed",
+                                       "productName":  "RS20 Max",
+                                       "goodsId":  "63807",
+                                       "editUrl":  "https://shop.ezvizlife.com/goods/add?id=63807",
+                                       "matchCount":  2,
+                                       "operations":  [
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 1",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/ns8rbl4.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qi471ul.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          },
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 2",
+                                                              "targetText":  "https://mfs.ezvizlife.com/service/20260810/ns90vlt.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qi4zqiq.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          }
+                                                      ],
+                                       "save":  {
+                                                    "requestUrl":  "https://shop.ezvizlife.com/goods/do-edit-goods",
+                                                    "responseStatus":  200,
+                                                    "backendStatus":  1,
+                                                    "redirect":  "https://shop.ezvizlife.com/goods/index"
+                                                },
+                                       "backendCheck":  {
+                                                            "status":  "passed",
+                                                            "operations":  [
+                                                                               {
+                                                                                   "label":  "地址 1",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               },
+                                                                               {
+                                                                                   "label":  "地址 2",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               }
+                                                                           ]
+                                                        }
+                                   },
+                                   {
+                                       "status":  "completed",
+                                       "productName":  "EZVIZ 400W Solar Starter Kit",
+                                       "goodsId":  "53218",
+                                       "editUrl":  "https://shop.ezvizlife.com/goods/add?id=53218",
+                                       "matchCount":  2,
+                                       "operations":  [
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 1",
+                                                              "targetText":  "https://mfs.ezvizlife.com/mall/3829f2b6733f2b82afc24f905aef8c94.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qhw08rb.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          },
+                                                          {
+                                                              "type":  "replace",
+                                                              "label":  "地址 2",
+                                                              "targetText":  "https://mfs.ezvizlife.com/mall/c92ff5af6b9fa10172eee677eb707813.jpg",
+                                                              "replacementText":  "https://mfs.ezvizlife.com/mall/static/20260813/qhuzfif.jpg",
+                                                              "matchingMode":  "exact",
+                                                              "matchCount":  1,
+                                                              "matches":  [
+                                                                              {
+                                                                                  "path":  "pcView.summary",
+                                                                                  "count":  1
+                                                                              }
+                                                                          ],
+                                                              "existingNewCount":  0,
+                                                              "expectedNewCount":  1
+                                                          }
+                                                      ],
+                                       "save":  {
+                                                    "requestUrl":  "https://shop.ezvizlife.com/goods/do-edit-goods",
+                                                    "responseStatus":  200,
+                                                    "backendStatus":  1,
+                                                    "redirect":  "https://shop.ezvizlife.com/goods/index"
+                                                },
+                                       "backendCheck":  {
+                                                            "status":  "passed",
+                                                            "operations":  [
+                                                                               {
+                                                                                   "label":  "地址 1",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               },
+                                                                               {
+                                                                                   "label":  "地址 2",
+                                                                                   "type":  "replace",
+                                                                                   "status":  "passed",
+                                                                                   "matchCount":  1,
+                                                                                   "remainingTargetCount":  0,
+                                                                                   "finalReplacementCount":  1,
+                                                                                   "expectedNewCount":  1
+                                                                               }
+                                                                           ]
+                                                        }
+                                   }
+                               ]
+               }
+}

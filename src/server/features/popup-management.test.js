@@ -96,3 +96,23 @@ test('Popup submission deletes an expired Period, verifies deletion, then create
     global.fetch = originalFetch;
   }
 });
+
+test('Popup deletion requires one row and verifies it is gone', async () => {
+  let rows = [{ configNo: 'popup-1', isValid: true, content: { popupName: 'Hidden popup' } }];
+  const page = {
+    setDefaultTimeout: () => {}, goto: async () => {}, waitForTimeout: async () => {},
+    request: { post: async (url) => {
+      if (url.endsWith('/delete')) rows = [];
+      return { ok: () => true, text: async () => JSON.stringify({ code: 0, data: { list: rows } }) };
+    } }
+  };
+  const popup = createPopupManagement({
+    logLine: () => {}, NEW_SHOP_API_BASE: 'https://api.example.test', NEW_SHOP_POPUP_EDIT_URL: 'https://new-shop.ezvizlife.com/popup/edit',
+    readCampaignConfig: () => ({}), requireSingleCampaignSite: () => ({ siteCode: 'fr' }),
+    getShopContext: async () => ({}), getOpenPage: async () => page, ensureShopLoggedIn: async () => page,
+    credentialDomainForSite: () => 'www.ezviz.com/fr'
+  });
+  const result = await popup.deleteExisting({}, []);
+  assert.equal(result.deleted.configNo, 'popup-1');
+  assert.equal(result.backendCheck.remaining, 0);
+});

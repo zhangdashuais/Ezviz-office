@@ -2,7 +2,7 @@ function registerCampaignRoutes(app, deps) {
   const {
     upload, logLine, normalizeBool, readCampaignConfig, getCampaignSites, parseSelectedSites,
     getShopContext, getOpenPage, ensureShopLoggedIn, credentialDomainForSite, isShopBackendUrl,
-    banner, product, popup, wtbProbe, languagePackageFeature, campaignLinkInspector,
+    banner, product, popup, dtc, wtbProbe, languagePackageFeature, campaignLinkInspector,
     buildBannerPlan, buildPopupPlan, runCampaignAudit, campaignAuditIssues,
     startCampaignAuditJob, campaignAuditJobs
   } = deps;
@@ -94,6 +94,19 @@ function registerCampaignRoutes(app, deps) {
   app.post("/api/campaign/popup-plan", upload.fields([{ name: "image", maxCount: 1 }]),
     (req, res) => { try { res.json({ ok: true, plan: buildPopupPlan(req.body || {}, req.files || {}) }); } catch (error) { res.status(500).json({ ok: false, error: errorMessage(error) }); } });
 
+  const dtcUpload = upload.fields([
+    { name: "bannerPcImage", maxCount: 1 },
+    { name: "bannerMobileImage", maxCount: 1 },
+    { name: "popupImage", maxCount: 1 }
+  ]);
+  app.post("/api/campaign/dtc-plan", dtcUpload,
+    (req, res) => { try { res.json({ ok: true, plan: dtc.buildPlan(req.body || {}, req.files || {}) }); } catch (error) { res.status(500).json({ ok: false, error: errorMessage(error) }); } });
+  app.post("/api/campaign/dtc-submit", dtcUpload, async (req, res) => {
+    const logs = [];
+    try { const result = await dtc.submit(req.body || {}, req.files || {}, logs); logLine(logs, "DTC Banner + Popup 后台配置流程完成。"); res.json({ ok: true, logs, result }); }
+    catch (error) { logLine(logs, "DTC Banner + Popup 后台配置失败：" + errorMessage(error)); res.status(500).json({ ok: false, error: errorMessage(error), logs }); }
+  });
+
   app.post("/api/campaign/banner-submit", upload.fields([{ name: "pcImage", maxCount: 1 }, { name: "mobileImage", maxCount: 1 }]), async (req, res) => {
     const logs = [];
     try { const result = await banner.submit(req.body || {}, req.files || {}, logs); logLine(logs, "Banner 后台提交流程完成。"); res.json({ ok: true, logs, result }); }
@@ -108,6 +121,16 @@ function registerCampaignRoutes(app, deps) {
     const logs = [];
     try { const result = await popup.submit(req.body || {}, req.files || {}, logs); logLine(logs, "Popup 后台提交流程完成。"); res.json({ ok: true, logs, result }); }
     catch (error) { logLine(logs, "Popup 后台提交失败：" + errorMessage(error)); res.status(500).json({ ok: false, error: errorMessage(error), logs }); }
+  });
+  app.post("/api/campaign/popup-delete-existing", async (req, res) => {
+    const logs = [];
+    try {
+      const result = await popup.deleteExisting(req.body || {}, logs);
+      res.json({ ok: true, logs, result });
+    } catch (error) {
+      logLine(logs, "Popup 删除失败：" + errorMessage(error));
+      res.status(500).json({ ok: false, error: errorMessage(error), logs });
+    }
   });
 
   app.post("/api/campaign/audit", async (req, res) => {

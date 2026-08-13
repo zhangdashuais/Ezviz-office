@@ -26,6 +26,7 @@
         <div class="nav-item" data-target="tab-text-comparison">PDF / HTML 文字对比</div>
         <div class="nav-item" data-target="tab-spec-upload">Spec 参数解析</div>
         <div class="nav-item" data-target="tab-spec-excel-build">Datasheet 生成 Spec 表</div>
+        <div class="nav-item" data-target="tab-language-column-filter">网站翻译表精简</div>
       </div>
     </div>
 
@@ -500,7 +501,7 @@
             <div>
               <input id="detailAddressExcelInput" type="file" accept=".xlsx,.xls">
               <a class="button" id="detailAddressTemplateDownload" href="/api/detail-address-replacement/template" download="Detail临时功能信息模板.xlsx">下载信息模板</a>
-              <div class="desc">表头：<code>Product_Name</code>、<code>Old_Address_1</code>、<code>New_Address_1</code>、<code>Old_Address_2</code>、<code>New_Address_2</code>、<code>Delete_Code_Block</code>。每行至少填写一项操作。</div>
+              <div class="desc">表头 9 列：<code>Product_Name</code>、<code>Old_Address_1</code>、<code>New_Address_1</code>、<code>Old_Address_2</code>、<code>New_Address_2</code>、<code>Delete_Code_Block</code>、<code>Album_Image_Index</code>、<code>Old_Album_Image</code>、<code>New_Album_Image</code>。每行至少填写一项操作。</div>
             </div>
             <label id="detailAddressTargetLabel" for="detailAddressOldUrlInput">被替换的完整地址</label>
             <textarea id="detailAddressOldUrlInput" class="detail-temporary-field" rows="3" placeholder="https://mfs.ezvizlife.com/old-image.jpg"></textarea>
@@ -738,6 +739,20 @@
 
         <div class="card">
           <h3>Banner 数据</h3>
+          <div class="sub-card">
+            <h4>DTC 德法西意荷专用</h4>
+            <p class="desc">固定站点：德国、法国、西班牙、意大利、荷兰。Banner 与 Popup 共用这里的上线/下线时间；Banner Model 自动写入：DE Angebote / FR Promotion / ES Venta Especial / IT Offerte top / NL Mega deal。其余标题、链接、图片复用本卡片和下方 Popup 表单。</p>
+            <div class="form-grid">
+              <label>DTC 统一上线时间</label>
+              <input id="dtcOnlineInput" type="datetime-local">
+              <label>DTC 统一下线时间</label>
+              <input id="dtcOfflineInput" type="datetime-local">
+            </div>
+            <div class="row">
+              <button id="dtcBuildPlanBtn" type="button">生成 DTC 清单（不提交后台）</button>
+              <button id="dtcSubmitBtn" type="button">执行 DTC Banner + Popup</button>
+            </div>
+          </div>
           <div class="form-grid">
             <label for="bannerHeadlineInput">标题 Headline（必填）</label>
             <input id="bannerHeadlineInput" type="text" placeholder="例如 EP8 Ultra" required>
@@ -883,6 +898,26 @@
         <textarea id="ezvizSiteAuditOutput" placeholder="站点、随机产品、巡查进度和问题清单会显示在这里..."></textarea>
       </div>
 
+      <div id="tab-language-column-filter" class="tab-content">
+        <div class="card">
+          <h3>网站翻译表精简</h3>
+          <p class="desc">上传同时包含 Datasheet 和 Specification（或 Spec）的翻译表。自动检测两个工作表的语言列；选择语言后，分别生成只保留英文和该语言的两份 Excel，并保留原模板、单元格样式与字体颜色。</p>
+          <div class="form-grid">
+            <label for="languageFilterFile">翻译表 Excel</label>
+            <input id="languageFilterFile" type="file" accept=".xlsx">
+            <label for="languageFilterDatasheet">Datasheet 语言</label>
+            <select id="languageFilterDatasheet" disabled><option value="">请先上传文件</option></select>
+            <label for="languageFilterSpec">Specification 语言</label>
+            <select id="languageFilterSpec" disabled><option value="">请先上传文件</option></select>
+          </div>
+          <div class="row">
+            <button id="languageFilterDownloadDatasheet" type="button" disabled>下载 Datasheet</button>
+            <button id="languageFilterDownloadSpec" type="button" disabled>下载 Specification</button>
+          </div>
+        </div>
+        <div id="languageFilterStatus" class="status">请选择一份网站翻译表。</div>
+      </div>
+
       <div id="tab-spec-excel-build" class="tab-content">
         <div class="card">
           <h3>Datasheet 生成 Spec 表</h3>
@@ -968,6 +1003,8 @@
   <script src="src/module-text-comparison.js?v=20260729-2"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
+  <script src="src/language-column-filter-rules.js?v=20260813-1"></script>
+  <script src="src/module-language-column-filter.js?v=20260813-1"></script>
   <script src="src/i18n-conversion-rules.js?v=20260807-2"></script>
   <script src="src/module-text.js?v=20260807-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
@@ -975,7 +1012,7 @@
   <script src="src/module-product-replacement.js"></script>
   <script src="src/module-product-revision-sync.js?v=20260807-1"></script>
   <script src="src/module-product-direct-revision.js?v=20260812-1"></script>
-  <script src="src/module-detail-address-replacement.js?v=20260811-1"></script>
+  <script src="src/module-detail-address-replacement.js?v=20260813-1"></script>
   <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260724-4"></script>
   <script src="src/module-ezviz-site-audit.js"></script>

@@ -21,6 +21,9 @@
 | POST | `/api/campaign/banner-fix-utm` | 写后台 |
 | POST | `/api/campaign/popup-plan` | 只生成清单 |
 | POST | `/api/campaign/popup-submit` | 写后台，可能启用 |
+| POST | `/api/campaign/dtc-plan` | 只生成 DTC 德法西意荷 Banner + Popup 清单 |
+| POST | `/api/campaign/dtc-submit` | 写后台，固定提交 DTC 德法西意荷 Banner + Popup |
+| POST | `/api/campaign/popup-delete-existing` | 单站点恰好存在一条 Popup 时删除并回读确认 |
 | POST | `/api/campaign/first-link` | 读取首个 Banner/Popup 链接 |
 | POST | `/api/campaign/audit` | 同步巡查 |
 | POST | `/api/campaign/audit-job` | 创建异步巡查 |
@@ -45,6 +48,8 @@ utm_campaign=web_{siteCode}_popup
 ```
 
 外部链接不自动添加 UTM。坏链只报告，不自动替换。
+
+DTC 专用入口固定站点为 `de/fr/es/it/nl`，不读取页面勾选站点。Banner 与 Popup 使用同一组上线/下线时间；Banner `model` 自动映射为：`de=Angebote`、`fr=Promotion`、`es=Venta Especial`、`it=Offerte top`、`nl=Mega deal`。先运行 `/api/campaign/dtc-plan`，确认清单后再运行 `/api/campaign/dtc-submit`。
 
 ## TDK
 
@@ -83,7 +88,7 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/product-revision/submit` | 携带预览指纹保存单产品修订并回读验证 |
 | POST | `/api/detail-address-replacement/preview` | 读取多个产品 PC Details，返回旧地址命中路径和次数 |
 | POST | `/api/detail-address-replacement/submit` | 精确替换命中地址，保存后逐产品回读 |
-| GET | `/api/detail-address-replacement/template` | 下载“临时功能”六列表格模板 |
+| GET | `/api/detail-address-replacement/template` | 下载“临时功能”九列表格模板 |
 | POST | `/api/specification/preview` | 预览，不提交 |
 | POST | `/api/specification/submit` | 写产品后台 |
 | POST | `/api/product-publishing/preview` | 在目标站读取国际产品复制源并预览上架，不提交 |
@@ -102,7 +107,7 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 
 Detail 内容操作递归处理 `vm.pcView` 的字符串值，适用于 Overview、自定义 Specifications 等 PC Details 内容。`operation: "replace"` 精确替换用户填写的文本，可为完整 URL、相对路径或地址片段，不要求 HTTP/HTTPS 协议；`operation: "delete"` 精确删除 `targetText` 指定的完整代码块（替换为空字符串）。先调用 `preview`；输入未变化且存在命中时才能调用 `submit`。无命中不保存，提交后必须回读并确认目标内容剩余为 0。它不修改 Mobile Details 或其他产品标签。
 
-“临时功能”优先从 `.xlsx/.xls` 导入。读取第一个工作表，表头固定为：`Product_Name`、`Old_Address_1`、`New_Address_1`、`Old_Address_2`、`New_Address_2`、`Delete_Code_Block`。每行对应一个产品，最多两组精确文本替换，并可同时删除一个代码块；空操作跳过，每行至少一项操作，产品名不得重复，一次最多 50 个产品。每个产品按“删除代码块、地址 1、地址 2”的顺序计算，全部操作只保存一次，再逐项回读。优先让用户通过页面的“下载信息模板”取得标准文件。
+“临时功能”优先从 `.xlsx/.xls` 导入。读取第一个工作表，表头固定为：`Product_Name`、`Old_Address_1`、`New_Address_1`、`Old_Address_2`、`New_Address_2`、`Delete_Code_Block`、`Album_Image_Index`、`Old_Album_Image`、`New_Album_Image`。每行对应一个产品，最多两组 PC Detail 精确文本替换、一个代码块删除和一组 Product Album 高清图替换；Album 替换只匹配 `scope.vm` 中字段路径包含 `album` 或 `gallery` 的值，并排除 `pcView`。空操作跳过，每行至少一项操作，产品名不得重复，一次最多 50 个产品。全部操作只保存一次，再逐项回读。优先让用户通过页面的“下载信息模板”取得标准文件。
 
 删除请求示例：
 
