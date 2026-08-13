@@ -633,6 +633,17 @@ function sameSiteHost(site, rawUrl) {
   }
 }
 
+function isOfficialEzvizProductUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+    return ["ezviz.com", "ezvizlife.com"].includes(host)
+      && /\/product\//i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function selectBackendFrontendCandidates(site, productName, rawSources) {
   const siteUrl = new URL(site.url);
   const siteBasePath = siteUrl.pathname.replace(/\/+$/, "") || "/";
@@ -644,10 +655,12 @@ function selectBackendFrontendCandidates(site, productName, rawSources) {
 
   for (const item of rawSources || []) {
     const url = absoluteSiteUrl(site, item?.value);
-    if (!url || !sameSiteHost(site, url)) continue;
+    const backendProductLink = item?.source === "backend-product-list-primary"
+      && isOfficialEzvizProductUrl(url);
+    if (!url || (!sameSiteHost(site, url) && !backendProductLink)) continue;
     const parsed = new URL(url);
     const pathName = parsed.pathname.replace(/\/+$/, "") || "/";
-    if (siteBasePath !== "/"
+    if (!backendProductLink && siteBasePath !== "/"
       && pathName !== siteBasePath
       && !pathName.startsWith(siteBasePath + "/")) continue;
     if (pathName === siteBasePath || pathName === "/") continue;
@@ -656,7 +669,8 @@ function selectBackendFrontendCandidates(site, productName, rawSources) {
 
     const sourceName = String(item?.source || "backend-model");
     const key = String(item?.key || "");
-    let score = sourceName === "backend-product-list-primary" ? 120
+    let score = sourceName === "configured-product-page-url" ? 200
+      : sourceName === "backend-product-list-primary" ? 120
       : sourceName === "backend-product-list-link" ? 100
         : 80;
     if (/front.*url|product.*url|page.*url|request.*path|url.*key/i.test(key)) score += 25;
@@ -677,6 +691,13 @@ function selectBackendFrontendCandidates(site, productName, rawSources) {
 
 async function collectProductFrontendCandidates(page, site, product, editInfo, logs) {
   const rawSources = [];
+  if (product?.productPageUrl) {
+    rawSources.push({
+      value: product.productPageUrl,
+      source: "configured-product-page-url",
+      key: "productPageUrl"
+    });
+  }
   if (editInfo?.productPageUrl) {
     rawSources.push({
       value: editInfo.productPageUrl,
@@ -1385,6 +1406,7 @@ async function restoreWtbLink(body, logs) {
     _test: {
       retailerTargetMatches,
       selectBackendFrontendCandidates,
+      isOfficialEzvizProductUrl,
       groupWtbRows,
       classifyWtbProductError,
       openWtbBuyModal,

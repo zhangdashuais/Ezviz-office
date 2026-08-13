@@ -376,6 +376,23 @@ function productSnapshotStabilitySignature(snapshot) {
   }));
 }
 
+async function retryProductReadback(read, verify, options = {}) {
+  const attempts = options.attempts || 6;
+  const wait = options.wait || (() => Promise.resolve());
+  let snapshot;
+  let verification;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    snapshot = await read();
+    verification = verify(snapshot);
+    if (verification.passed) return { snapshot, verification, attempt };
+    if (attempt < attempts) {
+      options.onRetry?.(attempt, verification);
+      await wait(options.delayMs || 3000);
+    }
+  }
+  return { snapshot, verification, attempt: attempts };
+}
+
 function revisionPreviewStatus({
   publishing,
   detailChanged,
@@ -732,6 +749,20 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
+  async function verifySavedProduct(page, productName, logs, verify) {
+    return retryProductReadback(
+      () => readProductSnapshot(page, productName, logs),
+      verify,
+      {
+        wait: (delayMs) => page.waitForTimeout(delayMs),
+        onRetry: (attempt) => logLine(
+          logs,
+          `保存后第 ${attempt} 次回读仍是旧数据，等待后台同步后重试（不会重复保存）。`
+        )
+      }
+    );
+  }
+
   async function prepareDirectRevision(body, logs) {
     const request = validateDirectRevision(body);
     const site = getCampaignSites(readCampaignConfig()).find((item) => item.siteCode === request.siteCode);
@@ -778,9 +809,19 @@ function createProductRevisionSyncFeature(deps) {
       prepared.before.productDescription
     );
     const save = await postProductUpdate(prepared.session.page, payload);
-    const after = await readProductSnapshot(prepared.session.page, prepared.request.productName, logs);
-    if ((prepared.request.revisionType === "detail" && after.detail.overview !== prepared.request.detailHtml)
-      || after.detail.specifications !== prepared.specification.value) {
+    const readback = await verifySavedProduct(
+      prepared.session.page,
+      prepared.request.productName,
+      logs,
+      (snapshot) => {
+        const detail = prepared.request.revisionType !== "detail"
+          || snapshot.detail.overview === prepared.request.detailHtml;
+        const specification = snapshot.detail.specifications === prepared.specification.value;
+        return { passed: detail && specification, detail, specification };
+      }
+    );
+    const after = readback.snapshot;
+    if (!readback.verification.passed) {
       throw new Error("保存后回读不一致：Detail 或 Specification 未正确更新。");
     }
     return {
@@ -1202,11 +1243,21 @@ function createProductRevisionSyncFeature(deps) {
             desired.productDescription.description
           );
           save = await postProductUpdate(session.page, payload);
-          after = await readProductSnapshot(session.page, request.productName, logs);
-          const detailVerified = after.detail.overview === targetSource.snapshot.detail.overview;
-          const specificationVerified = after.detail.specifications === desired.specifications;
-          const descriptionVerified = after.productDescription
-            === desired.productDescription.description;
+          const readback = await verifySavedProduct(
+            session.page,
+            request.productName,
+            logs,
+            (snapshot) => {
+              const detail = snapshot.detail.overview === targetSource.snapshot.detail.overview;
+              const specification = snapshot.detail.specifications === desired.specifications;
+              const description = snapshot.productDescription === desired.productDescription.description;
+              return { passed: detail && specification && description, detail, specification, description };
+            }
+          );
+          after = readback.snapshot;
+          const detailVerified = readback.verification.detail;
+          const specificationVerified = readback.verification.specification;
+          const descriptionVerified = readback.verification.description;
           components.detail = detailChanged
             ? (detailVerified ? "passed" : "failed")
             : "no-change";
@@ -1343,6 +1394,7 @@ module.exports = {
   normalizeDetailFieldName,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
+  retryProductReadback,
   extractSpecificationImage,
   parseSpecificationWorkbook,
   resolveWorkbookLanguage,

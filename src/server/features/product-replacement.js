@@ -7,9 +7,11 @@ function readDetailFieldsFromModel(viewModel) {
     ? viewModel.pcView
     : {};
   const customFields = Array.isArray(pcView.customs) ? pcView.customs : [];
-  const specificationsField = customFields.find(
-    (field) => normalizeDetailFieldName(field?.name) === "specifications"
-  );
+  const specificationsField = ["specifications", "specification"]
+    .map((name) => customFields.find(
+      (field) => normalizeDetailFieldName(field?.name) === name
+    ))
+    .find(Boolean);
   return {
     overview: String(pcView.summary || ""),
     specifications: String(specificationsField?.value || ""),

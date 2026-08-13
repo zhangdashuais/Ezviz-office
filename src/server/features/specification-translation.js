@@ -64,9 +64,10 @@ function createSpecificationTranslationFeature(deps) {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
-      const field = (scope.vm.pcView?.customs || []).find(
-        (item) => normalizeField(item?.name) === "specifications"
-      );
+      const fields = scope.vm.pcView?.customs || [];
+      const field = ["specifications", "specification"]
+        .map((name) => fields.find((item) => normalizeField(item?.name) === name))
+        .find(Boolean);
       if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
       return {
         goodsId: String(scope.goodsId),
@@ -107,9 +108,10 @@ function createSpecificationTranslationFeature(deps) {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
-      const field = (scope.vm.pcView?.customs || []).find(
-        (item) => normalizeField(item?.name) === "specifications"
-      );
+      const fields = scope.vm.pcView?.customs || [];
+      const field = ["specifications", "specification"]
+        .map((name) => fields.find((item) => normalizeField(item?.name) === name))
+        .find(Boolean);
       if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
       scope.vm.basic = scope.vm.basic || {};
       scope.vm.basic.isSearchable = false;

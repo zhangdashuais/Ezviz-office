@@ -67,7 +67,7 @@ utm_campaign=web_{siteCode}_popup
 
 字段：`Product`、`Product Page URL`、`Channel`、`Purchasing Link`。像 TDK 一样，WTB 必须通过下拉框选择且一次只允许一个站点；`Product Page URL` 属于其他站点时停止执行。渠道先精确匹配，再做唯一模糊匹配。
 
-WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Buy` 按钮，点击后出现零售商弹窗，并且每个已配置平台都能点击且目标地址与期望地址匹配。四项全部通过时状态为 `completed`；后台已写入但前台验证未通过时为 `configured_unverified`，不得报告为完整成功。
+WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Buy` 按钮，点击后出现零售商弹窗，并且每个已配置平台都能点击且目标地址与期望地址匹配。前台验证优先使用 Excel 的 `Product Page URL`，后台产品列表和编辑模型中的链接仅作为备用候选。四项全部通过时状态为 `completed`；后台已写入但前台验证未通过时为 `configured_unverified`，不得报告为完整成功。
 
 批量错误隔离：完全重复的同产品/平台/URL 行直接跳过；同一产品同一平台存在不同 URL 时跳过该产品并记录冲突。产品未找到或平台不存在记为 `skipped`；保存、会话等执行错误记为 `failed`。每个产品最多检查 3 个前台候选页并受总时限约束，单项异常后继续下一个产品。
 
@@ -97,6 +97,8 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/assets/upload-image` | 上传图片 |
 
 产品 Detail 读取只返回 PC `Overview` 和名称严格匹配 `Specifications` 的自定义字段。字段不存在时记录单项失败，不回退到其他 Detail 字段。
+
+产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
 
 Detail 内容操作递归处理 `vm.pcView` 的字符串值，适用于 Overview、自定义 Specifications 等 PC Details 内容。`operation: "replace"` 精确替换用户填写的文本，可为完整 URL、相对路径或地址片段，不要求 HTTP/HTTPS 协议；`operation: "delete"` 精确删除 `targetText` 指定的完整代码块（替换为空字符串）。先调用 `preview`；输入未变化且存在命中时才能调用 `submit`。无命中不保存，提交后必须回读并确认目标内容剩余为 0。它不修改 Mobile Details 或其他产品标签。
 

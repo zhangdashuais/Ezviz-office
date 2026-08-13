@@ -40,6 +40,67 @@ function replaceDetailAddress(value, targetText, replacementText) {
   return value;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function collectWhitespaceFlexibleMatches(value, target, path = "pcView", matches = []) {
+  const parts = String(target || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return matches;
+  if (typeof value === "string") {
+    const pattern = parts.map(escapeRegExp).join("\\s+");
+    for (const match of value.matchAll(new RegExp(pattern, "g"))) {
+      matches.push({ path, targetText: match[0] });
+    }
+    return matches;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectWhitespaceFlexibleMatches(item, target, `${path}[${index}]`, matches));
+    return matches;
+  }
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, item]) =>
+      collectWhitespaceFlexibleMatches(item, target, `${path}.${key}`, matches));
+  }
+  return matches;
+}
+
+function extractGuidElement(text, target) {
+  const trimmedTarget = String(target || "").trim();
+  const root = trimmedTarget.match(/^<([a-z][\w:-]*)\b[^>]*\bdata-guid=["']([^"']+)["'][^>]*>/i);
+  if (!root || !trimmedTarget.endsWith(`</${root[1]}>`)) return "";
+  const openingPattern = new RegExp(`<${root[1]}\\b[^>]*\\bdata-guid=["']${escapeRegExp(root[2])}["'][^>]*>`, "ig");
+  const openings = [...String(text || "").matchAll(openingPattern)];
+  if (openings.length !== 1) return "";
+  const tagPattern = new RegExp(`<(/?)${root[1]}\\b[^>]*>`, "ig");
+  tagPattern.lastIndex = openings[0].index;
+  let depth = 0;
+  for (const match of String(text || "").matchAll(tagPattern)) {
+    depth += match[1] ? -1 : 1;
+    if (depth === 0) return text.slice(openings[0].index, match.index + match[0].length);
+  }
+  return "";
+}
+
+function collectGuidElementMatches(value, target, path = "pcView", matches = []) {
+  if (typeof value === "string") {
+    const targetText = extractGuidElement(value, target);
+    if (targetText) matches.push({ path, targetText });
+    return matches;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectGuidElementMatches(item, target, `${path}[${index}]`, matches));
+    return matches;
+  }
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, item]) =>
+      collectGuidElementMatches(item, target, `${path}.${key}`, matches));
+  }
+  return matches;
+}
+
 function buildDetailAddressReplacement(pcView, targetText, replacementText) {
   const oldMatches = collectDetailAddressMatches(pcView, targetText);
   const existingNewMatches = collectDetailAddressMatches(pcView, replacementText);
@@ -200,18 +261,45 @@ function validateRequest(body) {
 function planDetailOperations(pcView, operations) {
   let updatedPcView = pcView;
   const steps = operations.map((operation) => {
-    const analysis = buildDetailAddressReplacement(
+    let effectiveOperation = operation;
+    let matchingMode = "exact";
+    let analysis = buildDetailAddressReplacement(
       updatedPcView,
       operation.targetText,
       operation.replacementText
     );
+    if (operation.type === "delete" && !analysis.matchCount) {
+      const flexibleMatches = collectWhitespaceFlexibleMatches(updatedPcView, operation.targetText);
+      if (flexibleMatches.length === 1) {
+        effectiveOperation = { ...operation, targetText: flexibleMatches[0].targetText };
+        matchingMode = "whitespace-flexible";
+        analysis = buildDetailAddressReplacement(
+          updatedPcView,
+          effectiveOperation.targetText,
+          operation.replacementText
+        );
+      }
+    }
+    if (operation.type === "delete" && !analysis.matchCount) {
+      const guidMatches = collectGuidElementMatches(updatedPcView, operation.targetText);
+      if (guidMatches.length === 1) {
+        effectiveOperation = { ...operation, targetText: guidMatches[0].targetText };
+        matchingMode = "guid-element";
+        analysis = buildDetailAddressReplacement(
+          updatedPcView,
+          effectiveOperation.targetText,
+          operation.replacementText
+        );
+      }
+    }
     updatedPcView = analysis.updatedPcView;
     return {
-      ...operation,
+      ...effectiveOperation,
+      matchingMode,
       matchCount: analysis.matchCount,
       matches: analysis.oldMatches,
       existingNewCount: analysis.existingNewCount,
-      expectedNewCount: operation.replacementText
+      expectedNewCount: effectiveOperation.replacementText
         ? analysis.existingNewCount + analysis.matchCount
         : 0
     };
@@ -221,6 +309,10 @@ function planDetailOperations(pcView, operations) {
     updatedPcView,
     matchCount: steps.reduce((sum, step) => sum + step.matchCount, 0)
   };
+}
+
+function isTransientShopLogoutMessage(message) {
+  return /账号.*退出|退出.*刷新|重新刷新|登录.*失效|未登录/.test(String(message || ""));
 }
 
 function createDetailAddressReplacementFeature(deps) {
@@ -338,7 +430,15 @@ function createDetailAddressReplacementFeature(deps) {
       throw new Error("产品保存接口返回的不是 JSON：" + responseText.slice(0, 200));
     }
     if (!response.ok() || Number(data?.status) !== 1) {
-      throw new Error(data?.msg || data?.message || `产品保存接口返回异常（HTTP ${response.status()}）`);
+      const message = data?.msg || data?.message || `产品保存接口返回异常（HTTP ${response.status()}）`;
+      if (!isTransientShopLogoutMessage(message)) throw new Error(message);
+      return {
+        requestUrl,
+        responseStatus: response.status(),
+        backendStatus: Number(data?.status || 0),
+        reportedError: message,
+        requiresReadback: true
+      };
     }
     return {
       requestUrl,
@@ -411,7 +511,7 @@ function createDetailAddressReplacementFeature(deps) {
           continue;
         }
 
-        const update = await buildSavePayload(session.page, item.operations);
+        const update = await buildSavePayload(session.page, plan.steps);
         plan.steps.forEach((step, index) => {
           if (update.replacedCounts[index] !== step.matchCount) {
             throw new Error(
@@ -462,6 +562,9 @@ function createDetailAddressReplacementFeature(deps) {
             operations: operationChecks
           }
         });
+        if (save.requiresReadback) {
+          logLine(logs, `后台曾提示“${save.reportedError}”，但 ${item.productName} 回读确认修改已生效，已忽略该误报。`);
+        }
         logLine(logs, `Detail 临时操作并回读通过：${item.productName} / ${plan.matchCount} 处。`);
       } catch (error) {
         results.push({
@@ -500,10 +603,13 @@ module.exports = {
   countOccurrences,
   collectDetailAddressMatches,
   replaceDetailAddress,
+  collectWhitespaceFlexibleMatches,
+  collectGuidElementMatches,
   buildDetailAddressReplacement,
   validateAddressPair,
   normalizeBatchItem,
   validateRequest,
   planDetailOperations,
+  isTransientShopLogoutMessage,
   createDetailAddressReplacementFeature
 };

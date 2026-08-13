@@ -260,6 +260,37 @@ test("WTB 前台复查地址只接受后台返回且属于所选站点的产品�
   assert.equal(candidates[0].source, "backend-product-list-primary");
 });
 
+test("WTB 前台复查优先使用配置中的 Product Page URL", () => {
+  const { selectBackendFrontendCandidates } = createPlanFeature()._test;
+  const site = { name: "Viet Nam", siteCode: "vn", url: "https://www.ezviz.com/vn" };
+  const candidates = selectBackendFrontendCandidates(site, "H8c Pro", [
+    {
+      source: "configured-product-page-url",
+      key: "productPageUrl",
+      value: "https://www.ezviz.com/vn/product/h8c-pro/12345"
+    },
+    {
+      source: "backend-product-list-primary",
+      key: "productPageUrl",
+      value: "https://www.ezviz.com/vn/product/other/999"
+    }
+  ]);
+  assert.equal(candidates[0].url, "https://www.ezviz.com/vn/product/h8c-pro/12345");
+  assert.equal(candidates[0].source, "configured-product-page-url");
+});
+
+test("WTB accepts the official ezvizlife product link from td.lb", () => {
+  const { selectBackendFrontendCandidates, isOfficialEzvizProductUrl } = createPlanFeature()._test;
+  const url = "https://www.ezvizlife.com/inter/en/product/rs20-max/63807";
+  assert.equal(isOfficialEzvizProductUrl(url), true);
+  const candidates = selectBackendFrontendCandidates(
+    { name: "International", siteCode: "hq", url: "https://www.ezviz.com/inter" },
+    "RS20 Max",
+    [{ source: "backend-product-list-primary", key: "productPageUrl", value: url }]
+  );
+  assert.equal(candidates[0].url, url);
+});
+
 test("WTB forces the legacy shop backend before opening product editor", async () => {
   const visited = [];
   const page = {

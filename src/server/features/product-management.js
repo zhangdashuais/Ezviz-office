@@ -97,6 +97,7 @@ function createProductManagement({ logLine, normalizeBool }) {
           || controls.find((el) => /\/goods\/add\?id=|\/goods\/edit/i.test(el.getAttribute("href") || ""));
         if (!edit) return { ok: false, reason: "找到产品行，但没有找到 Edit 按钮。" };
         const href = edit.href || edit.getAttribute("href") || "";
+        const primaryProductUrl = row.querySelector("td.lb > a[href], td.lb a[href]")?.href || "";
         const candidateUrls = [...row.querySelectorAll("a[href]")]
           .map((link) => link.href || link.getAttribute("href") || "")
           .filter((value) => value && !/\/goods\/(?:add|edit)|javascript:/i.test(value));
@@ -104,7 +105,7 @@ function createProductManagement({ logLine, normalizeBool }) {
         return {
           ok: true,
           href,
-          productPageUrl: candidateUrls[0] || "",
+          productPageUrl: primaryProductUrl || candidateUrls[0] || "",
           candidateUrls: [...new Set(candidateUrls)],
           rowText: (row.innerText || "").trim().slice(0, 500)
         };

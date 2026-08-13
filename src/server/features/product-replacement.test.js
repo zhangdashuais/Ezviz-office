@@ -55,3 +55,20 @@ test("Specifications 不存在时不回退到其他 Detail 字段", () => {
   assert.equal(result.specifications, "");
   assert.equal(result.specificationsFound, false);
 });
+
+test("Detail 规格字段兼容单数并优先复数命名", () => {
+  const singular = readDetailFieldsFromModel({
+    pcView: { summary: "", customs: [{ name: "Specification", value: "single" }] }
+  });
+  assert.equal(singular.specifications, "single");
+  assert.equal(singular.specificationsFieldName, "Specification");
+
+  const both = readDetailFieldsFromModel({
+    pcView: { customs: [
+      { name: "Specification", value: "single" },
+      { name: "Specifications", value: "plural" }
+    ] }
+  });
+  assert.equal(both.specifications, "plural");
+  assert.equal(both.specificationsFieldName, "Specifications");
+});

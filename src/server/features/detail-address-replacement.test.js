@@ -5,8 +5,16 @@ const {
   collectDetailAddressMatches,
   buildDetailAddressReplacement,
   validateRequest,
-  planDetailOperations
+  planDetailOperations,
+  collectWhitespaceFlexibleMatches,
+  collectGuidElementMatches,
+  isTransientShopLogoutMessage
 } = require("./detail-address-replacement");
+
+test("Detail save treats the shop logout refresh message as readback-required", () => {
+  assert.equal(isTransientShopLogoutMessage("账号退出，请重新刷新"), true);
+  assert.equal(isTransientShopLogoutMessage("保存参数错误"), false);
+});
 
 test("Detail replacement accepts a relative path or fragment as address 1", () => {
   const request = validateRequest({
@@ -161,4 +169,64 @@ test("code-block deletion preserves the exact target and replaces it with empty 
     }),
     /完整代码块/
   );
+});
+
+test("code-block deletion tolerates editor-only whitespace changes when the match is unique", () => {
+  const target = '<section class="hero">\n  <div>Green robot</div>\n</section>';
+  const stored = '<section class="hero"> <div>Green robot</div> </section>';
+  const plan = planDetailOperations({ summary: `before${stored}after` }, [{
+    type: "delete",
+    label: "删除代码块",
+    targetText: target,
+    replacementText: ""
+  }]);
+
+  assert.equal(collectWhitespaceFlexibleMatches({ summary: stored }, target).length, 1);
+  assert.equal(plan.steps[0].matchingMode, "whitespace-flexible");
+  assert.equal(plan.steps[0].matchCount, 1);
+  assert.equal(plan.updatedPcView.summary, "beforeafter");
+});
+
+test("code-block deletion does not guess when whitespace-flexible matches are ambiguous", () => {
+  const target = "<div>\n  repeated\n</div>";
+  const stored = "<div> repeated </div>";
+  const plan = planDetailOperations({ summary: `${stored}${stored}` }, [{
+    type: "delete",
+    label: "删除代码块",
+    targetText: target,
+    replacementText: ""
+  }]);
+
+  assert.equal(plan.steps[0].matchingMode, "exact");
+  assert.equal(plan.steps[0].matchCount, 0);
+});
+
+test("code-block deletion uses a unique root data-guid when editor content changed", () => {
+  const target = '<section data-guid="green-block"><div>old copy</div></section>';
+  const stored = '<section class="changed" data-guid="green-block"><div>new copy</div></section>';
+  const pcView = { summary: `before${stored}after` };
+  const plan = planDetailOperations(pcView, [{
+    type: "delete",
+    label: "删除代码块",
+    targetText: target,
+    replacementText: ""
+  }]);
+
+  assert.equal(collectGuidElementMatches(pcView, target).length, 1);
+  assert.equal(plan.steps[0].matchingMode, "guid-element");
+  assert.equal(plan.steps[0].matchCount, 1);
+  assert.equal(plan.updatedPcView.summary, "beforeafter");
+});
+
+test("code-block deletion does not use duplicate data-guid roots", () => {
+  const target = '<section data-guid="duplicate"><div>old</div></section>';
+  const stored = '<section data-guid="duplicate"><div>new</div></section>';
+  const plan = planDetailOperations({ summary: `${stored}${stored}` }, [{
+    type: "delete",
+    label: "删除代码块",
+    targetText: target,
+    replacementText: ""
+  }]);
+
+  assert.equal(plan.steps[0].matchCount, 0);
 });

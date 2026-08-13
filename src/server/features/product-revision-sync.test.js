@@ -16,8 +16,23 @@ const {
   resolveProductDescription,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
+  retryProductReadback,
   specificationTitleForSite
 } = require("./product-revision-sync");
+
+test("retries stale product readback without resubmitting the save", async () => {
+  let reads = 0;
+  let waits = 0;
+  const result = await retryProductReadback(
+    async () => ({ detail: reads++ ? "new" : "old" }),
+    (snapshot) => ({ passed: snapshot.detail === "new" }),
+    { wait: async () => { waits += 1; } }
+  );
+  assert.equal(result.snapshot.detail, "new");
+  assert.equal(result.attempt, 2);
+  assert.equal(reads, 2);
+  assert.equal(waits, 1);
+});
 
 test("direct product revision validates Detail and applies delete/replace operations", () => {
   const request = validateDirectRevision({
