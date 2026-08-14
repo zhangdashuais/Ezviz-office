@@ -67,4 +67,158 @@
     site.innerHTML = (data.sites || []).filter((item) => item.enabled !== false)
       .map((item) => `<option value="${item.siteCode}">${item.name} (${item.siteCode})</option>`).join("");
   });
+
+  const common = {
+    site: byId("commonRevisionSite"),
+    selectAllSites: byId("commonRevisionSelectAllSites"),
+    clearSites: byId("commonRevisionClearSites"),
+    products: byId("commonRevisionProducts"),
+    field: byId("commonRevisionField"),
+    operation: byId("commonRevisionOperation"),
+    target: byId("commonRevisionTarget"),
+    replacement: byId("commonRevisionReplacement"),
+    replacementLabel: byId("commonRevisionReplacementLabel"),
+    preview: byId("commonRevisionPreview"),
+    submit: byId("commonRevisionSubmit"),
+    status: byId("commonRevisionStatus"),
+    output: byId("commonRevisionOutput")
+  };
+  if (!Object.values(common).every(Boolean)) return;
+  let commonPreview = null;
+  let commonSignature = "";
+
+  function commonBody() {
+    const operation = {
+      type: common.operation.value,
+      targetText: common.target.value,
+      replacementText: common.operation.value === "replace" ? common.replacement.value : ""
+    };
+    return {
+      sites: [...common.site.querySelectorAll("input[type='checkbox']:checked")]
+        .map((input) => input.value)
+        .filter(Boolean),
+      productNames: common.products.value,
+      revisionType: common.field.value,
+      detailOperations: common.field.value === "detail" ? [operation] : [],
+      specificationOperations: common.field.value === "specification" ? [operation] : []
+    };
+  }
+
+  function invalidateCommon() {
+    commonPreview = null;
+    commonSignature = "";
+    common.submit.disabled = true;
+  }
+
+  function renderCommon(result, submitting) {
+    const lines = [
+      submitting ? "多个产品相同部分修订结果" : "多个产品相同部分修订预览（尚未保存）",
+      `国家：${result.siteCount}，产品：${result.productCount}，任务：${result.operationCount}，${submitting ? `完成：${result.completedCount}` : `可执行：${result.readyCount}，无需修改：${result.noChangeCount}`}，失败：${result.failedCount}`,
+      ""
+    ];
+    result.results.forEach((item) => {
+      const detailMatches = item.result?.detailOperations?.reduce((sum, operation) => sum + operation.matchCount, 0) || 0;
+      const specificationMatches = item.result?.specificationOperations?.reduce((sum, operation) => sum + operation.matchCount, 0) || 0;
+      const siteName = item.site?.name || item.site?.siteCode || "未知站点";
+      lines.push(`- ${siteName} | ${item.productName} | ${item.status}${item.error ? ` | ${item.error}` : ""}`);
+      if (!submitting && item.result) {
+        lines.push(`  · Detail 命中 ${detailMatches}；Specification 命中 ${specificationMatches}`);
+      }
+    });
+    common.output.value = lines.join("\n");
+  }
+
+  async function runCommon(action) {
+    const body = commonBody();
+    const signature = JSON.stringify(body);
+    if (action === "submit" && (!commonPreview || signature !== commonSignature)) {
+      invalidateCommon();
+      common.status.textContent = "输入已经变化，请重新预览。";
+      return;
+    }
+    if (action === "submit") {
+      const readyResults = commonPreview.results.filter((item) => item.status === "ready");
+      body.fingerprints = Object.fromEntries(readyResults
+        .map((item) => [`${item.site.siteCode}\n${item.productName.toLowerCase()}`, {
+          siteCode: item.site.siteCode,
+          productName: item.productName,
+          fingerprint: item.result.fingerprint
+        }]));
+      if (!window.confirm(`将执行 ${commonPreview.readyCount} 项国家 × 产品修订，确认继续？`)) return;
+    }
+    common.preview.disabled = true;
+    common.submit.disabled = true;
+    common.status.textContent = action === "preview" ? "正在逐产品预览，不会保存..." : "正在逐产品保存并回读验证...";
+    try {
+      const response = await fetch(`/api/product-revision/common-${action}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "请求失败");
+      renderCommon(data.result, action === "submit");
+      if (action === "preview") {
+        commonPreview = data.result;
+        commonSignature = signature;
+        common.submit.disabled = !data.result.readyCount;
+        common.status.textContent = `预览完成：可执行 ${data.result.readyCount}，失败 ${data.result.failedCount}。`;
+      } else {
+        invalidateCommon();
+        common.status.textContent = `执行完成：成功 ${data.result.completedCount}，失败 ${data.result.failedCount}。`;
+      }
+    } catch (error) {
+      invalidateCommon();
+      common.status.textContent = `${action === "preview" ? "预览" : "执行"}失败：${error.message || error}`;
+    } finally {
+      common.preview.disabled = false;
+    }
+  }
+
+  [common.site, common.products, common.field, common.operation, common.target, common.replacement]
+    .forEach((element) => element.addEventListener("input", invalidateCommon));
+  common.operation.addEventListener("change", () => {
+    const replace = common.operation.value === "replace";
+    common.replacement.hidden = !replace;
+    common.replacementLabel.hidden = !replace;
+    if (!replace) common.replacement.value = "";
+    invalidateCommon();
+  });
+  common.preview.addEventListener("click", () => runCommon("preview"));
+  common.submit.addEventListener("click", () => runCommon("submit"));
+  common.selectAllSites.addEventListener("click", () => {
+    common.site.querySelectorAll("input[type='checkbox']").forEach((input) => {
+      input.checked = true;
+    });
+    invalidateCommon();
+  });
+  common.clearSites.addEventListener("click", () => {
+    common.site.querySelectorAll("input[type='checkbox']").forEach((input) => {
+      input.checked = false;
+    });
+    invalidateCommon();
+  });
+  fetch("/api/campaign/sites").then((response) => response.json()).then((data) => {
+    common.site.innerHTML = "";
+    (data.sites || []).filter((item) => item.enabled !== false).forEach((item) => {
+      const label = document.createElement("label");
+      label.className = "site-option";
+
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = item.siteCode;
+      input.checked = !!item.enabled;
+
+      const name = document.createElement("span");
+      name.className = "site-name";
+      name.textContent = `${item.name} (${item.siteCode})`;
+
+      const url = document.createElement("span");
+      url.className = "site-url";
+      url.textContent = item.url || "";
+
+      label.append(input, name, url);
+      common.site.appendChild(label);
+    });
+  });
 })();

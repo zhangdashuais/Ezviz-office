@@ -11,6 +11,7 @@ const {
   planLanguagePackageUpdates,
   assertSafePlan,
   writeUpdatedLanguagePackage,
+  writeUpdatedLanguagePackageNative,
   normalizeSourceForComparison
 } = require("./language-package-workbook");
 
@@ -96,7 +97,7 @@ test("plans exact field and source matches, including identical duplicates", () 
   assert.equal(plan.skippedBlankCount, 1);
 });
 
-test("blocks missing keys but treats the site package source as authoritative", () => {
+test("plans new Datasheet fields for append and treats the site package source as authoritative", () => {
   const datasheet = parseLanguageDatasheet(workbookBuffer([
     ["Field", "Source", "Spanish"],
     ["product_title", "Different source", "Nuevo"],
@@ -104,10 +105,12 @@ test("blocks missing keys but treats the site package source as authoritative", 
   ]));
   const languagePackage = readLanguagePackage(packageBuffer(), "es-ES");
   const plan = planLanguagePackageUpdates(languagePackage, datasheet, "Spanish");
-  assert.equal(plan.safe, false);
+  assert.equal(plan.safe, true);
   assert.equal(plan.missing.length, 1);
+  assert.equal(plan.newFields.length, 1);
   assert.equal(plan.sourceMismatches.length, 1);
   assert.equal(plan.changedCellCount, 1);
+  if (plan.newFields.length) return;
   assert.throws(() => assertSafePlan(plan), /预检未通过/);
 });
 
@@ -139,6 +142,61 @@ test("writes an xls package and verifies updated cells", () => {
     assert.equal(sheet.E3.v, "Mismo texto");
     assert.equal(sheet.E4.v, "Mismo texto");
     assert.equal(sheet.E5.v, "Conservar");
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("appends new Datasheet fields to the language package end", () => {
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["new_field", "New source", "Nuevo"]
+  ]));
+  const languagePackage = readLanguagePackage(packageBuffer(), "es-ES");
+  const plan = planLanguagePackageUpdates(languagePackage, datasheet, "Spanish");
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "language-package-append-"));
+  try {
+    const outputPath = path.join(temporaryDirectory, "es-ES.xlsx");
+    const result = writeUpdatedLanguagePackage(languagePackage, plan, outputPath);
+    assert.equal(result.appendedFieldCount, 1);
+    const verified = readLanguagePackage(outputPath, "es-ES");
+    const sheet = verified.workbook.Sheets.Sheet1;
+    assert.equal(sheet.C6.v, "new_field");
+    assert.equal(sheet.D6.v, "New source");
+    assert.equal(sheet.E6.v, "Nuevo");
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("uses native Excel to update and append fields without rebuilding the xls", {
+  skip: process.platform !== "win32",
+  timeout: 30000
+}, () => {
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "language-package-native-"));
+  try {
+    const inputPath = path.join(temporaryDirectory, "before.xls");
+    const outputPath = path.join(temporaryDirectory, "after.xls");
+    fs.writeFileSync(inputPath, packageBuffer());
+    const datasheet = parseLanguageDatasheet(workbookBuffer([
+      ["Field", "Source", "Spanish"],
+      ["product_title", "Smart camera", "Nuevo"],
+      ["new_field", "New source", "Nueva traduccion"]
+    ]));
+    const languagePackage = readLanguagePackage(inputPath, "es-ES");
+    const plan = planLanguagePackageUpdates(languagePackage, datasheet, "Spanish");
+    const result = writeUpdatedLanguagePackageNative(
+      inputPath,
+      languagePackage,
+      datasheet,
+      plan,
+      outputPath
+    );
+    assert.equal(result.verifiedCellCount, 2);
+    const verified = readLanguagePackage(outputPath, "es-ES");
+    assert.equal(verified.workbook.Sheets.Sheet1.E2.v, "Nuevo");
+    assert.equal(verified.workbook.Sheets.Sheet1.C6.v, "new_field");
+    assert.equal(verified.workbook.Sheets.Sheet1.E6.v, "Nueva traduccion");
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }

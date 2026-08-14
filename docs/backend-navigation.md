@@ -69,7 +69,11 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 
 “网站翻译表精简”用于处理同一 Excel 中并存的 Datasheet 与 Specification/Spec 工作表。页面自动读取首行语言表头，Datasheet 以单列为一个语言块，Specification 以相邻两列为一个语言块；用户可分别选择目标语言并下载两份文件。输出只保留英文和所选语言，Datasheet 额外保留字段键列，原有模板样式与字体颜色不改写。
 
-Detail 批量替换的前后值按精确文本处理，可填写完整 URL、相对路径或地址片段，不要求以 `http://` 或 `https://` 开头。预览仍需命中原文本才允许提交，保存后继续逐项回读确认。
+语言包定向修订提供 `/api/language-package/hg2-400-4-preview` 与 `/api/language-package/hg2-400-4-submit`。流程逐站下载语言包，精确定位 `HG2_400_4` 并只处理 E 列中的 `15s / 18s / 20s`；E 列为空或不含目标内容时不上传。旧 `.xls` 使用本机 Excel 原生保存以保留后台要求的文件结构，提交后重新下载回读，失败时恢复原包。
+
+语言包页另有独立的“按单产品 Datasheet 更新站点语言包”功能。`datasheet-inspect` 识别第三列起的语种说明；`datasheet-preview` 按字段 Key 对比所选站点当前语言包；`datasheet-submit` 将所选语种覆盖到目标列，站点不存在的 Key 复制末行样式后追加。空译文跳过，英文原文差异只提示并以站点语言包固有列为准；预览后 Datasheet 或站点语言包发生变化时停止提交。旧 `.xls` 仍由本机 Excel 原生保存，上传后重新下载回读，失败时恢复原包。
+
+Detail 批量替换默认选择“全选”，可在一次预览中同时处理地址替换、代码块删除和高清图覆盖，也可切换为单项操作。替换前后值按精确文本处理，可填写完整 URL、相对路径或地址片段，不要求以 `http://` 或 `https://` 开头。页面和七列 Excel 均支持 `Product_Album_Image`：可填写本机绝对路径或 HTTPS 图片地址。预览会从 “Product Album” 行的 Angular 绑定精确定位高清图字段，兼容后台使用 `mainPic` 等非 album 字段名；提交时直接使用现成 MFS 地址，或将本机/其他 HTTPS 图片上传后覆盖现有高清图并回读。字段缺失或候选不唯一时不会保存。
 
 多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications。国际复制源的 Detail 标签会等待异步加载完成后再读取，找到复制源且至少有一个目标站可执行时即可确认提交；部分站点失败不会阻塞其他已通过预检的站点。Specification 和 Datasheet 的语言表头都从实际工作簿读取并由页面选择，不依赖固定名称。Datasheet 明确提供 Product Description 时写入目标译文；未提供时，首次上架保留国际复制源描述，已复制产品的修订同步则保留目标站当前描述。Detail 规格字段精确兼容英文 `Specification/Specifications` 和日本站 `仕様`。产品上架会下载目标站总语言包，以站点包的字段键和英文原文列为基准，只按稳定字段键覆盖 Datasheet 所选语种到目标列；英文原文差异提示但不改动前置列，字段键缺失仍阻止提交。生成文件统一使用真实 `.xlsx` 格式，上传后再次下载回读。产品下架使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`；只关闭 `isSearchable` 并把 `whenType` 设为 `0`（No Set Uptime），随后回读验证。
 
@@ -99,3 +103,4 @@ SharePoint 素材归档类目固定为 `02_Security Camera`、`03_Home Sensor & 
 
 规格 HTML 的主图地址支持标准 `src` 以及常见懒加载属性 `data-src`、`data-original`、`data-lazy-src` 和 `srcset`。
 若源规格明确包含无地址的空图片占位标签，则视为源产品无规格图，目标规格会省略图片块；不会猜测或生成图片地址。
+产品修订不复用产品上架的文件夹批处理。页面内用 Tab 切换两种流程：同一产品跨国家修订使用 Specifications 与 Datasheet 同步；多个产品相同部分修订可同时选择多个国家站点，对最多 50 个产品的 Detail 或 Specification 执行同一条精确删除/替换，并按国家 × 产品逐项预览、保存和回读。

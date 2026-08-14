@@ -10,6 +10,7 @@ const {
   assertSafePlan,
   writeUpdatedLanguagePackage
 } = require("./language-package-workbook");
+const { parseProductNames } = require("./product-replacement");
 
 const SITE_LANGUAGE_NEEDLES = {
   hq: ["english"],
@@ -78,8 +79,11 @@ function specificationTitleForSite(siteCode, fallback = "Specifications") {
 const SPECIFICATION_DETAIL_FIELD_NAMES = [
   "specifications",
   "specification",
+  "specs",
   "\u4ed5\u69d8"
 ];
+
+const MAX_FRAME_RATE_PATTERN = /\bMax\s*[.:：]?\s*\d+(?:\.\d+)?\s*fps\b/i;
 
 function normalize(value) {
   return String(value == null ? "" : value)
@@ -94,12 +98,18 @@ function normalizeDetailFieldName(value) {
 
 function findSpecificationDetailField(customFields) {
   const fields = Array.isArray(customFields) ? customFields : [];
-  for (const fieldName of SPECIFICATION_DETAIL_FIELD_NAMES) {
+  const knownNames = [
+    ...SPECIFICATION_DETAIL_FIELD_NAMES,
+    ...Object.values(SITE_SPECIFICATION_TITLES).map(normalizeDetailFieldName)
+  ];
+  for (const fieldName of knownNames) {
     const field = fields.find(
       (item) => normalizeDetailFieldName(item?.name) === fieldName
     );
     if (field) return field;
   }
+  const frameRateFields = fields.filter((item) => MAX_FRAME_RATE_PATTERN.test(String(item?.value || "")));
+  if (frameRateFields.length === 1) return frameRateFields[0];
   return null;
 }
 
@@ -489,37 +499,78 @@ function validateDirectRevision(body) {
   const siteCode = String(body?.siteCode || "").trim();
   const revisionType = body?.revisionType === "specification" ? "specification" : "detail";
   const detailHtml = String(body?.detailHtml ?? "");
-  let operations = body?.specificationOperations || [];
+  let operations = revisionType === "detail"
+    ? body?.detailOperations || []
+    : body?.specificationOperations || [];
   if (typeof operations === "string") {
-    try { operations = JSON.parse(operations); } catch { throw new Error("Specification 操作必须是有效 JSON。"); }
+    try { operations = JSON.parse(operations); } catch { throw new Error(`${revisionType === "detail" ? "Detail" : "Specification"} 操作必须是有效 JSON。`); }
   }
   if (!siteCode) throw new Error("请选择国家站点。");
   if (!productName) throw new Error("请填写产品名称。");
-  if (revisionType === "detail" && !detailHtml.trim()) throw new Error("请填写替换后的 Detail 代码。");
-  if (revisionType === "specification" && (!Array.isArray(operations) || !operations.length)) throw new Error("请至少填写一条 Specification 操作。");
-  if (revisionType === "detail") operations = [];
+  if (!Array.isArray(operations)) throw new Error("修订操作格式不正确。");
+  if (revisionType === "detail" && !detailHtml.trim() && !operations.length) {
+    throw new Error("请填写替换后的 Detail 代码，或至少填写一条 Detail 局部操作。");
+  }
+  if (revisionType === "specification" && !operations.length) throw new Error("请至少填写一条 Specification 操作。");
+  const fieldLabel = revisionType === "detail" ? "Detail" : "Specification";
   operations = operations.map((item, index) => {
-    const type = item?.type === "delete" ? "delete" : item?.type === "replace" ? "replace" : "";
+    const type = item?.type === "delete-frame-rate"
+      ? "delete-frame-rate"
+      : item?.type === "delete" ? "delete" : item?.type === "replace" ? "replace" : "";
     const targetText = String(item?.targetText ?? "");
     const replacementText = type === "replace" ? String(item?.replacementText ?? "") : "";
-    if (!type) throw new Error(`第 ${index + 1} 条 Specification 操作类型无效。`);
-    if (!targetText) throw new Error(`第 ${index + 1} 条 Specification 操作缺少目标内容。`);
-    if (type === "replace" && !replacementText) throw new Error(`第 ${index + 1} 条 Specification 替换操作缺少替换内容。`);
-    if (type === "replace" && targetText === replacementText) throw new Error(`第 ${index + 1} 条 Specification 新旧内容不能相同。`);
+    if (!type) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 操作类型无效。`);
+    if (type === "delete-frame-rate" && revisionType !== "specification") {
+      throw new Error("帧率删除操作只允许用于 Specification。");
+    }
+    if (type !== "delete-frame-rate" && !targetText) {
+      throw new Error(`第 ${index + 1} 条 ${fieldLabel} 操作缺少目标内容。`);
+    }
+    if (type === "replace" && !replacementText) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 替换操作缺少替换内容。`);
+    if (type === "replace" && targetText === replacementText) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 新旧内容不能相同。`);
     return { type, targetText, replacementText };
   });
   return { siteCode, productName, revisionType, detailHtml, operations };
 }
 
-function applySpecificationOperations(source, operations) {
+function applyContentOperations(source, operations, fieldLabel = "Specification") {
   let value = source;
   const results = operations.map((operation) => {
+    if (operation.type === "delete-frame-rate") {
+      const frameRate = /\bMax\s*[.:：]?\s*\d+(?:\.\d+)?\s*fps\b\s*[;；]?\s*/gi;
+      const matchCount = value.match(frameRate)?.length || 0;
+      if (!matchCount) throw new Error(`${fieldLabel} 中未找到目标内容，已停止操作。`);
+      value = value.replace(frameRate, "");
+      return { ...operation, matchCount };
+    }
     const matchCount = value.split(operation.targetText).length - 1;
-    if (!matchCount) throw new Error("Specification 中未找到目标内容，已停止操作。");
+    if (!matchCount) throw new Error(`${fieldLabel} 中未找到目标内容，已停止操作。`);
     value = value.split(operation.targetText).join(operation.replacementText);
     return { ...operation, matchCount };
   });
   return { value, results };
+}
+
+function applySpecificationOperations(source, operations) {
+  return applyContentOperations(source, operations, "Specification");
+}
+
+function buildCommonRevisionTargets(body, availableSites) {
+  const productNames = parseProductNames(body?.productNames ?? body?.productName);
+  if (!productNames.length) throw new Error("请填写至少一个产品名称。");
+  if (productNames.length > 50) throw new Error("一次最多修订 50 个产品。");
+  const selectedSiteCodes = [...new Set((Array.isArray(body?.sites) ? body.sites : [body?.siteCode])
+    .map((value) => normalize(value).toLowerCase()).filter(Boolean))];
+  if (!selectedSiteCodes.length) throw new Error("请至少选择一个国家站点。");
+  const sitesByCode = new Map(availableSites.filter((site) => site.enabled !== false)
+    .map((site) => [normalize(site.siteCode).toLowerCase(), site]));
+  const sites = selectedSiteCodes.map((siteCode) => sitesByCode.get(siteCode));
+  if (sites.some((site) => !site)) throw new Error("所选国家站点不存在或未启用。");
+  return {
+    sites,
+    productNames,
+    targets: sites.flatMap((site) => productNames.map((productName) => ({ site, productName })))
+  };
 }
 
 function createProductRevisionSyncFeature(deps) {
@@ -635,23 +686,33 @@ function createProductRevisionSyncFeature(deps) {
   }
 
   async function readProductSnapshot(page, productName, logs) {
-    const editInfo = await openProductEditorByName(page, productName, logs);
+    const editInfo = await openProductEditorByName(page, productName, logs, { exactOnly: true });
     return readCurrentProductSnapshot(page, productName, logs, editInfo);
   }
 
-  async function buildSavePayload(page, overview, specifications, productDescription) {
+  async function buildSavePayload(
+    page,
+    overview,
+    specifications,
+    productDescription,
+    specificationFieldName = ""
+  ) {
     return page.evaluate(({
       overview,
       specifications,
       productDescription,
-      specificationFieldNames
+      specificationFieldNames,
+      specificationFieldName
     }) => {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
       const customFields = scope.vm.pcView?.customs || [];
-      let field = null;
+      let field = customFields.find(
+        (item) => String(item?.name || "") === specificationFieldName
+      ) || null;
       for (const fieldName of specificationFieldNames) {
+        if (field) break;
         field = customFields.find(
           (item) => normalizeField(item?.name) === fieldName
         );
@@ -669,7 +730,11 @@ function createProductRevisionSyncFeature(deps) {
       overview,
       specifications,
       productDescription,
-      specificationFieldNames: SPECIFICATION_DETAIL_FIELD_NAMES
+      specificationFieldNames: [
+        ...SPECIFICATION_DETAIL_FIELD_NAMES,
+        ...Object.values(SITE_SPECIFICATION_TITLES).map(normalizeDetailFieldName)
+      ],
+      specificationFieldName
     });
   }
 
@@ -745,6 +810,8 @@ function createProductRevisionSyncFeature(deps) {
       unchangedCellCount: plan.unchangedCellCount,
       skippedBlankCount: plan.skippedBlankCount,
       missing: plan.missing.slice(0, 50),
+      newFields: plan.newFields.slice(0, 50),
+      appendedFieldCount: plan.newFields.length,
       sourceMismatches: plan.sourceMismatches.slice(0, 50)
     };
   }
@@ -763,25 +830,30 @@ function createProductRevisionSyncFeature(deps) {
     );
   }
 
-  async function prepareDirectRevision(body, logs) {
+  async function prepareDirectRevision(body, logs, existingSession) {
     const request = validateDirectRevision(body);
     const site = getCampaignSites(readCampaignConfig()).find((item) => item.siteCode === request.siteCode);
     if (!site || site.enabled === false) throw new Error("所选国家站点不存在或未启用。");
-    const session = await prepareSiteSession(site, body, logs);
+    const session = existingSession || await prepareSiteSession(site, body, logs);
     const before = await readProductSnapshot(session.page, request.productName, logs);
     const specification = request.revisionType === "specification"
       ? applySpecificationOperations(before.detail.specifications, request.operations)
       : { value: before.detail.specifications, results: [] };
+    const detail = request.revisionType === "detail"
+      ? (request.operations.length
+        ? applyContentOperations(before.detail.overview, request.operations, "Detail")
+        : { value: request.detailHtml, results: [] })
+      : { value: before.detail.overview, results: [] };
     const fingerprint = hashValue(JSON.stringify({
       goodsId: before.goodsId,
       detail: before.detail.overview,
       specifications: before.detail.specifications
     }));
-    return { request, site, session, before, specification, fingerprint };
+    return { request, site, session, before, detail, specification, fingerprint };
   }
 
-  async function previewDirectRevision(body, logs) {
-    const prepared = await prepareDirectRevision(body, logs);
+  async function previewDirectRevision(body, logs, existingSession) {
+    const prepared = await prepareDirectRevision(body, logs, existingSession);
     return {
       mode: "product-direct-revision-preview",
       site: prepared.site,
@@ -789,24 +861,24 @@ function createProductRevisionSyncFeature(deps) {
       goodsId: prepared.before.goodsId,
       fingerprint: prepared.fingerprint,
       revisionType: prepared.request.revisionType,
-      detailChanged: prepared.request.revisionType === "detail"
-        && prepared.before.detail.overview !== prepared.request.detailHtml,
+      detailChanged: prepared.before.detail.overview !== prepared.detail.value,
       specificationChanged: prepared.before.detail.specifications !== prepared.specification.value,
+      detailOperations: prepared.detail.results,
       specificationOperations: prepared.specification.results
     };
   }
 
-  async function submitDirectRevision(body, logs) {
-    const prepared = await prepareDirectRevision(body, logs);
+  async function submitDirectRevision(body, logs, existingSession) {
+    const prepared = await prepareDirectRevision(body, logs, existingSession);
     if (!body?.fingerprint || body.fingerprint !== prepared.fingerprint) {
       throw new Error("产品内容在预览后发生变化，请重新预览后再提交。");
     }
     const payload = await buildSavePayload(
       prepared.session.page,
-      prepared.request.revisionType === "detail"
-        ? prepared.request.detailHtml : prepared.before.detail.overview,
+      prepared.detail.value,
       prepared.specification.value,
-      prepared.before.productDescription
+      prepared.before.productDescription,
+      prepared.before.detail.specificationsFieldName
     );
     const save = await postProductUpdate(prepared.session.page, payload);
     const readback = await verifySavedProduct(
@@ -814,8 +886,7 @@ function createProductRevisionSyncFeature(deps) {
       prepared.request.productName,
       logs,
       (snapshot) => {
-        const detail = prepared.request.revisionType !== "detail"
-          || snapshot.detail.overview === prepared.request.detailHtml;
+        const detail = snapshot.detail.overview === prepared.detail.value;
         const specification = snapshot.detail.specifications === prepared.specification.value;
         return { passed: detail && specification, detail, specification };
       }
@@ -831,6 +902,97 @@ function createProductRevisionSyncFeature(deps) {
       goodsId: after.goodsId,
       save,
       backendCheck: { status: "passed", detail: "passed", specification: "passed" }
+    };
+  }
+
+  function commonRevisionTargets(body) {
+    return buildCommonRevisionTargets(body, getCampaignSites(readCampaignConfig()));
+  }
+
+  async function previewCommonRevision(body, logs) {
+    const { sites, productNames, targets } = commonRevisionTargets(body);
+    const results = [];
+    const sessions = new Map();
+    for (const { site, productName } of targets) {
+      try {
+        let session = sessions.get(site.siteCode);
+        if (!session) {
+          session = await prepareSiteSession(site, body, logs);
+          sessions.set(site.siteCode, session);
+        }
+        const result = await previewDirectRevision(
+          { ...(body || {}), siteCode: site.siteCode, productName },
+          logs,
+          session
+        );
+        const changed = result.detailChanged || result.specificationChanged;
+        results.push({ status: changed ? "ready" : "no-change", site, productName, result });
+      } catch (error) {
+        if (/page|context|browser.*closed/i.test(error?.message || "")) sessions.delete(site.siteCode);
+        results.push({ status: "failed", site, productName, error: error?.message || String(error) });
+      }
+    }
+    return {
+      mode: "product-common-revision-preview",
+      siteCount: sites.length,
+      productCount: productNames.length,
+      operationCount: targets.length,
+      readyCount: results.filter((item) => item.status === "ready").length,
+      noChangeCount: results.filter((item) => item.status === "no-change").length,
+      failedCount: results.filter((item) => item.status === "failed").length,
+      results
+    };
+  }
+
+  async function submitCommonRevision(body, logs) {
+    const { sites, productNames, targets } = commonRevisionTargets(body);
+    let fingerprints;
+    try {
+      fingerprints = typeof body?.fingerprints === "string"
+        ? JSON.parse(body.fingerprints)
+        : body?.fingerprints || {};
+    } catch {
+      throw new Error("预览指纹格式不正确，请重新预览。");
+    }
+    const allowedTargets = new Set(targets.map(({ site, productName }) => `${site.siteCode}\n${productName.toLowerCase()}`));
+    const submitTargets = Object.values(fingerprints);
+    if (!submitTargets.length) throw new Error("没有可执行的预览结果，请重新预览。");
+    const results = [];
+    const sessions = new Map();
+    for (const target of submitTargets) {
+      const siteCode = normalize(target?.siteCode).toLowerCase();
+      const productName = normalize(target?.productName);
+      const fingerprint = normalize(target?.fingerprint);
+      const site = sites.find((item) => item.siteCode === siteCode);
+      if (!site || !productName || !fingerprint || !allowedTargets.has(`${siteCode}\n${productName.toLowerCase()}`)) {
+        results.push({ status: "failed", site, productName, error: "预览目标或指纹不正确，请重新预览。" });
+        continue;
+      }
+      try {
+        let session = sessions.get(siteCode);
+        if (!session) {
+          session = await prepareSiteSession(site, body, logs);
+          sessions.set(siteCode, session);
+        }
+        const result = await submitDirectRevision(
+          { ...(body || {}), siteCode, productName, fingerprint },
+          logs,
+          session
+        );
+        results.push({ status: "completed", site, productName, result });
+      } catch (error) {
+        if (/page|context|browser.*closed/i.test(error?.message || "")) sessions.delete(siteCode);
+        results.push({ status: "failed", site, productName, error: error?.message || String(error) });
+      }
+    }
+    return {
+      mode: "product-common-revision-submit",
+      siteCount: sites.length,
+      productCount: productNames.length,
+      operationCount: submitTargets.length,
+      completedCount: results.filter((item) => item.status === "completed").length,
+      failedCount: results.filter((item) => item.status === "failed").length,
+      results
     };
   }
 
@@ -1240,7 +1402,8 @@ function createProductRevisionSyncFeature(deps) {
             session.page,
             targetSource.snapshot.detail.overview,
             desired.specifications,
-            desired.productDescription.description
+            desired.productDescription.description,
+            before.detail.specificationsFieldName
           );
           save = await postProductUpdate(session.page, payload);
           const readback = await verifySavedProduct(
@@ -1383,7 +1546,16 @@ function createProductRevisionSyncFeature(deps) {
   const submitPublishing = (body, excelFile, languageDatasheetFile, logs) =>
     submit(body, excelFile, languageDatasheetFile, logs, { publishing: true });
 
-  return { preview, submit, previewPublishing, submitPublishing, previewDirectRevision, submitDirectRevision };
+  return {
+    preview,
+    submit,
+    previewPublishing,
+    submitPublishing,
+    previewDirectRevision,
+    submitDirectRevision,
+    previewCommonRevision,
+    submitCommonRevision
+  };
 }
 
 module.exports = {
@@ -1407,6 +1579,8 @@ module.exports = {
   internationalListSource,
   resolveProductDescription,
   validateDirectRevision,
+  applyContentOperations,
   applySpecificationOperations,
+  buildCommonRevisionTargets,
   createProductRevisionSyncFeature
 };

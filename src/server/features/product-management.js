@@ -55,7 +55,7 @@ function createProductManagement({ logLine, normalizeBool }) {
     while (productEditCache.size > 200) productEditCache.delete(productEditCache.keys().next().value);
   }
 
-  async function openProductEditorByName(page, productName, logs) {
+  async function openProductEditorByName(page, productName, logs, options = {}) {
     const targetName = String(productName || "").trim();
     if (!targetName) throw new Error("请填写产品名称。");
     pruneProductEditCache();
@@ -83,13 +83,15 @@ function createProductManagement({ logLine, normalizeBool }) {
     }
 
     async function findAndClickEdit() {
-      return page.evaluate((name) => {
+      return page.evaluate(({ name, exactOnly }) => {
         const normalized = name.toLowerCase();
         const visible = (el) => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
         const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope")].filter(visible);
         const exact = rows.find((row) => [...row.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name']")]
           .some((cell) => (cell.innerText || cell.textContent || "").trim().toLowerCase() === normalized));
-        const fuzzy = rows.find((row) => (row.innerText || "").trim().toLowerCase().includes(normalized));
+        const fuzzy = exactOnly
+          ? null
+          : rows.find((row) => (row.innerText || "").trim().toLowerCase().includes(normalized));
         const row = exact || fuzzy;
         if (!row) return { ok: false };
         const controls = [...row.querySelectorAll("a, button")].filter(visible);
@@ -109,7 +111,7 @@ function createProductManagement({ logLine, normalizeBool }) {
           candidateUrls: [...new Set(candidateUrls)],
           rowText: (row.innerText || "").trim().slice(0, 500)
         };
-      }, targetName);
+      }, { name: targetName, exactOnly: options.exactOnly === true });
     }
 
     let found = await findAndClickEdit();

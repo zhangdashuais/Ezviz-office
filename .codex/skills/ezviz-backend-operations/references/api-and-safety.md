@@ -86,9 +86,11 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/product-replacement/details` | 最多 50 个产品批量只读 |
 | POST | `/api/product-revision/preview` | 单产品 Detail 整体替换与 Specification 删除/替换预览 |
 | POST | `/api/product-revision/submit` | 携带预览指纹保存单产品修订并回读验证 |
+| POST | `/api/product-revision/common-preview` | 多站点 × 多产品的相同 Detail/Specification 片段删除或替换预览 |
+| POST | `/api/product-revision/common-submit` | 按逐站点、逐产品预览指纹执行相同片段修订并分别回读 |
 | POST | `/api/detail-address-replacement/preview` | 读取多个产品 PC Details，返回旧地址命中路径和次数 |
 | POST | `/api/detail-address-replacement/submit` | 精确替换命中地址，保存后逐产品回读 |
-| GET | `/api/detail-address-replacement/template` | 下载“临时功能”九列表格模板 |
+| GET | `/api/detail-address-replacement/template` | 下载“临时功能”七列表格模板 |
 | POST | `/api/specification/preview` | 预览，不提交 |
 | POST | `/api/specification/submit` | 写产品后台 |
 | POST | `/api/product-publishing/preview` | 在目标站读取国际产品复制源并预览上架，不提交 |
@@ -98,16 +100,21 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 
 产品上架写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列，顶部 Specification 标题按站点代码自动使用本地化译文；未知站点回退到工作簿标题。
 | POST | `/api/language-package/upload` | 上传语言包 |
+| POST | `/api/language-package/datasheet-inspect` | 识别单产品 Datasheet 的语种列和字段，不访问商城后台 |
+| POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖/追加预览，不上传 |
+| POST | `/api/language-package/datasheet-submit` | 校验预览指纹后原生修改、上传并重新下载回读；失败时回滚原包 |
+| POST | `/api/language-package/hg2-400-4-preview` | 逐站下载语言包并预览 `HG2_400_4` E 列秒数删除，不上传 |
+| POST | `/api/language-package/hg2-400-4-submit` | 按预览指纹逐站修改、上传并重新下载回读；失败时回滚原包 |
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |
 | POST | `/api/assets/upload-image` | 上传图片 |
 
 产品 Detail 读取只返回 PC `Overview` 和名称严格匹配 `Specifications` 的自定义字段。字段不存在时记录单项失败，不回退到其他 Detail 字段。
 
-产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
+产品修订分为两种：同一产品跨国家修订继续使用 Specifications 与 Datasheet 同步；多个不同产品的相同部分修订可同时选择多个站点，对 Detail 或 Specification 执行同一条精确删除/替换。后者按国家 × 产品逐项预览、保存和回读，单项失败不影响其他任务，一次最多 50 个产品。产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
 
 Detail 内容操作递归处理 `vm.pcView` 的字符串值，适用于 Overview、自定义 Specifications 等 PC Details 内容。`operation: "replace"` 精确替换用户填写的文本，可为完整 URL、相对路径或地址片段，不要求 HTTP/HTTPS 协议；`operation: "delete"` 精确删除 `targetText` 指定的完整代码块（替换为空字符串）。先调用 `preview`；输入未变化且存在命中时才能调用 `submit`。无命中不保存，提交后必须回读并确认目标内容剩余为 0。它不修改 Mobile Details 或其他产品标签。
 
-“临时功能”优先从 `.xlsx/.xls` 导入。读取第一个工作表，表头固定为：`Product_Name`、`Old_Address_1`、`New_Address_1`、`Old_Address_2`、`New_Address_2`、`Delete_Code_Block`、`Album_Image_Index`、`Old_Album_Image`、`New_Album_Image`。每行对应一个产品，最多两组 PC Detail 精确文本替换、一个代码块删除和一组 Product Album 高清图替换；Album 替换只匹配 `scope.vm` 中字段路径包含 `album` 或 `gallery` 的值，并排除 `pcView`。空操作跳过，每行至少一项操作，产品名不得重复，一次最多 50 个产品。全部操作只保存一次，再逐项回读。优先让用户通过页面的“下载信息模板”取得标准文件。
+“临时功能”默认操作类型为“全选”，同一次预览可包含地址替换、代码块删除和 Product Album 高清图覆盖；单项模式仍可单独选择。Excel 读取第一个工作表，表头固定为：`Product_Name`、`Old_Address_1`、`New_Address_1`、`Old_Address_2`、`New_Address_2`、`Delete_Code_Block`、`Product_Album_Image`。高清图列可填写本机 `jpg/jpeg/png/webp` 绝对路径或 HTTPS 图片地址。现成 `mfs.ezvizlife.com` 地址直接使用；其他 HTTPS 地址在 `submit` 时安全下载并上传到文件服务。`preview` 只校验输入和产品当前 Product Album 字段，不下载、不上传。高清图字段优先从编辑页 “Product Album” 行的 Angular 绑定精确定位，兼容字段名不含 `album/gallery` 的后台模型。提交后以最终 MFS URL 覆盖当前高清图，并重新打开产品编辑页回读。Product Album 字段缺失或候选不唯一时单项失败，不猜测覆盖。空操作跳过，每行至少一项操作，产品名不得重复，一次最多 50 个产品。全部操作只保存一次，再逐项回读。优先让用户通过页面的“下载信息模板”取得标准文件。
 
 删除请求示例：
 

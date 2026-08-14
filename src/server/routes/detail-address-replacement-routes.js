@@ -8,9 +8,7 @@ function buildProductNameTemplate() {
     "Old_Address_2",
     "New_Address_2",
     "Delete_Code_Block",
-    "Album_Image_Index",
-    "Old_Album_Image",
-    "New_Album_Image"
+    "Product_Album_Image"
   ]]);
   worksheet["!cols"] = [
     { wch: 28 },
@@ -19,9 +17,7 @@ function buildProductNameTemplate() {
     { wch: 48 },
     { wch: 48 },
     { wch: 70 },
-    { wch: 18 },
-    { wch: 48 },
-    { wch: 48 }
+    { wch: 72 }
   ];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Products");

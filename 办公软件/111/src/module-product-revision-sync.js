@@ -26,13 +26,22 @@
   const languageHelp = document.getElementById("revisionSyncLanguageHelp");
   const targetsHeading = document.getElementById("revisionSyncTargetsHeading");
   const targetsHelp = document.getElementById("revisionSyncTargetsHelp");
+  const syncHeading = document.getElementById("revisionSyncHeading");
+  const syncDescription = document.getElementById("revisionSyncDescription");
+  const operationLabel = document.getElementById("revisionSyncOperationLabel");
+  const revisionModeTabs = document.getElementById("revisionModeTabs");
+  const sameProductTab = document.getElementById("revisionSameProductTab");
+  const commonPartTab = document.getElementById("revisionCommonPartTab");
+  const sameProductPanel = document.getElementById("revisionSameProductPanel");
+  const commonPartPanel = document.getElementById("revisionCommonPartPanel");
   if (!operationSelect || !sourceSiteSelect || !productNameInput || !excelInput || !languageDatasheetInput
     || !targetsElement
     || !selectMatchedButton || !clearTargetsButton || !selectedCountElement || !previewButton
     || !submitButton || !statusElement || !outputElement || !folderInput || !folderGroup
     || !folderLabel || !productNameLabel || !excelLabel || !languageDatasheetLabel
     || !delistLabel || !delistProductsInput || !sourceSiteLabel || !languageHelp
-    || !targetsHeading || !targetsHelp) return;
+    || !targetsHeading || !targetsHelp || !revisionModeTabs || !sameProductTab || !commonPartTab
+    || !sameProductPanel || !commonPartPanel || !syncHeading || !syncDescription || !operationLabel) return;
 
   const languageNeedles = {
     hq: ["english"], us: ["english"], uk: ["english"], eu: ["english"],
@@ -64,6 +73,14 @@
   const currentMode = () => operationSelect.value;
   const isBatchPublishing = () => currentMode() === "publish-batch";
   const isDelisting = () => currentMode() === "delist";
+
+  function showRevisionPanel(panel) {
+    const common = panel === "common";
+    sameProductPanel.hidden = common;
+    commonPartPanel.hidden = !common;
+    sameProductTab.setAttribute("aria-selected", String(!common));
+    commonPartTab.setAttribute("aria-selected", String(common));
+  }
 
   function setStatus(message, type) {
     statusElement.textContent = message;
@@ -139,7 +156,8 @@
     const sourceCode = sourceSiteSelect.value;
     const targetSites = sites.filter((site) =>
       site.enabled !== false && (isDelisting() || isBatchPublishing() || site.siteCode !== sourceCode));
-    if (!isDelisting() && (!specificationHeaders.length || !languagePackageHeaders.length)) {
+    if (!isBatchPublishing() && !isDelisting()
+      && (!specificationHeaders.length || !languagePackageHeaders.length)) {
       targetsElement.textContent = "上传 Specification Excel 和语言包 Datasheet 后显示站点与语言列。";
       updateSelectedCount();
       return;
@@ -660,6 +678,15 @@
     invalidatePreview();
     const batch = isBatchPublishing();
     const delist = isDelisting();
+    const revision = currentMode() === "revision";
+    revisionModeTabs.hidden = !revision;
+    if (!revision) showRevisionPanel("same");
+    operationLabel.hidden = revision;
+    operationSelect.hidden = revision;
+    syncHeading.textContent = revision ? "同一产品跨国家修订" : "产品上架 / 下架";
+    syncDescription.textContent = revision
+      ? "将一个源站点中已有产品的 Product Description、Detail、Specification 和语言包同步到多个已存在该产品的目标站点。只修订，不复制新产品。"
+      : "批量上架从本地文件夹识别多个产品并逐站复制和更新资料；下架只关闭 Searchable 并将 Type of listing 设为 No Set Uptime。所有写操作都必须先预览。";
     folderLabel.hidden = !batch;
     folderGroup.hidden = !batch;
     productNameLabel.hidden = batch || delist;
@@ -691,6 +718,8 @@
         : "修订模式：只修改目标站点已经存在的产品。");
   }
   operationSelect.addEventListener("change", updateModeUi);
+  sameProductTab.addEventListener("click", () => showRevisionPanel("same"));
+  commonPartTab.addEventListener("click", () => showRevisionPanel("common"));
   productNameInput.addEventListener("input", invalidatePreview);
   delistProductsInput.addEventListener("input", invalidatePreview);
   folderInput.addEventListener("change", async () => {
@@ -810,7 +839,7 @@
       return;
     }
     const confirmed = window.confirm(isBatchPublishing()
-      ? `将批量上架 ${validatedPreview.productCount} 个产品，逐站复制并同步 Product Description、Detail、Specification 和语言包。确认继续？`
+      ? `将批量上架 ${validatedPreview.productCount} 个产品，逐国家站点同步 Product Description、Detail、Specification 和语言包。确认继续？`
       : isDelisting()
         ? `将执行 ${validatedPreview.readyCount} 项下架：取消 Searchable，并把 Type of listing 改为 No Set Uptime。确认继续？`
         : `将把 ${validatedPreview.source.site.name} 的产品 ${validatedPreview.productName} 同步到 ${validatedPreview.readyCount} 个目标站点。确认继续？`);

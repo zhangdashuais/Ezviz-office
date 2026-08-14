@@ -1,5 +1,11 @@
 function registerProductRevisionSyncRoutes(app, deps) {
-  const { upload, feature, batchFeature, delistingFeature, logLine } = deps;
+  const {
+    upload,
+    feature,
+    batchFeature,
+    delistingFeature,
+    logLine
+  } = deps;
 
   const excelArgs = (req) => {
     const specificationExcel = req.files?.specExcel?.[0];
@@ -30,20 +36,21 @@ function registerProductRevisionSyncRoutes(app, deps) {
     { name: "specExcel", maxCount: 1 },
     { name: "languageDatasheet", maxCount: 1 }
   ]);
-
   [
-    ["/api/product-revision-sync/preview", excelUpload, feature.preview, "产品修订同步预览", excelArgs, true],
-    ["/api/product-revision-sync/submit", excelUpload, feature.submit, "产品修订同步", excelArgs, true],
-    ["/api/product-revision/preview", upload.none(), feature.previewDirectRevision, "产品局部修订预览", delistingArgs, true],
-    ["/api/product-revision/submit", upload.none(), feature.submitDirectRevision, "产品局部修订", delistingArgs, true],
-    ["/api/product-publishing/preview", excelUpload, feature.previewPublishing, "产品上架预览", excelArgs, true],
-    ["/api/product-publishing/submit", excelUpload, feature.submitPublishing, "产品上架", excelArgs, true],
-    ["/api/product-publishing/batch-preview", upload.array("productFiles", 40), batchFeature.preview, "批量产品上架预览", batchArgs],
-    ["/api/product-publishing/batch-submit", upload.array("productFiles", 40), batchFeature.submit, "批量产品上架", batchArgs],
-    ["/api/product-delisting/preview", upload.none(), delistingFeature.preview, "产品下架预览", delistingArgs],
-    ["/api/product-delisting/submit", upload.none(), delistingFeature.submit, "产品下架", delistingArgs]
-  ].forEach(([path, middleware, operation, label, buildArgs, allowServerError]) => {
-    app.post(path, middleware, (req, res) =>
+    ["/api/product-revision-sync/preview", excelUpload, feature.preview, "product revision preview", excelArgs, true],
+    ["/api/product-revision-sync/submit", excelUpload, feature.submit, "product revision submit", excelArgs, true],
+    ["/api/product-revision/preview", upload.none(), feature.previewDirectRevision, "direct revision preview", delistingArgs, true],
+    ["/api/product-revision/submit", upload.none(), feature.submitDirectRevision, "direct revision submit", delistingArgs, true],
+    ["/api/product-revision/common-preview", upload.none(), feature.previewCommonRevision, "common revision preview", delistingArgs, true],
+    ["/api/product-revision/common-submit", upload.none(), feature.submitCommonRevision, "common revision submit", delistingArgs, true],
+    ["/api/product-publishing/preview", excelUpload, feature.previewPublishing, "product publishing preview", excelArgs, true],
+    ["/api/product-publishing/submit", excelUpload, feature.submitPublishing, "product publishing submit", excelArgs, true],
+    ["/api/product-publishing/batch-preview", upload.array("productFiles", 40), batchFeature.preview, "batch publishing preview", batchArgs],
+    ["/api/product-publishing/batch-submit", upload.array("productFiles", 40), batchFeature.submit, "batch publishing submit", batchArgs],
+    ["/api/product-delisting/preview", upload.none(), delistingFeature.preview, "product delisting preview", delistingArgs],
+    ["/api/product-delisting/submit", upload.none(), delistingFeature.submit, "product delisting submit", delistingArgs]
+  ].forEach(([route, middleware, operation, label, buildArgs, allowServerError]) => {
+    app.post(route, middleware, (req, res) =>
       handle(req, res, operation, label, buildArgs, allowServerError));
   });
 }

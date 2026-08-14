@@ -25,7 +25,9 @@ function setup() {
     submitPublishing: async (body) => {
       calls.push(["submitPublishing", body]);
       return { mode: "product-publishing-submit" };
-    }
+    },
+    previewCommonRevision: async () => ({ mode: "product-common-revision-preview" }),
+    submitCommonRevision: async () => ({ mode: "product-common-revision-submit" })
   };
   registerProductRevisionSyncRoutes(app, {
     upload,
@@ -72,4 +74,14 @@ test("product publishing routes use the copy-before-revision workflow", async ()
   assert.equal(submit.statusCode, 200);
   assert.equal(submit.body.result.mode, "product-publishing-submit");
   assert.deepEqual(calls.map(([name]) => name), ["previewPublishing", "submitPublishing"]);
+});
+
+test("common partial revision has dedicated routes instead of publishing batch routes", async () => {
+  const { routes } = setup();
+  const preview = await invoke(routes.get("/api/product-revision/common-preview"));
+  const submit = await invoke(routes.get("/api/product-revision/common-submit"));
+
+  assert.equal(preview.body.result.mode, "product-common-revision-preview");
+  assert.equal(submit.body.result.mode, "product-common-revision-submit");
+  assert.equal(routes.has("/api/product-revision/batch-preview"), false);
 });

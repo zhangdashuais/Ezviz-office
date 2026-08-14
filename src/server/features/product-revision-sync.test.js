@@ -12,13 +12,29 @@ const {
   internationalListSource,
   validateRevisionRequest,
   validateDirectRevision,
+  applyContentOperations,
   applySpecificationOperations,
+  buildCommonRevisionTargets,
   resolveProductDescription,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
   retryProductReadback,
   specificationTitleForSite
 } = require("./product-revision-sync");
+
+test("common product revision expands multiple countries and products into independent targets", () => {
+  const result = buildCommonRevisionTargets({
+    sites: ["de", "fr", "de"],
+    productNames: "CP8\nH9c"
+  }, [
+    { siteCode: "de", name: "Germany" },
+    { siteCode: "fr", name: "France" },
+    { siteCode: "it", name: "Italy", enabled: false }
+  ]);
+  assert.deepEqual(result.targets.map(({ site, productName }) => `${site.siteCode}:${productName}`), [
+    "de:CP8", "de:H9c", "fr:CP8", "fr:H9c"
+  ]);
+});
 
 test("retries stale product readback without resubmitting the save", async () => {
   let reads = 0;
@@ -51,6 +67,28 @@ test("direct product revision validates Detail and applies delete/replace operat
   assert.deepEqual(result.results.map((item) => item.matchCount), [1, 1]);
 });
 
+test("Specification frame-rate deletion preserves the site's remaining text", () => {
+  const request = validateDirectRevision({
+    revisionType: "specification",
+    siteCode: "de",
+    productName: "H1c",
+    specificationOperations: [{ type: "delete-frame-rate" }]
+  });
+  const result = applySpecificationOperations(
+    "<td>Max:25fps; Selbstanpassend bei Netzwerkübertragung</td>"
+      + "<td>Max. 15 fps；テキスト</td>",
+    request.operations
+  );
+  assert.equal(result.value, "<td>Selbstanpassend bei Netzwerkübertragung</td><td>テキスト</td>");
+  assert.equal(result.results[0].matchCount, 2);
+  assert.throws(() => validateDirectRevision({
+    revisionType: "detail",
+    siteCode: "de",
+    productName: "H1c",
+    detailOperations: [{ type: "delete-frame-rate" }]
+  }), /只允许用于 Specification/);
+});
+
 test("Detail and Specification direct revisions validate independently", () => {
   const detail = validateDirectRevision({
     revisionType: "detail", siteCode: "de", productName: "CP8", detailHtml: "<main>new</main>"
@@ -63,6 +101,20 @@ test("Detail and Specification direct revisions validate independently", () => {
   });
   assert.equal(specification.revisionType, "specification");
   assert.equal(specification.detailHtml, "");
+});
+
+test("different products can share one exact Detail operation", () => {
+  const request = validateDirectRevision({
+    revisionType: "detail",
+    siteCode: "de",
+    productName: "CP8",
+    detailOperations: [{ type: "replace", targetText: "OLD BLOCK", replacementText: "NEW BLOCK" }]
+  });
+  const result = applyContentOperations("before OLD BLOCK after", request.operations, "Detail");
+
+  assert.equal(request.detailHtml, "");
+  assert.equal(result.value, "before NEW BLOCK after");
+  assert.equal(result.results[0].matchCount, 1);
 });
 
 test("reads both singular and plural Specification custom field names", () => {
@@ -91,6 +143,31 @@ test("reads the exact Japanese Specification custom field name", () => {
   ]);
   assert.equal(field.name, "\u4ed5\u69d8");
   assert.equal(field.value, "Japanese specifications");
+});
+
+test("reads the legacy Specs custom field name", () => {
+  const field = findSpecificationDetailField([
+    { name: "Overview", value: "Overview" },
+    { name: "Specs", value: "Legacy specifications" }
+  ]);
+  assert.equal(field.name, "Specs");
+  assert.equal(field.value, "Legacy specifications");
+});
+
+test("reads a localized Specification custom field name", () => {
+  const field = findSpecificationDetailField([
+    { name: "Resumen", value: "Resumen" },
+    { name: "Especificaciones", value: "Max: 25fps; texto local" }
+  ]);
+  assert.equal(field.name, "Especificaciones");
+});
+
+test("falls back to the only custom field containing a Max fps fragment", () => {
+  const field = findSpecificationDetailField([
+    { name: "未知字段", value: "普通内容" },
+    { name: "本地规格标题", value: "Max: 15fps；保留本地文字" }
+  ]);
+  assert.equal(field.name, "本地规格标题");
 });
 
 test("product snapshot stability changes when asynchronously loaded Detail changes", () => {

@@ -1,4 +1,30 @@
 const crypto = require("crypto");
+const {
+  inspectTargetField,
+  inspectTargetFieldNative,
+  targetRevisionFingerprint,
+  writeTargetFieldUpdateNative
+} = require("./language-package-targeted-edit");
+const {
+  parseLanguageDatasheet,
+  readLanguagePackage,
+  planLanguagePackageUpdates,
+  writeUpdatedLanguagePackageNative
+} = require("./language-package-workbook");
+
+const SITE_LANGUAGE_NEEDLES = {
+  hq: ["english"], us: ["english"], uk: ["english"], eu: ["english"],
+  ca: ["english"], au: ["english"], in: ["english"], my: ["english"], af: ["english"],
+  cis: ["russian"], de: ["german", "deutsch"], fr: ["french", "france"],
+  be: ["french", "france"], it: ["italian", "italiano"], es: ["spanish-", "espanol"],
+  pl: ["polish", "polski"], cz: ["czech"], nl: ["dutch", "nederlands"],
+  tr: ["turkish"], ro: ["romanian"], th: ["thai"], vn: ["vietnamese"],
+  jp: ["japanese"], kr: ["korean"], id: ["indonesian", "indonesia"],
+  br: ["brazilian portuguese", "portuguese - brazil"],
+  la: ["spanish(latin)", "latin america"], arg: ["spanish(latin)", "latin america"],
+  ar: ["arabic"], sa: ["arabic"], cn: ["chinese", "繁体中文", "简体中文"]
+};
+const ENGLISH_SOURCE_HEADER = "English (Source)";
 
 function createLanguagePackageFeature(deps) {
   const {
@@ -653,12 +679,367 @@ async function submitLanguagePackageToBackend(body, files, logs) {
   };
 }
 
+function requestedSites(config, body) {
+  let codes = body?.sites;
+  if (typeof codes === "string") {
+    try { codes = JSON.parse(codes); }
+    catch { codes = codes.split(",").map((item) => item.trim()).filter(Boolean); }
+  }
+  const selected = new Set(Array.isArray(codes) ? codes.map(String) : []);
+  return (config.sites || [])
+    .filter((site) => site.enabled !== false)
+    .filter((site) => !selected.size || selected.has(site.siteCode));
+}
+
+function expectedFingerprints(body) {
+  if (!body?.expectedFingerprints) return {};
+  if (typeof body.expectedFingerprints === "object") return body.expectedFingerprints;
+  try { return JSON.parse(body.expectedFingerprints); }
+  catch { throw new Error("语言包预览指纹格式不正确，请重新预览。"); }
+}
+
+function parseDatasheetTargets(body, sites, parsedDatasheet) {
+  let requested = body?.targets;
+  if (typeof requested === "string") {
+    try { requested = JSON.parse(requested); }
+    catch { throw new Error("站点与 Datasheet 语言列映射格式不正确。"); }
+  }
+  if (!Array.isArray(requested) || !requested.length) {
+    throw new Error("请至少选择一个站点及其 Datasheet 语言列。");
+  }
+  const requestedCodes = requested.map((target) => String(target?.siteCode || "").trim());
+  if (new Set(requestedCodes).size !== requestedCodes.length) {
+    throw new Error("站点不能重复选择。");
+  }
+  const siteByCode = new Map(sites.map((site) => [site.siteCode, site]));
+  return requested.map((target) => {
+    const siteCode = String(target?.siteCode || "").trim();
+    const site = siteByCode.get(siteCode);
+    if (!site) throw new Error(`站点不存在或未启用：${siteCode}`);
+    let header = String(target?.languagePackageHeader || "").trim();
+    if (!header) {
+      const needles = SITE_LANGUAGE_NEEDLES[siteCode] || [siteCode];
+      const matches = parsedDatasheet.headers.filter((candidate) => {
+        const normalized = candidate.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        return needles.some((needle) => normalized.includes(needle));
+      });
+      if (matches.length !== 1) {
+        throw new Error(`${siteCode} 无法唯一匹配 Datasheet 语言列，请手工选择。`);
+      }
+      [header] = matches;
+    }
+    const exactHeader = parsedDatasheet.headers.find(
+      (candidate) => candidate.toLowerCase() === header.toLowerCase()
+    );
+    if (!exactHeader) throw new Error(`${siteCode} 的 Datasheet 语言列不存在：${header}`);
+    return { site, languagePackageHeader: exactHeader };
+  });
+}
+
+function summarizeDatasheetPlan(plan) {
+  return {
+    translationHeader: plan.translationHeader,
+    requestedCount: plan.requestedCount,
+    matchedFieldCount: plan.matchedFieldCount,
+    changedCellCount: plan.changedCellCount,
+    unchangedCellCount: plan.unchangedCellCount,
+    appendedFieldCount: plan.newFields.length,
+    skippedBlankCount: plan.skippedBlankCount,
+    missing: plan.missing,
+    sourceMismatches: plan.sourceMismatches,
+    updates: plan.updates.slice(0, 100).map((item) => ({
+      key: item.key,
+      sheetName: item.sheetName,
+      rowNumber: item.rowNumber,
+      before: item.current,
+      after: item.translation
+    }))
+  };
+}
+
+function inspectLanguageDatasheet(file) {
+  if (!file?.path) throw new Error("请上传单产品 Datasheet。");
+  const parsed = parseStandaloneDatasheet(file.path);
+  return {
+    sheetName: parsed.sheetName,
+    fingerprint: parsed.fingerprint,
+    headers: parsed.headers,
+    fieldCount: parsed.rows.length
+  };
+}
+
+function parseStandaloneDatasheet(filePath) {
+  const parsed = parseLanguageDatasheet(filePath);
+  return {
+    ...parsed,
+    headers: [ENGLISH_SOURCE_HEADER, ...parsed.headers],
+    rows: parsed.rows.map((row) => ({
+      ...row,
+      translations: {
+        [ENGLISH_SOURCE_HEADER]: row.source,
+        ...row.translations
+      }
+    }))
+  };
+}
+
+async function reviseFromDatasheet(body, file, logs, submit = false) {
+  if (!file?.path) throw new Error("请上传单产品 Datasheet。");
+  const parsedDatasheet = parseStandaloneDatasheet(file.path);
+  if (submit && body?.expectedDatasheetFingerprint !== parsedDatasheet.fingerprint) {
+    throw new Error("Datasheet 与预览时不一致，请重新预览。");
+  }
+  const config = readCampaignConfig();
+  const enabledSites = (config.sites || []).filter((site) => site.enabled !== false);
+  const targets = parseDatasheetTargets(body, enabledSites, parsedDatasheet);
+  const fingerprints = expectedFingerprints(body);
+  const results = [];
+  const runDir = path.resolve(
+    "outputs",
+    "language-package-datasheet",
+    new Date().toISOString().replace(/[:.]/g, "-")
+  );
+  if (submit) fs.mkdirSync(runDir, { recursive: true });
+
+  for (const target of targets) {
+    let downloaded = null;
+    let verification = null;
+    let uploaded = false;
+    let originalFingerprint = "";
+    try {
+      const session = await prepareLanguagePage({
+        ...body,
+        sites: JSON.stringify([target.site.siteCode])
+      }, logs);
+      downloaded = await downloadCurrentLanguagePackageForPage(
+        session.page,
+        target.site,
+        logs
+      );
+      const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+      originalFingerprint = packageInfo.contentFingerprint;
+      const plan = planLanguagePackageUpdates(
+        packageInfo,
+        parsedDatasheet,
+        target.languagePackageHeader
+      );
+      const changed = plan.changedCellCount + plan.newFields.length;
+      if (!submit || !changed) {
+        results.push({
+          status: changed ? "ready" : "no-change",
+          site: target.site,
+          fingerprint: packageInfo.contentFingerprint,
+          plan: summarizeDatasheetPlan(plan)
+        });
+        continue;
+      }
+      if (fingerprints[target.site.siteCode] !== packageInfo.contentFingerprint) {
+        throw new Error("站点语言包已在预览后变化，请重新预览。");
+      }
+
+      const extension = path.extname(downloaded.fileName).toLowerCase() || ".xlsx";
+      const originalPath = path.join(runDir, `${target.site.siteCode}-before${extension}`);
+      const modifiedPath = path.join(runDir, `${target.site.siteCode}-after${extension}`);
+      fs.copyFileSync(downloaded.filePath, originalPath);
+      const generated = writeUpdatedLanguagePackageNative(
+        downloaded.filePath,
+        packageInfo,
+        parsedDatasheet,
+        plan,
+        modifiedPath
+      );
+      await uploadLanguagePackageForPage(session.page, {
+        ...generated,
+        fileName: downloaded.fileName,
+        langCode: downloaded.langCode
+      }, logs);
+      uploaded = true;
+      verification = await downloadCurrentLanguagePackageForPage(
+        session.page,
+        target.site,
+        logs
+      );
+      const verifiedInfo = readLanguagePackage(verification.filePath, verification.langCode);
+      const verifiedPlan = planLanguagePackageUpdates(
+        verifiedInfo,
+        parsedDatasheet,
+        target.languagePackageHeader
+      );
+      if (verifiedPlan.changedCellCount || verifiedPlan.missing.length) {
+        throw new Error("上传后回读仍有未更新字段。");
+      }
+      results.push({
+        status: "updated",
+        site: target.site,
+        fingerprint: packageInfo.contentFingerprint,
+        verifiedFingerprint: verifiedInfo.contentFingerprint,
+        plan: summarizeDatasheetPlan(plan)
+      });
+    } catch (error) {
+      let rollback = null;
+      if (submit && uploaded && downloaded?.filePath) {
+        try {
+          const context = await getShopContext();
+          const page = await getOpenPage(context);
+          await uploadLanguagePackageForPage(page, {
+            filePath: downloaded.filePath,
+            fileName: downloaded.fileName,
+            langCode: downloaded.langCode
+          }, logs);
+          const restored = await downloadCurrentLanguagePackageForPage(page, target.site, logs);
+          try {
+            rollback = readLanguagePackage(restored.filePath, restored.langCode).contentFingerprint
+              === originalFingerprint ? "passed" : "FAILED: 恢复后语言包内容不一致";
+          } finally {
+            fs.rmSync(restored.filePath, { force: true });
+          }
+        } catch (rollbackError) {
+          rollback = `FAILED: ${rollbackError.message}`;
+        }
+      }
+      results.push({
+        status: "failed",
+        site: target.site,
+        languagePackageHeader: target.languagePackageHeader,
+        error: error.message || String(error),
+        rollback
+      });
+    } finally {
+      if (downloaded?.filePath) fs.rmSync(downloaded.filePath, { force: true });
+      if (verification?.filePath) fs.rmSync(verification.filePath, { force: true });
+    }
+  }
+
+  return {
+    mode: submit ? "submit" : "preview",
+    datasheet: inspectLanguageDatasheet(file),
+    runDir: submit ? runDir : "",
+    sites: results
+  };
+}
+
+async function reviseHg24004(body, logs, submit = false) {
+  const config = readCampaignConfig();
+  const sites = requestedSites(config, body);
+  const fingerprints = expectedFingerprints(body);
+  const results = [];
+  const runDir = path.resolve("outputs", "language-package-hg2-400-4", new Date().toISOString().replace(/[:.]/g, "-"));
+  if (submit) fs.mkdirSync(runDir, { recursive: true });
+  for (const site of sites) {
+    let downloaded = null;
+    let verification = null;
+    let uploaded = false;
+    let originalValue = "";
+    try {
+      const session = await prepareLanguagePage({
+        ...body,
+        sites: JSON.stringify([site.siteCode])
+      }, logs);
+      const rowInfo = await findLanguageRow(session.page, site.siteCode);
+      downloaded = {
+        ...await downloadLanguagePackage(session.page, rowInfo, logs),
+        langCode: String(rowInfo.langCode || "").trim()
+          || inferLangCodeFromFile({ originalname: rowInfo.rowText })
+      };
+      if (!downloaded.langCode) {
+        throw new Error("无法从语言行识别 lang_code，停止上传。");
+      }
+      let inspected;
+      try { inspected = inspectTargetField(downloaded.filePath); }
+      catch { inspected = inspectTargetFieldNative(downloaded.filePath); }
+      originalValue = inspected.before;
+      const status = inspected.blank ? "blank" : inspected.changed ? "ready" : "no-target-text";
+      if (!submit || status !== "ready") {
+        results.push({
+          site: { name: site.name, siteCode: site.siteCode },
+          status,
+          fingerprint: targetRevisionFingerprint(inspected),
+          sheetName: inspected.sheetName,
+          rowNumber: inspected.rowNumber,
+          before: inspected.before,
+          after: inspected.after
+        });
+        continue;
+      }
+      const currentFingerprint = targetRevisionFingerprint(inspected);
+      if (!fingerprints[site.siteCode] || fingerprints[site.siteCode] !== currentFingerprint) {
+        throw new Error("语言包已在预览后变化，请重新预览该站点。");
+      }
+      const extension = path.extname(downloaded.fileName).toLowerCase() || ".xlsx";
+      const originalPath = path.join(runDir, `${site.siteCode}-before${extension}`);
+      const modifiedPath = path.join(runDir, `${site.siteCode}-after${extension}`);
+      fs.copyFileSync(downloaded.filePath, originalPath);
+      writeTargetFieldUpdateNative(downloaded.filePath, modifiedPath);
+      await uploadLanguagePackageForPage(session.page, {
+        filePath: modifiedPath,
+        fileName: downloaded.fileName,
+        langCode: downloaded.langCode
+      }, logs);
+      uploaded = true;
+      verification = await downloadCurrentLanguagePackageForPage(session.page, site, logs);
+      let verified;
+      try { verified = inspectTargetField(verification.filePath); }
+      catch { verified = inspectTargetFieldNative(verification.filePath); }
+      if (verified.before !== inspected.after || verified.changed) {
+        throw new Error(`上传后回读不一致，实际 E 列为“${verified.before}”。`);
+      }
+      results.push({
+        site: { name: site.name, siteCode: site.siteCode },
+        status: "updated",
+        before: inspected.before,
+        after: inspected.after,
+        fingerprint: currentFingerprint,
+        verifiedFingerprint: targetRevisionFingerprint(verified)
+      });
+    } catch (error) {
+      let rollback = null;
+      if (submit && uploaded && downloaded?.filePath) {
+        try {
+          const context = await getShopContext();
+          const page = await getOpenPage(context);
+          await uploadLanguagePackageForPage(page, {
+            filePath: downloaded.filePath,
+            fileName: downloaded.fileName,
+            langCode: downloaded.langCode
+          }, logs);
+          const restored = await downloadCurrentLanguagePackageForPage(page, site, logs);
+          let restoredInspection;
+          try { restoredInspection = inspectTargetField(restored.filePath); }
+          catch { restoredInspection = inspectTargetFieldNative(restored.filePath); }
+          const restoredValue = restoredInspection.before;
+          rollback = restoredValue === originalValue
+            ? "passed"
+            : `FAILED: 恢复后 E 列为“${restoredValue}”`;
+          fs.rmSync(restored.filePath, { force: true });
+        } catch (rollbackError) {
+          rollback = `FAILED: ${rollbackError.message}`;
+        }
+      }
+      results.push({
+        site: { name: site.name, siteCode: site.siteCode },
+        status: "failed",
+        error: error.message || String(error),
+        rollback
+      });
+    } finally {
+      if (downloaded?.filePath) fs.rmSync(downloaded.filePath, { force: true });
+      if (verification?.filePath) fs.rmSync(verification.filePath, { force: true });
+    }
+  }
+  return { mode: submit ? "submit" : "preview", fieldKey: "HG2_400_4", sites: results, runDir: submit ? runDir : "" };
+}
+
   return {
     probeLanguagePackageUpload,
     submitLanguagePackageToBackend,
     roundTripLanguagePackage,
     downloadCurrentLanguagePackageForPage,
-    uploadLanguagePackageForPage
+    uploadLanguagePackageForPage,
+    inspectLanguageDatasheet,
+    previewFromDatasheet: (body, file, logs) => reviseFromDatasheet(body, file, logs, false),
+    submitFromDatasheet: (body, file, logs) => reviseFromDatasheet(body, file, logs, true),
+    previewHg24004: (body, logs) => reviseHg24004(body, logs, false),
+    submitHg24004: (body, logs) => reviseHg24004(body, logs, true)
   };
 }
 

@@ -49,6 +49,8 @@
 
   function copySheet(source, target, keptColumns) {
     const columnMap = new Map(keptColumns.map((column, index) => [column + 1, index + 1]));
+    const rowMap = new Map();
+    let targetRowNumber = 0;
     keptColumns.forEach((sourceColumn, targetIndex) => {
       const sourceCol = source.getColumn(sourceColumn + 1);
       const targetCol = target.getColumn(targetIndex + 1);
@@ -57,7 +59,14 @@
       targetCol.outlineLevel = sourceCol.outlineLevel;
     });
     source.eachRow({ includeEmpty: true }, (sourceRow, rowNumber) => {
-      const targetRow = target.getRow(rowNumber);
+      const values = keptColumns.map((sourceColumn) => sourceRow.getCell(sourceColumn + 1).text);
+      if (rules.isStatusRow(values)) {
+        rowMap.set(rowNumber, null);
+        return;
+      }
+      targetRowNumber += 1;
+      rowMap.set(rowNumber, targetRowNumber);
+      const targetRow = target.getRow(targetRowNumber);
       targetRow.height = sourceRow.height;
       targetRow.hidden = sourceRow.hidden;
       targetRow.outlineLevel = sourceRow.outlineLevel;
@@ -75,7 +84,10 @@
       const start = source.getCell(`${match[1]}${match[2]}`).col;
       const end = source.getCell(`${match[3]}${match[4]}`).col;
       if (!columnMap.has(start) || !columnMap.has(end)) return;
-      target.mergeCells(Number(match[2]), columnMap.get(start), Number(match[4]), columnMap.get(end));
+      const mappedStart = rowMap.get(Number(match[2]));
+      const mappedEnd = rowMap.get(Number(match[4]));
+      if (!mappedStart || !mappedEnd) return;
+      target.mergeCells(mappedStart, columnMap.get(start), mappedEnd, columnMap.get(end));
     });
     target.views = structuredClone(source.views || []);
     target.pageSetup = structuredClone(source.pageSetup || {});

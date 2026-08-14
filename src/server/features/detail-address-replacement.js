@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const { parseProductNames } = require("./product-replacement");
 
 function countOccurrences(text, target) {
@@ -130,57 +132,148 @@ function validateAddressPair(oldAddress, newAddress, label) {
 }
 
 function isAlbumPath(path) {
-  return /(?:^|\.)(?:[^.[\]]*(?:album|gallery)[^.[\]]*)(?=$|[.\[])/i.test(String(path || ""))
-    && !/(?:^|[.\[])pcView(?:$|[.\]])/i.test(String(path || ""));
+  const value = String(path || "");
+  return !/(?:^|[.\[])pcView(?:$|[.\]])/i.test(value)
+    && /(?:^|\.)(?:[^.[\]]*(?:album|gallery|master(?:pic|image)|(?:pic|image)(?:hd|high|original|large|big)|(?:hd|high|original|large|big)(?:pic|image)|product(?:pic|image)|(?:pic|image|img)s?(?:list)?)[^.[\]]*)(?=$|[.\[])/i.test(value);
 }
 
-function collectAlbumImageMatches(value, target, path = "vm", matches = []) {
+function matchesAlbumBinding(pathText, modelPaths) {
+  return (modelPaths || []).some((modelPath) =>
+    pathText === modelPath || pathText.startsWith(`${modelPath}.`) || pathText.startsWith(`${modelPath}[`));
+}
+
+function collectAlbumImageEntries(value, pathText = "vm", entries = [], modelPaths = []) {
+  if (typeof value === "string") {
+    if ((isAlbumPath(pathText) || matchesAlbumBinding(pathText, modelPaths))
+      && /^(?:https?:)?\/\//i.test(value.trim())) {
+      entries.push({ path: pathText, value: value.trim() });
+    }
+    return entries;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectAlbumImageEntries(item, `${pathText}[${index}]`, entries, modelPaths));
+    return entries;
+  }
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, item]) =>
+      collectAlbumImageEntries(item, `${pathText}.${key}`, entries, modelPaths));
+  }
+  return entries;
+}
+
+function selectAlbumImageEntry(viewModel, modelPaths = []) {
+  const entries = collectAlbumImageEntries(viewModel, "vm", [], modelPaths);
+  const bound = entries.filter((entry) => matchesAlbumBinding(entry.path, modelPaths));
+  const scoped = bound.length ? bound : entries;
+  const preferred = scoped.filter((entry) => /(?:hd|high|original|large|big|master)/i.test(entry.path));
+  const candidates = preferred.length ? preferred : scoped;
+  if (candidates.length !== 1) {
+    throw new Error(
+      candidates.length
+        ? `Product Album 高清图字段不唯一，共找到 ${candidates.length} 个候选，请检查产品编辑页。`
+        : "产品编辑页没有找到 Product Album 高清图地址。"
+    );
+  }
+  return candidates[0];
+}
+
+function validateAlbumImageSource(rawSource, productName) {
+  const input = String(rawSource || "").trim();
+  if (!input) return null;
+  if (/^https?:\/\//i.test(input)) {
+    let parsed;
+    try {
+      parsed = new URL(input);
+    } catch {
+      throw new Error(`${productName} 的 Product Album 高清图地址无效。`);
+    }
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+      throw new Error(`${productName} 的 Product Album 高清图必须使用无账号信息的 HTTPS 地址。`);
+    }
+    if (parsed.port && parsed.port !== "443") {
+      throw new Error(`${productName} 的 Product Album 高清图地址只允许使用 HTTPS 默认端口。`);
+    }
+    return {
+      type: "replace-album-image-source",
+      label: "Product Album 高清图",
+      sourceType: parsed.hostname.toLowerCase() === "mfs.ezvizlife.com" ? "mfs-url" : "remote-url",
+      imageSource: parsed.href
+    };
+  }
+  if (!path.isAbsolute(input)) {
+    throw new Error(`${productName} 的 Product Album 高清图必须填写本机绝对路径或 HTTPS 图片地址。`);
+  }
+  const filePath = path.resolve(input);
+  if (!/\.(?:jpe?g|png|webp)$/i.test(filePath)) {
+    throw new Error(`${productName} 的 Product Album 高清图必须是 jpg、jpeg、png 或 webp 文件。`);
+  }
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    throw new Error(`${productName} 的 Product Album 高清图不存在：${filePath}`);
+  }
+  return {
+    type: "replace-album-image-source",
+    label: "Product Album 高清图",
+    sourceType: "local-file",
+    imageSource: filePath
+  };
+}
+
+function isAlbumImageIndex(path, imageIndex) {
+  return !imageIndex || String(path).includes(`[${imageIndex - 1}]`);
+}
+
+function collectAlbumImageMatches(value, target, path = "vm", matches = [], imageIndex = 0, fieldPath = "") {
   if (!target) return matches;
   if (typeof value === "string") {
-    const count = isAlbumPath(path) ? countOccurrences(value, target) : 0;
+    const count = (fieldPath ? path === fieldPath : isAlbumPath(path) && isAlbumImageIndex(path, imageIndex))
+      ? countOccurrences(value, target)
+      : 0;
     if (count) matches.push({ path, count });
     return matches;
   }
   if (Array.isArray(value)) {
     value.forEach((item, index) =>
-      collectAlbumImageMatches(item, target, `${path}[${index}]`, matches));
+      collectAlbumImageMatches(item, target, `${path}[${index}]`, matches, imageIndex, fieldPath));
     return matches;
   }
   if (value && typeof value === "object") {
     Object.entries(value).forEach(([key, item]) =>
-      collectAlbumImageMatches(item, target, `${path}.${key}`, matches));
+      collectAlbumImageMatches(item, target, `${path}.${key}`, matches, imageIndex, fieldPath));
   }
   return matches;
 }
 
-function replaceAlbumImage(value, targetText, replacementText, path = "vm") {
+function replaceAlbumImage(value, targetText, replacementText, path = "vm", imageIndex = 0, fieldPath = "") {
   if (typeof value === "string") {
-    return isAlbumPath(path) ? value.split(targetText).join(replacementText) : value;
+    return (fieldPath ? path === fieldPath : isAlbumPath(path) && isAlbumImageIndex(path, imageIndex))
+      ? value.split(targetText).join(replacementText)
+      : value;
   }
   if (Array.isArray(value)) {
     return value.map((item, index) =>
-      replaceAlbumImage(item, targetText, replacementText, `${path}[${index}]`));
+      replaceAlbumImage(item, targetText, replacementText, `${path}[${index}]`, imageIndex, fieldPath));
   }
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        replaceAlbumImage(item, targetText, replacementText, `${path}.${key}`)
+        replaceAlbumImage(item, targetText, replacementText, `${path}.${key}`, imageIndex, fieldPath)
       ])
     );
   }
   return value;
 }
 
-function buildAlbumImageReplacement(viewModel, targetText, replacementText) {
-  const oldMatches = collectAlbumImageMatches(viewModel, targetText);
-  const existingNewMatches = collectAlbumImageMatches(viewModel, replacementText);
+function buildAlbumImageReplacement(viewModel, targetText, replacementText, imageIndex = 0, fieldPath = "") {
+  const oldMatches = collectAlbumImageMatches(viewModel, targetText, "vm", [], imageIndex, fieldPath);
+  const existingNewMatches = collectAlbumImageMatches(viewModel, replacementText, "vm", [], imageIndex, fieldPath);
   return {
     oldMatches,
     existingNewMatches,
     matchCount: oldMatches.reduce((sum, item) => sum + item.count, 0),
     existingNewCount: existingNewMatches.reduce((sum, item) => sum + item.count, 0),
-    updatedViewModel: replaceAlbumImage(viewModel, targetText, replacementText)
+    updatedViewModel: replaceAlbumImage(viewModel, targetText, replacementText, "vm", imageIndex, fieldPath)
   };
 }
 
@@ -192,7 +285,10 @@ function validateAlbumReplacement(albumReplacement, productName) {
     albumReplacement?.newAddress ?? albumReplacement?.New_Album_Image ?? ""
   ).trim();
   const rawIndex = String(
-    albumReplacement?.index ?? albumReplacement?.Album_Image_Index ?? ""
+    albumReplacement?.index
+      ?? albumReplacement?.albumImageIndex
+      ?? albumReplacement?.Album_Image_Index
+      ?? ""
   ).trim();
   if (!targetText && !replacementText && !rawIndex) return null;
   if (!targetText || !replacementText) {
@@ -276,8 +372,8 @@ function normalizeBatchItem(item, index) {
     );
     if (operation) operations.push(operation);
   });
-  const albumOperation = validateAlbumReplacement(
-    item?.albumReplacement ?? item,
+  const albumOperation = validateAlbumImageSource(
+    item?.productAlbumImage ?? item?.Product_Album_Image ?? item?.productAlbumImagePath ?? item?.Product_Album_Image_Path,
     productName
   );
   if (albumOperation) operations.push(albumOperation);
@@ -308,7 +404,9 @@ function validateRequest(body) {
   }
 
   const productNames = parseProductNames(body?.productNames ?? body?.productName);
-  const operation = body?.operation === "delete" ? "delete" : "replace";
+  const operation = ["delete", "replace-album-image-source"].includes(body?.operation)
+    ? body.operation
+    : "replace";
   const rawTargetText = String(body?.targetText ?? body?.codeBlock ?? body?.oldUrl ?? "");
   const targetText = operation === "delete" ? rawTargetText : rawTargetText.trim();
   const replacementText = operation === "delete"
@@ -327,6 +425,9 @@ function validateRequest(body) {
       targetText,
       replacementText: ""
     };
+  } else if (operation === "replace-album-image-source") {
+    operationConfig = validateAlbumImageSource(body?.productAlbumImage, "手工模式");
+    if (!operationConfig) throw new Error("请填写 Product Album 高清图本机路径或 HTTPS 地址。");
   } else {
     operationConfig = validateAddressPair(targetText, replacementText, "地址替换");
     if (!operationConfig) throw new Error("请填写被替换地址和替换后地址。");
@@ -405,7 +506,9 @@ function planAlbumOperations(viewModel, operations) {
     const analysis = buildAlbumImageReplacement(
       updatedViewModel,
       operation.targetText,
-      operation.replacementText
+      operation.replacementText,
+      operation.imageIndex,
+      operation.fieldPath
     );
     updatedViewModel = analysis.updatedViewModel;
     return {
@@ -424,14 +527,39 @@ function planAlbumOperations(viewModel, operations) {
   };
 }
 
+function planAlbumFileOperations(viewModel, operations, albumModelPaths = []) {
+  const steps = operations.map((operation) => {
+    const target = selectAlbumImageEntry(viewModel, albumModelPaths);
+    return {
+      ...operation,
+      targetText: target.value,
+      replacementText: "",
+      fieldPath: target.path,
+      matchingMode: "product-album-field",
+      matchCount: 1,
+      matches: [{ path: target.path, count: 1 }],
+      existingNewCount: 0,
+      expectedNewCount: 1
+    };
+  });
+  return { steps, matchCount: steps.length };
+}
+
 function planProductOperations(snapshot, operations) {
-  const detailOperations = operations.filter((operation) => operation.type !== "replace-album-image");
+  const detailOperations = operations.filter((operation) =>
+    !["replace-album-image", "replace-album-image-source"].includes(operation.type));
   const albumOperations = operations.filter((operation) => operation.type === "replace-album-image");
+  const albumFileOperations = operations.filter((operation) => operation.type === "replace-album-image-source");
   const detailPlan = planDetailOperations(snapshot.pcView, detailOperations);
   const albumPlan = planAlbumOperations(snapshot.viewModel, albumOperations);
+  const albumFilePlan = planAlbumFileOperations(
+    snapshot.viewModel,
+    albumFileOperations,
+    snapshot.albumModelPaths
+  );
   return {
-    steps: [...detailPlan.steps, ...albumPlan.steps],
-    matchCount: detailPlan.matchCount + albumPlan.matchCount
+    steps: [...detailPlan.steps, ...albumPlan.steps, ...albumFilePlan.steps],
+    matchCount: detailPlan.matchCount + albumPlan.matchCount + albumFilePlan.matchCount
   };
 }
 
@@ -443,18 +571,36 @@ function createDetailAddressReplacementFeature(deps) {
   const {
     logLine,
     readCampaignConfig,
+    getCampaignSites,
     requireSingleCampaignSite,
     getShopContext,
     getOpenPage,
     ensureShopLoggedIn,
     credentialDomainForSite,
-    openProductEditorByName
+    openProductEditorByName,
+    resolveAlbumImageSource
   } = deps;
 
   function requestBodyForSite(body) {
     return body?.sites || !body?.siteCode
       ? (body || {})
       : { ...(body || {}), sites: [String(body.siteCode).trim()] };
+  }
+
+  function selectedSites(body) {
+    const raw = body?.sites ?? body?.siteCode;
+    const codes = (Array.isArray(raw) ? raw : String(raw || "").split(","))
+      .map((value) => String(value || "").trim().toLowerCase())
+      .filter(Boolean);
+    if (!codes.length) throw new Error("请选择国家站点。");
+    const allSites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
+    const byCode = new Map(allSites.map((site) => [site.siteCode.toLowerCase(), site]));
+    const unique = [...new Set(codes)];
+    const sites = unique.map((code) => byCode.get(code));
+    if (sites.some((site) => !site)) {
+      throw new Error(`目标站点不存在或未启用：${unique.find((code) => !byCode.has(code))}。`);
+    }
+    return sites;
   }
 
   async function prepareSession(body, logs) {
@@ -495,12 +641,27 @@ function createDetailAddressReplacementFeature(deps) {
     }, null, { timeout: 30000 });
     const snapshot = await page.evaluate(() => {
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
+      const albumModelPaths = [];
+      const labels = [...document.querySelectorAll("label, th, td, span, div")]
+        .filter((element) => /^product\s+album\s*[:：*]?$/i.test((element.textContent || "").trim()));
+      labels.forEach((label) => {
+        const container = label.closest("tr, .form-group, .control-group, .row") || label.parentElement;
+        [container, ...(container?.querySelectorAll("*") || [])].filter(Boolean).forEach((element) => {
+          [...element.attributes].forEach((attribute) => {
+            const paths = attribute.value.match(/\bvm(?:\.[A-Za-z_$][\w$]*|\[\d+\])+/g) || [];
+            paths.forEach((modelPath) => {
+              if (!albumModelPaths.includes(modelPath)) albumModelPaths.push(modelPath);
+            });
+          });
+        });
+      });
       scope.vm.tabNav.moveTo(2);
       (scope.$root || scope).$applyAsync?.();
       return {
         goodsId: String(scope.goodsId),
         viewModel: JSON.parse(JSON.stringify(scope.vm || {})),
-        pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {}))
+        pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {})),
+        albumModelPaths
       };
     });
     return { editInfo, ...snapshot };
@@ -528,10 +689,14 @@ function createDetailAddressReplacementFeature(deps) {
           return value;
         }
         function updateAlbum(value, path = "vm") {
-          const isAlbumPath = /(?:^|\.)(?:[^.[\]]*(?:album|gallery)[^.[\]]*)(?=$|[.\[])/i.test(path)
-            && !/(?:^|[.\[])pcView(?:$|[.\]])/i.test(path);
+          const isAlbumPath = operation.fieldPath
+            ? path === operation.fieldPath
+            : /(?:^|\.)(?:[^.[\]]*(?:album|gallery)[^.[\]]*)(?=$|[.\[])/i.test(path)
+              && !/(?:^|[.\[])pcView(?:$|[.\]])/i.test(path);
+          const isSelectedImage = !operation.imageIndex
+            || path.includes(`[${operation.imageIndex - 1}]`);
           if (typeof value === "string") {
-            if (!isAlbumPath) return value;
+            if (!isAlbumPath || !isSelectedImage) return value;
             const count = value.split(operation.targetText).length - 1;
             replaced += count;
             return value.split(operation.targetText).join(operation.replacementText);
@@ -553,10 +718,12 @@ function createDetailAddressReplacementFeature(deps) {
       const data = scope.md.toModel(scope.vm);
       data.goods_id = scope.goodsId;
       return { payload: data, replacedCounts };
-    }, operations.map(({ type, targetText, replacementText }) => ({
+    }, operations.map(({ type, targetText, replacementText, imageIndex, fieldPath }) => ({
       type,
       targetText,
-      replacementText
+      replacementText,
+      imageIndex,
+      fieldPath
     })));
   }
 
@@ -593,7 +760,7 @@ function createDetailAddressReplacementFeature(deps) {
     };
   }
 
-  async function preview(body, logs) {
+  async function previewSingle(body, logs) {
     const request = validateRequest(body);
     const session = await prepareSession(body, logs);
     const results = [];
@@ -635,7 +802,7 @@ function createDetailAddressReplacementFeature(deps) {
     };
   }
 
-  async function submit(body, logs) {
+  async function submitSingle(body, logs) {
     const request = validateRequest(body);
     const session = await prepareSession(body, logs);
     const results = [];
@@ -656,8 +823,29 @@ function createDetailAddressReplacementFeature(deps) {
           continue;
         }
 
-        const update = await buildSavePayload(session.page, plan.steps);
-        plan.steps.forEach((step, index) => {
+        const saveSteps = [];
+        for (const step of plan.steps) {
+          if (step.type !== "replace-album-image-source") {
+            saveSteps.push(step);
+            continue;
+          }
+          const uploadResult = await resolveAlbumImageSource(step);
+          logLine(
+            logs,
+            step.sourceType === "mfs-url"
+              ? "Product Album 高清图使用现有 MFS 地址。"
+              : `Product Album 高清图已上传：${step.sourceType === "local-file" ? path.basename(step.imageSource) : step.imageSource}`
+          );
+          saveSteps.push({
+            ...step,
+            type: "replace-album-image",
+            replacementText: uploadResult.url,
+            expectedNewCount: 1
+          });
+        }
+
+        const update = await buildSavePayload(session.page, saveSteps);
+        saveSteps.forEach((step, index) => {
           if (update.replacedCounts[index] !== step.matchCount) {
             throw new Error(
               `${step.label}保存前匹配数量发生变化：预览 ${step.matchCount}，`
@@ -667,14 +855,14 @@ function createDetailAddressReplacementFeature(deps) {
         });
         const save = await postProductUpdate(session.page, update.payload);
         const after = await readProductPcView(session.page, item.productName, logs);
-        const operationChecks = plan.steps.map((step) => {
+        const operationChecks = saveSteps.map((step) => {
           const remainingTargetCount = (step.type === "replace-album-image"
-            ? collectAlbumImageMatches(after.viewModel, step.targetText)
+            ? collectAlbumImageMatches(after.viewModel, step.targetText, "vm", [], step.imageIndex, step.fieldPath)
             : collectDetailAddressMatches(after.pcView, step.targetText)
           ).reduce((sum, match) => sum + match.count, 0);
           const finalReplacementCount = step.replacementText
             ? (step.type === "replace-album-image"
-              ? collectAlbumImageMatches(after.viewModel, step.replacementText)
+              ? collectAlbumImageMatches(after.viewModel, step.replacementText, "vm", [], step.imageIndex, step.fieldPath)
               : collectDetailAddressMatches(after.pcView, step.replacementText)
             ).reduce((sum, match) => sum + match.count, 0)
             : 0;
@@ -702,7 +890,7 @@ function createDetailAddressReplacementFeature(deps) {
           goodsId: after.goodsId,
           editUrl: after.editInfo.editUrl,
           matchCount: plan.matchCount,
-          operations: plan.steps,
+          operations: saveSteps,
           save,
           backendCheck: {
             status: "passed",
@@ -740,6 +928,72 @@ function createDetailAddressReplacementFeature(deps) {
         .filter((item) => item.status === "completed")
         .reduce((sum, item) => sum + item.matchCount, 0),
       results
+    };
+  }
+
+  async function preview(body, logs) {
+    const sites = selectedSites(body);
+    const results = [];
+    for (const site of sites) {
+      try {
+        results.push(await previewSingle({ ...(body || {}), sites: [site.siteCode] }, logs));
+      } catch (error) {
+        results.push({
+          mode: "detail-temporary-operation-preview",
+          site,
+          productCount: 0,
+          readyCount: 0,
+          noMatchCount: 0,
+          failedCount: 1,
+          matchCount: 0,
+          results: [],
+          error: error?.message || String(error)
+        });
+      }
+    }
+    if (results.length === 1) return results[0];
+    return {
+      mode: "detail-temporary-operation-multi-preview",
+      sites: results,
+      siteCount: results.length,
+      productCount: results.reduce((sum, item) => sum + item.productCount, 0),
+      readyCount: results.reduce((sum, item) => sum + item.readyCount, 0),
+      noMatchCount: results.reduce((sum, item) => sum + item.noMatchCount, 0),
+      failedCount: results.reduce((sum, item) => sum + item.failedCount, 0),
+      matchCount: results.reduce((sum, item) => sum + item.matchCount, 0)
+    };
+  }
+
+  async function submit(body, logs) {
+    const sites = selectedSites(body);
+    const results = [];
+    for (const site of sites) {
+      try {
+        results.push(await submitSingle({ ...(body || {}), sites: [site.siteCode] }, logs));
+      } catch (error) {
+        results.push({
+          mode: "authenticated-detail-temporary-operation",
+          site,
+          productCount: 0,
+          completedCount: 0,
+          noMatchCount: 0,
+          failedCount: 1,
+          replacementCount: 0,
+          results: [],
+          error: error?.message || String(error)
+        });
+      }
+    }
+    if (results.length === 1) return results[0];
+    return {
+      mode: "authenticated-detail-temporary-operation-multi",
+      sites: results,
+      siteCount: results.length,
+      productCount: results.reduce((sum, item) => sum + item.productCount, 0),
+      completedCount: results.reduce((sum, item) => sum + item.completedCount, 0),
+      noMatchCount: results.reduce((sum, item) => sum + item.noMatchCount, 0),
+      failedCount: results.reduce((sum, item) => sum + item.failedCount, 0),
+      replacementCount: results.reduce((sum, item) => sum + item.replacementCount, 0)
     };
   }
 

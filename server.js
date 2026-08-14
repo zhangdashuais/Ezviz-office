@@ -24,7 +24,7 @@ const { createBrowserAuth, isShopBackendUrl } = require("./src/server/features/b
 const { createSpecificationTranslationFeature } = require("./src/server/features/specification-translation");
 const { registerSpecificationTranslationRoutes } = require("./src/server/routes/specification-translation-routes");
 const { registerCampaignRoutes } = require("./src/server/routes/campaign-routes");
-const { registerAssetUploadRoutes } = require("./src/server/routes/asset-upload-routes");
+const { registerAssetUploadRoutes, uploadToFs, uploadUrlToFs } = require("./src/server/routes/asset-upload-routes");
 const { createTdkManagement } = require("./src/server/features/tdk-management");
 const { registerTdkRoutes } = require("./src/server/routes/tdk-routes");
 const { createProductReplacementFeature } = require("./src/server/features/product-replacement");
@@ -816,18 +816,33 @@ const productReplacementFeature = createProductReplacementFeature({
   getOpenPage: browserAuth.getOpenPage,
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
   credentialDomainForSite,
-  openProductEditorByName: productManagement.openByName
+  openProductEditorByName: productManagement.openByName,
+  uploadImageFromPath: (filePath) => uploadToFs(
+    "https://fs.ezvizlife.com/upload.php",
+    { path: filePath, originalname: path.basename(filePath) }
+  )
 });
 
 const detailAddressReplacementFeature = createDetailAddressReplacementFeature({
   logLine,
   readCampaignConfig,
+  getCampaignSites,
   requireSingleCampaignSite,
   getShopContext: browserAuth.getShopContext,
   getOpenPage: browserAuth.getOpenPage,
   ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
   credentialDomainForSite,
-  openProductEditorByName: productManagement.openByName
+  openProductEditorByName: productManagement.openByName,
+  resolveAlbumImageSource: (operation) => {
+    if (operation.sourceType === "mfs-url") return { url: operation.imageSource };
+    if (operation.sourceType === "remote-url") {
+      return uploadUrlToFs("https://fs.ezvizlife.com/upload.php", operation.imageSource);
+    }
+    return uploadToFs(
+      "https://fs.ezvizlife.com/upload.php",
+      { path: operation.imageSource, originalname: path.basename(operation.imageSource) }
+    );
+  }
 });
 
 const productRevisionSyncFeature = createProductRevisionSyncFeature({

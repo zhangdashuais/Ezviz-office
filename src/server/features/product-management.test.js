@@ -56,7 +56,7 @@ test("product editor opens legacy goods index even when current new shop path ma
       return this.currentUrl;
     },
     async evaluate(_fn, arg) {
-      if (arg === "H8c") {
+      if (arg?.name === "H8c") {
         return {
           ok: true,
           href: "https://shop.ezvizlife.com/goods/add?id=123",
@@ -80,4 +80,22 @@ test("product editor opens legacy goods index even when current new shop path ma
   await feature.openByName(page, "H8c", []);
 
   assert.deepEqual(visited, [LEGACY_GOODS_INDEX_URL]);
+});
+
+test("product editor forwards exact-only matching to the page search", async () => {
+  let searchOptions;
+  const feature = createProductManagement({ logLine() {}, normalizeBool: Boolean });
+  const page = {
+    currentUrl: LEGACY_GOODS_INDEX_URL,
+    url() { return this.currentUrl; },
+    async evaluate(_fn, arg) {
+      if (!arg?.name) return "";
+      searchOptions = arg;
+      this.currentUrl = "https://shop.ezvizlife.com/goods/add?id=456";
+      return { ok: true, href: this.currentUrl, rowText: "H6c" };
+    },
+    async waitForTimeout() {}
+  };
+  await feature.openByName(page, "H6c", [], { exactOnly: true });
+  assert.deepEqual(searchOptions, { name: "H6c", exactOnly: true });
 });

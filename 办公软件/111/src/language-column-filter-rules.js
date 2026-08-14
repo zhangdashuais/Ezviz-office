@@ -30,5 +30,10 @@
     return [...new Set(columns)].sort((a, b) => a - b);
   }
 
-  return { detectLanguageBlocks, isEnglish, selectedColumns };
+  function isStatusRow(values) {
+    const cells = Array.from(values || [], text).filter(Boolean);
+    return cells.length > 0 && cells.every((value) => /^ok$/i.test(value));
+  }
+
+  return { detectLanguageBlocks, isEnglish, selectedColumns, isStatusRow };
 });

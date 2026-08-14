@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const childProcess = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
@@ -214,6 +215,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
 
   const updates = [];
   const missing = [];
+  const newFields = [];
   const sourceMismatches = [];
   const skippedBlank = [];
   const unchanged = [];
@@ -225,7 +227,14 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
     }
     const candidates = candidatesByKey.get(entry.key) || [];
     if (!candidates.length) {
-      missing.push({ key: entry.key, source: entry.source, datasheetRow: entry.rowNumber });
+      const item = {
+        key: entry.key,
+        source: entry.source,
+        translation,
+        datasheetRow: entry.rowNumber
+      };
+      missing.push(item);
+      newFields.push(item);
       return;
     }
     const sourceMatches = candidates.filter(
@@ -249,7 +258,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
 
   return {
     translationHeader,
-    safe: missing.length === 0,
+    safe: missing.length === 0 || newFields.length === missing.length,
     requestedCount: parsedDatasheet.rows.length - skippedBlank.length,
     matchedFieldCount: new Set(
       updates.concat(unchanged).map((item) => item.key)
@@ -258,6 +267,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
     unchangedCellCount: unchanged.length,
     skippedBlankCount: skippedBlank.length,
     missing,
+    newFields,
     sourceMismatches,
     skippedBlank,
     updates
@@ -285,6 +295,37 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
     const existing = sheet[address] || {};
     sheet[address] = { ...existing, t: "s", v: update.translation, w: update.translation };
   });
+  const appended = [];
+  plan.newFields.forEach((field) => {
+    packageInfo.sections.forEach((section) => {
+      const sheet = packageInfo.workbook.Sheets[section.sheetName];
+      const range = XLSX.utils.decode_range(sheet["!ref"]);
+      const row = range.e.r + 1;
+      for (let column = range.s.c; column <= range.e.c; column += 1) {
+        const sourceAddress = XLSX.utils.encode_cell({ r: range.e.r, c: column });
+        const targetAddress = XLSX.utils.encode_cell({ r: row, c: column });
+        if (sheet[sourceAddress]) sheet[targetAddress] = { ...sheet[sourceAddress] };
+      }
+      const keyAddress = XLSX.utils.encode_cell({ r: row, c: section.keyColumn });
+      const sourceAddress = XLSX.utils.encode_cell({ r: row, c: section.sourceColumn });
+      const targetAddress = XLSX.utils.encode_cell({ r: row, c: section.targetColumn });
+      sheet[keyAddress] = { t: "s", v: field.key, w: field.key };
+      sheet[sourceAddress] = { t: "s", v: field.source, w: field.source };
+      sheet[targetAddress] = { t: "s", v: field.translation, w: field.translation };
+      sheet["!ref"] = XLSX.utils.encode_range({
+        s: range.s,
+        e: { r: row, c: range.e.c }
+      });
+      appended.push({
+        key: field.key,
+        sheetName: section.sheetName,
+        row: row,
+        rowNumber: row + 1,
+        targetColumn: section.targetColumn,
+        translation: field.translation
+      });
+    });
+  });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   const extension = path.extname(outputPath).toLowerCase();
   XLSX.writeFile(packageInfo.workbook, outputPath, {
@@ -307,6 +348,19 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
       });
     }
   });
+  appended.forEach((update) => {
+    const sheet = verified.workbook.Sheets[update.sheetName];
+    const actual = String(cellValue(sheet, update.row, update.targetColumn) ?? "");
+    if (actual !== update.translation) {
+      failures.push({
+        key: update.key,
+        sheetName: update.sheetName,
+        rowNumber: update.rowNumber,
+        expected: update.translation,
+        actual
+      });
+    }
+  });
   if (failures.length) {
     throw new Error(`语言包生成后回读失败：${failures.length} 个单元格不一致。`);
   }
@@ -315,7 +369,77 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
     fileName: path.basename(outputPath),
     size: fs.statSync(outputPath).size,
     sha256: verified.fingerprint,
-    verifiedCellCount: plan.updates.length
+    verifiedCellCount: plan.updates.length + appended.length,
+    appendedFieldCount: appended.length,
+    appendedFields: appended
+  };
+}
+
+function writeUpdatedLanguagePackageNative(
+  inputPath,
+  packageInfo,
+  parsedDatasheet,
+  plan,
+  outputPath
+) {
+  assertSafePlan(plan);
+  const instructions = {
+    updates: plan.updates.map((update) => ({
+      sheetName: update.sheetName,
+      rowNumber: update.row + 1,
+      columnNumber: update.targetColumn + 1,
+      value: update.translation
+    })),
+    appends: packageInfo.sections.flatMap((section) =>
+      plan.newFields.map((field, index) => ({
+        sheetName: section.sheetName,
+        rowNumber: section.lastDataRow + 2 + index,
+        keyColumnNumber: section.keyColumn + 1,
+        sourceColumnNumber: section.sourceColumn + 1,
+        targetColumnNumber: section.targetColumn + 1,
+        value: field.translation,
+        key: field.key,
+        source: field.source
+      }))
+    )
+  };
+  const instructionPath = `${outputPath}.json`;
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(instructionPath, JSON.stringify(instructions), "utf8");
+  try {
+    const result = childProcess.spawnSync("powershell.exe", [
+      "-NoProfile",
+      "-ExecutionPolicy", "Bypass",
+      "-File", path.resolve("scripts", "update-language-package-from-plan.ps1"),
+      "-InputPath", path.resolve(inputPath),
+      "-OutputPath", path.resolve(outputPath),
+      "-InstructionPath", path.resolve(instructionPath)
+    ], { encoding: "utf8", windowsHide: true, timeout: 120000 });
+    if (result.error || result.status !== 0) {
+      throw new Error(
+        `Excel 原生保存失败：${result.error?.message || result.stderr || result.stdout}`.trim()
+      );
+    }
+  } finally {
+    fs.rmSync(instructionPath, { force: true });
+  }
+
+  const verified = readLanguagePackage(outputPath);
+  const verificationPlan = planLanguagePackageUpdates(
+    verified,
+    parsedDatasheet,
+    plan.translationHeader
+  );
+  if (verificationPlan.changedCellCount || verificationPlan.missing.length) {
+    throw new Error("语言包经 Excel 保存后回读不一致。");
+  }
+  return {
+    filePath: outputPath,
+    fileName: path.basename(outputPath),
+    size: fs.statSync(outputPath).size,
+    sha256: verified.fingerprint,
+    verifiedCellCount: plan.updates.length + instructions.appends.length,
+    appendedFieldCount: instructions.appends.length
   };
 }
 
@@ -329,5 +453,6 @@ module.exports = {
   readLanguagePackage,
   planLanguagePackageUpdates,
   assertSafePlan,
-  writeUpdatedLanguagePackage
+  writeUpdatedLanguagePackage,
+  writeUpdatedLanguagePackageNative
 };

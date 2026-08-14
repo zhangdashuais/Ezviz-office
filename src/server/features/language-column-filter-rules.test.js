@@ -8,3 +8,9 @@ test("detects datasheet and specification language blocks", () => {
   assert.deepEqual(rules.selectedColumns("datasheet", datasheet.english, datasheet.blocks[1]), [0, 1, 2]);
   assert.deepEqual(rules.selectedColumns("specification", specification.english, specification.blocks[1]), [0, 1, 2, 3]);
 });
+
+test("recognizes the standalone OK status row", () => {
+  assert.equal(rules.isStatusRow(["OK", "OK"]), true);
+  assert.equal(rules.isStatusRow(["OK", "Caméra"]), false);
+  assert.equal(rules.isStatusRow(["", ""]), false);
+});

@@ -39,7 +39,7 @@
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
         <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
         <div class="nav-item" data-target="tab-product-revision-sync" data-operation="publish-batch">产品上架 / 下架</div>
-        <div class="nav-item" data-target="tab-product-direct-revision">产品修订</div>
+        <div class="nav-item" data-target="tab-product-revision-sync" data-operation="revision">产品修订</div>
         <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换/删除</div>
       </div>
     </div>
@@ -386,14 +386,19 @@
       </div>
 
       <div id="tab-product-revision-sync" class="tab-content">
+        <div id="revisionModeTabs" class="row" role="tablist" aria-label="产品修订模式" hidden>
+          <button id="revisionSameProductTab" type="button" role="tab" aria-selected="true">同一产品跨国家修订</button>
+          <button id="revisionCommonPartTab" type="button" role="tab" aria-selected="false">多个产品相同部分修订</button>
+        </div>
+        <div id="revisionSameProductPanel" role="tabpanel">
         <div class="card">
-          <h3>产品上架 / 修订 / 下架</h3>
-          <p class="desc">批量上架从本地文件夹识别多个产品，逐站执行国际站复制、Product Description 翻译、Overview/Specification 和语言包更新；修订模式只更新已有产品；下架模式只关闭 Searchable 并将 Type of listing 设为 No Set Uptime。所有写操作都必须先预览。</p>
+          <h3 id="revisionSyncHeading">产品上架 / 下架</h3>
+          <p id="revisionSyncDescription" class="desc">批量上架从本地文件夹识别多个产品，逐站执行国际站复制、Product Description 翻译、Overview/Specification 和语言包更新；下架模式只关闭 Searchable 并将 Type of listing 设为 No Set Uptime。所有写操作都必须先预览。</p>
           <div class="form-grid">
-            <label for="revisionSyncOperation">操作流程</label>
+            <label id="revisionSyncOperationLabel" for="revisionSyncOperation">操作流程</label>
             <select id="revisionSyncOperation">
               <option value="publish-batch" selected>产品上架（文件夹批量）</option>
-              <option value="revision">产品修订（仅修改已有产品）</option>
+              <option value="revision" hidden>产品修订（仅修改已有产品）</option>
               <option value="delist">产品下架（关闭搜索与上架时间）</option>
             </select>
             <label id="revisionSyncSourceSiteLabel" for="revisionSyncSourceSite">源站点</label>
@@ -425,7 +430,7 @@
           <h3 id="revisionSyncTargetsHeading">目标站点与两份 Excel 的语言列</h3>
           <p id="revisionSyncTargetsHelp" class="desc">每一行都是独立映射：目标站点 → Specification 语言列 → 本站使用的 Datasheet 译文列。系统会自动匹配，执行前可逐站核对；一次预览、一次确认后连续处理全部已选站点。</p>
           <div id="revisionSyncTargets" class="revision-targets">
-            上传两份 Excel 后显示站点与语言列。
+            加载站点后即可选择多个国家；上传文件后再补充语言列映射。
           </div>
           <div class="row">
             <button id="revisionSyncPreview" type="button">预览批量上架（不复制）</button>
@@ -436,6 +441,42 @@
         <div class="card">
           <h3>预览与执行结果</h3>
           <textarea id="revisionSyncOutput" placeholder="源站点图片信息、Detail / Specification / 语言包变更项和回读结果会显示在这里..."></textarea>
+        </div>
+        </div>
+        <div id="revisionCommonPartPanel" role="tabpanel" hidden>
+          <div class="card">
+            <h3>多个产品相同部分修订</h3>
+            <p class="desc">在所选多个国家站点内，对多个不同产品的 Detail 或 Specification 执行同一条精确删除/替换。按国家 × 产品逐项预览、保存和回读，单项失败不会中断其他任务。</p>
+            <div class="form-grid">
+              <label for="commonRevisionSite" style="grid-column:1 / -1;">国家站点（可多选）</label>
+              <div style="grid-column:1 / -1;">
+                <div class="row">
+                  <button id="commonRevisionSelectAllSites" type="button">全选站点</button>
+                  <button id="commonRevisionClearSites" type="button">清空站点</button>
+                </div>
+                <div id="commonRevisionSite" class="site-grid">正在加载站点...</div>
+              </div>
+              <label for="commonRevisionProducts">产品名称（可多个）</label>
+              <textarea id="commonRevisionProducts" rows="5" placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
+              <label for="commonRevisionField">修改部分</label>
+              <select id="commonRevisionField"><option value="detail">Detail</option><option value="specification">Specification</option></select>
+              <label for="commonRevisionOperation">操作</label>
+              <select id="commonRevisionOperation"><option value="replace">替换</option><option value="delete">删除</option></select>
+              <label for="commonRevisionTarget">目标内容</label>
+              <textarea id="commonRevisionTarget" rows="8" placeholder="粘贴每个产品中都需要修改的完整内容"></textarea>
+              <label id="commonRevisionReplacementLabel" for="commonRevisionReplacement">替换后内容</label>
+              <textarea id="commonRevisionReplacement" rows="8" placeholder="粘贴替换后的内容"></textarea>
+            </div>
+            <div class="row">
+              <button id="commonRevisionPreview" type="button">预览多个产品（不保存）</button>
+              <button id="commonRevisionSubmit" type="button" disabled>确认并执行</button>
+            </div>
+          </div>
+          <div id="commonRevisionStatus" class="status">请选择站点并填写产品和修改内容。</div>
+          <div class="card">
+            <h3>预览与执行结果</h3>
+            <textarea id="commonRevisionOutput" rows="16" readonly></textarea>
+          </div>
         </div>
       </div>
 
@@ -488,25 +529,35 @@
           <div class="form-grid">
             <label for="detailAddressOperationSelect">操作类型</label>
             <select id="detailAddressOperationSelect">
-              <option value="delete" selected>删除指定代码块</option>
+              <option value="all" selected>全选（地址替换 + 删除代码块 + 高清图）</option>
+              <option value="delete">删除指定代码块</option>
               <option value="replace">替换完整地址</option>
+              <option value="replace-album-image-source">覆盖 Product Album 高清图</option>
             </select>
-            <label for="detailAddressSiteSelect">国家站点</label>
-            <select id="detailAddressSiteSelect">
-              <option value="">正在加载站点...</option>
-            </select>
+            <label for="detailAddressSiteSelect" style="grid-column:1 / -1;margin-top:8px;">国家站点</label>
+            <div style="grid-column:1 / -1;">
+              <div class="row">
+                <button id="detailAddressSelectAllSites" type="button">全选站点</button>
+                <button id="detailAddressClearSites" type="button">清空站点</button>
+              </div>
+              <div id="detailAddressSiteSelect" class="site-grid">正在加载站点...</div>
+            </div>
             <label for="detailAddressProductNamesInput">产品名称（可多个）</label>
             <textarea id="detailAddressProductNamesInput" class="detail-temporary-field" rows="4" placeholder="每行一个产品，也支持逗号或分号分隔，例如：&#10;CP8&#10;H8c&#10;EB3"></textarea>
             <label for="detailAddressExcelInput">临时功能信息 Excel</label>
             <div>
               <input id="detailAddressExcelInput" type="file" accept=".xlsx,.xls">
               <a class="button" id="detailAddressTemplateDownload" href="/api/detail-address-replacement/template" download="Detail临时功能信息模板.xlsx">下载信息模板</a>
-              <div class="desc">表头 9 列：<code>Product_Name</code>、<code>Old_Address_1</code>、<code>New_Address_1</code>、<code>Old_Address_2</code>、<code>New_Address_2</code>、<code>Delete_Code_Block</code>、<code>Album_Image_Index</code>、<code>Old_Album_Image</code>、<code>New_Album_Image</code>。每行至少填写一项操作。</div>
+              <div class="desc">表头 7 列：<code>Product_Name</code>、<code>Old_Address_1</code>、<code>New_Address_1</code>、<code>Old_Address_2</code>、<code>New_Address_2</code>、<code>Delete_Code_Block</code>、<code>Product_Album_Image</code>。高清图可填写本机绝对路径或 HTTPS 图片地址；现成 MFS 地址直接使用，其他图片在提交时上传后覆盖原图。</div>
             </div>
             <label id="detailAddressTargetLabel" for="detailAddressOldUrlInput">被替换的完整地址</label>
             <textarea id="detailAddressOldUrlInput" class="detail-temporary-field" rows="3" placeholder="https://mfs.ezvizlife.com/old-image.jpg"></textarea>
             <label id="detailAddressReplacementLabel" for="detailAddressNewUrlInput">替换后的完整地址</label>
             <textarea id="detailAddressNewUrlInput" class="detail-temporary-field" rows="3" placeholder="https://mfs.ezvizlife.com/new-image.jpg"></textarea>
+            <label id="detailAddressDeleteCodeLabel" for="detailAddressDeleteCodeInput">要删除的完整代码块</label>
+            <textarea id="detailAddressDeleteCodeInput" class="detail-temporary-field" rows="4" placeholder="仅“全选”模式使用；不删除可留空"></textarea>
+            <label id="detailAddressAlbumImageLabel" for="detailAddressAlbumImageInput">Product Album 高清图</label>
+            <input id="detailAddressAlbumImageInput" class="detail-temporary-field" type="text" placeholder="本机绝对路径或 HTTPS 图片地址；不替换可留空">
             <label for="detailAddressUsernameInput">商城账号</label>
             <input id="detailAddressUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
             <label for="detailAddressPasswordInput">商城密码</label>
@@ -640,6 +691,25 @@
           <div class="row">
             <button id="languageUploadBtn" type="button">上传语言包</button>
           </div>
+        </div>
+
+        <div class="card">
+          <h3>按单产品 Datasheet 更新站点语言包</h3>
+          <p class="desc">上传结构类似 Datasheet 的单产品语言表，按字段 Key 将所选语种写入对应站点当前语言包。先预览，确认后才会上传并回读验证。</p>
+          <div class="form-grid">
+            <label for="languageDatasheetInput">单产品 Datasheet</label>
+            <input id="languageDatasheetInput" type="file" accept=".xls,.xlsx">
+          </div>
+          <div class="row">
+            <button id="languageDatasheetInspectBtn" type="button">识别语言列</button>
+          </div>
+          <div id="languageDatasheetMappings" class="revision-targets">选择上方站点并识别 Datasheet 后显示语言列映射。</div>
+          <div class="row">
+            <button id="languageDatasheetPreviewBtn" type="button" disabled>预览站点语言包</button>
+            <button id="languageDatasheetSubmitBtn" type="button" disabled>确认并上传</button>
+          </div>
+          <div id="languageDatasheetStatus" class="status">请先选择站点并上传单产品 Datasheet。</div>
+          <textarea id="languageDatasheetOutput" placeholder="字段匹配、覆盖、新增、跳过和站点回读结果会显示在这里..."></textarea>
         </div>
 
         <div id="languageStatus" class="status">请先加载站点。</div>
@@ -1003,16 +1073,16 @@
   <script src="src/module-text-comparison.js?v=20260729-2"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
-  <script src="src/language-column-filter-rules.js?v=20260813-1"></script>
-  <script src="src/module-language-column-filter.js?v=20260813-1"></script>
+  <script src="src/language-column-filter-rules.js?v=20260814-1"></script>
+  <script src="src/module-language-column-filter.js?v=20260814-1"></script>
   <script src="src/i18n-conversion-rules.js?v=20260807-2"></script>
   <script src="src/module-text.js?v=20260807-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
-  <script src="src/module-language-package.js"></script>
+  <script src="src/module-language-package.js?v=20260814-1"></script>
   <script src="src/module-product-replacement.js"></script>
-  <script src="src/module-product-revision-sync.js?v=20260807-1"></script>
-  <script src="src/module-product-direct-revision.js?v=20260812-1"></script>
-  <script src="src/module-detail-address-replacement.js?v=20260813-1"></script>
+  <script src="src/module-product-revision-sync.js?v=20260814-2"></script>
+  <script src="src/module-product-direct-revision.js?v=20260814-3"></script>
+  <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260724-4"></script>
   <script src="src/module-ezviz-site-audit.js"></script>

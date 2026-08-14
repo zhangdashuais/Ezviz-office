@@ -90,7 +90,7 @@ function createShopCredentials(options = {}) {
     const expectedGroup = String(targetGroup || "Website").toLowerCase();
     for (const row of data) {
       const domain = row?.[0] || "";
-      if (!domain.includes(".") && !/^domain$/i.test(domain) && !row[1] && !row[2]) {
+      if (!domain.includes(".") && !/^domain$/i.test(domain) && !row?.[1] && !row?.[2]) {
         if (domain) group = domain;
         inheritedDomain = "";
         continue;
@@ -102,7 +102,7 @@ function createShopCredentials(options = {}) {
       const defaultWebsite = ["website", "main", "regular", "default"].includes(expectedGroup) && currentGroup === "";
       if (effectiveDomain === targetDomain && (currentGroup === expectedGroup || defaultWebsite)) {
         matchedDomain = true;
-        if (!row[1] || !row[2]) continue;
+        if (!row?.[1] || !row?.[2]) continue;
         return { account: row[1], password: row[2], workbookPath };
       }
     }
