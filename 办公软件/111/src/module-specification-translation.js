@@ -1,82 +1,97 @@
 (function () {
   const byId = (id) => document.getElementById(id);
   const site = byId("specTranslationSite");
-  const product = byId("specTranslationProduct");
-  const locale = byId("specTranslationLocale");
-  const excel = byId("specTranslationExcel");
+  const referenceUrl = byId("specTranslationReferenceUrl");
   const preview = byId("specTranslationPreview");
   const submit = byId("specTranslationSubmit");
   const status = byId("specTranslationStatus");
-  const html = byId("specTranslationHtml");
+  const output = byId("specTranslationHtml");
   const logs = byId("specTranslationLogs");
   if (!preview) return;
+  let previewFingerprint = "";
 
   function setStatus(message, type) {
     status.textContent = message;
     status.className = "status" + (type ? " " + type : "");
   }
 
+  function fingerprint() {
+    return JSON.stringify({ siteCode: site.value, referenceUrl: referenceUrl.value.trim() });
+  }
+
+  function invalidatePreview() {
+    previewFingerprint = "";
+    submit.disabled = true;
+  }
+
+  async function loadSites() {
+    try {
+      const response = await fetch("/api/campaign/sites");
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "站点加载失败");
+      const sites = (data.sites || []).filter((item) => item.enabled !== false);
+      site.innerHTML = sites.map((item) => `<option value="${item.siteCode}">${item.name || item.siteName || item.siteCode} (${item.siteCode})</option>`).join("");
+      setStatus("请选择站点，并填写该站点一个已翻译的产品详情页地址。");
+    } catch (error) {
+      setStatus("站点加载失败：" + error.message, "warn");
+    }
+  }
+
   async function run(endpoint) {
-    const file = excel.files && excel.files[0];
-    if (!file) throw new Error("请选择 Specification 翻译 Excel。");
-    const form = new FormData();
-    form.append("specExcel", file);
-    form.append("siteCode", site.value);
-    form.append("productName", product.value.trim() || "CP8");
-    form.append("locale", locale.value.trim() || site.value);
-    if (!window.XLSX) throw new Error("XLSX 解析库未加载。");
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" });
-    const hint = (locale.value.trim() || site.value).toLowerCase();
-    const aliases = { fr: ["français", "france", "french"], de: ["deutsch", "german"], it: ["italiano", "italian"], es: ["español", "spanish"], pl: ["polski", "polish"], nl: ["nederlands", "dutch"], pt: ["português", "portuguese"] };
-    const needles = [hint].concat(aliases[hint] || []);
-    let target = -1;
-    for (let index = 0; index < (rows[0] || []).length; index += 2) {
-      const header = String(rows[0][index] || "").toLowerCase();
-      if (needles.some((needle) => header.includes(needle))) { target = index; break; }
-    }
-    if (target < 0) throw new Error("翻译 Excel 中没有找到目标语言列：" + hint);
-    const normalize = (value) => String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-    const mapping = new Map();
-    for (let index = 1; index < rows.length; index += 1) {
-      const row = rows[index] || [];
-      [[row[0], row[target]], [row[1], row[target + 1]]].forEach(([source, translated]) => {
-        const from = normalize(source); const to = normalize(translated);
-        if (from && to && from !== to) mapping.set(from, to);
-      });
-    }
-    form.append("translationsJson", JSON.stringify([...mapping].map(([source, target]) => ({ source, target }))));
-    form.append("localeHeader", String(rows[0][target] || hint));
-    const response = await fetch(endpoint, { method: "POST", body: form });
+    if (!site.value) throw new Error("请选择站点。");
+    if (!/^https:\/\//i.test(referenceUrl.value.trim())) throw new Error("请填写已翻译详情页的 HTTPS 地址。");
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ siteCode: site.value, referenceUrl: referenceUrl.value.trim() })
+    });
     const data = await response.json();
     logs.value = (data.logs || []).join("\n");
     if (!response.ok || !data.ok) throw new Error(data.error || "请求失败。");
-    html.value = data.result.generatedHtml || "";
-    return data;
+    const result = data.result;
+    output.value = [
+      `取得译文：${result.translatedTerm}`,
+      `产品总数：${result.total}`,
+      `有命中产品：${result.changed}`,
+      `替换总数：${result.replacements}`,
+      "",
+      ...result.results.map((item) => `${item.name || item.goodsId || "未命名产品"}\t${item.status}\t${item.replaced} 处${item.reason ? `\t${item.reason}` : ""}`)
+    ].join("\n");
+    return result;
   }
+
+  site.addEventListener("change", invalidatePreview);
+  referenceUrl.addEventListener("input", invalidatePreview);
 
   preview.addEventListener("click", async () => {
     preview.disabled = true;
-    submit.disabled = true;
-    setStatus("正在打开商品编辑页并生成预览…");
+    invalidatePreview();
+    setStatus("正在读取译文并扫描当前站点全部产品…");
     try {
-      const data = await run("/api/specification/preview");
-      submit.disabled = false;
-      setStatus(`预览完成：替换 ${data.result.replaced} 个文本节点，保留 ${data.result.images.length} 张图片。`, "ok");
+      const result = await run("/api/specification/preview");
+      previewFingerprint = fingerprint();
+      submit.disabled = result.changed === 0;
+      setStatus(`预览完成：译文“${result.translatedTerm}”，${result.changed}/${result.total} 个产品共命中 ${result.replacements} 处。`, "ok");
     } catch (error) {
       setStatus("预览失败：" + error.message, "warn");
-    } finally { preview.disabled = false; }
+    } finally {
+      preview.disabled = false;
+    }
   });
 
   submit.addEventListener("click", async () => {
+    if (previewFingerprint !== fingerprint()) return invalidatePreview();
     submit.disabled = true;
-    setStatus("正在写入 Specification 并点击 Complete…");
+    setStatus("正在逐个保存并记录批量替换结果…");
     try {
-      const data = await run("/api/specification/submit");
-      setStatus(`已保存 ${data.result.productName} Specification，替换 ${data.result.replaced} 个文本节点。`, "ok");
+      const result = await run("/api/specification/submit");
+      previewFingerprint = "";
+      setStatus(`批量替换完成：已处理 ${result.changed} 个产品，共替换 ${result.replacements} 处。`, "ok");
     } catch (error) {
-      setStatus("保存失败：" + error.message, "warn");
+      setStatus("批量替换失败：" + error.message, "warn");
       submit.disabled = false;
     }
   });
+
+  loadSites();
 })();

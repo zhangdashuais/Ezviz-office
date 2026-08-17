@@ -1,52 +1,21 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createSpecificationTranslationFeature } = require("./specification-translation");
+const { replaceSpecificationTerms } = require("./specification-translation");
 
-function createFeature() {
-  return createSpecificationTranslationFeature({
-    logLine() {},
-    shopCredentials: {},
-    async openProductEditorByName() {}
-  });
-}
-
-test("Specification submit posts the full product model directly", async () => {
-  let captured = null;
-  const page = {
-    request: {
-      async post(url, options) {
-        captured = { url, options };
-        return {
-          ok: () => true,
-          status: () => 200,
-          text: async () => JSON.stringify({ status: 1, redirect: "/goods/index" })
-        };
-      }
-    }
-  };
-  const payload = { goods_id: "123", pcView: { customs: [] } };
-  const result = await createFeature().postProductUpdate(page, payload);
-
-  assert.equal(captured.url, "https://shop.ezvizlife.com/goods/do-edit-goods");
-  assert.deepEqual(captured.options.data, { data: payload });
-  assert.equal(captured.options.headers["x-requested-with"], "XMLHttpRequest");
-  assert.equal(result.backendStatus, 1);
+test("replaces singular and plural Specification with one localized term", () => {
+  const result = replaceSpecificationTerms(
+    "<h2>Specifications</h2><a>Specification</a><p>specification-grade</p>",
+    "Spécifications"
+  );
+  assert.equal(result.replaced, 3);
+  assert.equal(result.generatedHtml, "<h2>Spécifications</h2><a>Spécifications</a><p>Spécifications-grade</p>");
 });
 
-test("Specification submit rejects a backend business failure", async () => {
-  const page = {
-    request: {
-      async post() {
-        return {
-          ok: () => true,
-          status: () => 200,
-          text: async () => JSON.stringify({ status: 0, msg: "blocked" })
-        };
-      }
-    }
-  };
-  await assert.rejects(
-    () => createFeature().postProductUpdate(page, { goods_id: "123" }),
-    /blocked/
-  );
+test("does not replace a Specification substring inside another word", () => {
+  const result = replaceSpecificationTerms("<p>respecification</p>", "Datenblatt");
+  assert.equal(result.replaced, 0);
+});
+
+test("requires a translated term", () => {
+  assert.throws(() => replaceSpecificationTerms("Specification", "  "), /没有从参考详情页取得/);
 });

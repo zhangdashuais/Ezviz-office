@@ -126,6 +126,27 @@ function createProductPublishingBatchFeature(deps) {
     } catch {
       throw new Error("批量预览校验信息格式不正确，请重新预览。");
     }
+    const expectedLanguagePackageFingerprints = {};
+    products.forEach((product) => {
+      const previewResult = expected[product.productName];
+      (previewResult?.results || []).forEach((item) => {
+        if (item.site?.siteCode && item.languagePackage?.sourceFingerprint
+          && !expectedLanguagePackageFingerprints[item.site.siteCode]) {
+          expectedLanguagePackageFingerprints[item.site.siteCode] =
+            item.languagePackage.sourceFingerprint;
+        }
+      });
+    });
+    logLine(logs, "先合并本批次全部产品译文，并按站点一次上传语言包。");
+    await revisionFeature.submitPublishingLanguagePackageBatch(
+      body,
+      products.map((product) => ({
+        productName: product.productName,
+        file: product.files.datasheet
+      })),
+      expectedLanguagePackageFingerprints,
+      logs
+    );
     const results = [];
     for (const product of products) {
       const previewResult = expected[product.productName];
@@ -135,7 +156,7 @@ function createProductPublishingBatchFeature(deps) {
       }
       try {
         logLine(logs, `执行上架产品：${product.productName}`);
-        const result = await revisionFeature.submitPublishing({
+        const result = await revisionFeature.submitPublishingWithoutLanguagePackage({
           ...(body || {}),
           productName: product.productName,
           expectedSourceFingerprint: previewResult.source?.fingerprint || "",

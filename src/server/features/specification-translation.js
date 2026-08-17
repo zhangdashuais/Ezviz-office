@@ -1,198 +1,172 @@
-const fs = require("fs");
+const GOODS_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
 
-function createSpecificationTranslationFeature(deps) {
-  const { logLine, shopCredentials, openProductEditorByName } = deps;
-  if (typeof openProductEditorByName !== "function") {
-    throw new Error("Specification 翻译缺少共用产品查询能力。");
-  }
+function normalizeTerm(value) {
+  return String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
 
-  function normalize(value) {
-    return String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-  }
+function replaceSpecificationTerms(html, translatedTerm) {
+  const target = normalizeTerm(translatedTerm);
+  if (!target) throw new Error("没有从参考详情页取得 Specification 的译文。");
+  let replaced = 0;
+  const generatedHtml = String(html || "").replace(/\bspecifications?\b/gi, () => {
+    replaced += 1;
+    return target;
+  });
+  return { generatedHtml, replaced };
+}
 
-  function readWorkbookRows(filePath) {
-    const archive = shopCredentials.zipEntries(fs.readFileSync(filePath));
-    const shared = shopCredentials.sharedStrings(archive.get("xl/sharedStrings.xml"));
-    return shopCredentials.readRows(archive.get("xl/worksheets/sheet1.xml"), shared).filter(Boolean);
-  }
-
-  function findLocalePair(headers, localeHint) {
-    const hint = normalize(localeHint).toLowerCase();
-    const aliases = {
-      fr: ["français", "france", "french"], de: ["deutsch", "german"],
-      it: ["italiano", "italian"], es: ["español", "spanish"],
-      pl: ["polski", "polish"], nl: ["nederlands", "dutch"],
-      pt: ["português", "portuguese"], ro: ["român", "romanian"],
-      cz: ["český", "czech"], tr: ["türkçe", "turkish"]
-    };
-    const needles = [hint, ...(aliases[hint] || [])].filter(Boolean);
-    for (let index = 0; index < headers.length; index += 2) {
-      const text = normalize(headers[index]).toLowerCase();
-      if (needles.some((needle) => text.includes(needle))) return index;
+function createSpecificationTranslationFeature({ logLine }) {
+  async function extractTranslatedTerm(page, referenceUrl) {
+    await page.goto(referenceUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForTimeout(1500);
+    const result = await page.evaluate(() => {
+      const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
+      const candidates = [...document.querySelectorAll("body *")]
+        .filter((element) => {
+          const marker = [element.id, element.className, element.getAttribute("href"), element.getAttribute("data-target")]
+            .map(clean).join(" ");
+          const text = clean(element.textContent);
+          return /specification/i.test(marker) && text && text.length <= 80 && element.children.length <= 2;
+        })
+        .map((element) => ({
+          text: clean(element.textContent),
+          marker: clean([element.id, element.className, element.getAttribute("href"), element.getAttribute("data-target")].join(" "))
+        }))
+        .sort((left, right) => left.text.length - right.text.length);
+      if (/^specifications?$/i.test(candidates[0]?.text || "")) {
+        candidates[0].text = "Specification";
+      }
+      return candidates[0] || null;
+    });
+    if (!result?.text) {
+      throw new Error("参考详情页中没有识别到已翻译的 Specification 标题，请确认该 URL 属于当前站点且页面已完成翻译。");
     }
-    throw new Error("翻译 Excel 中没有找到目标语言列：" + localeHint);
+    return result;
   }
 
-  function buildTranslationMap(filePath, localeHint) {
-    const rows = readWorkbookRows(filePath);
-    if (!rows.length) throw new Error("翻译 Excel 为空。");
-    const targetStart = findLocalePair(rows[0], localeHint);
-    const map = new Map();
-    const add = (source, target) => {
-      const from = normalize(source);
-      const to = normalize(target);
-      if (from && to && from !== to) map.set(from, to);
-    };
-    for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
-      const row = rows[rowIndex] || [];
-      add(row[0], row[targetStart]);
-      add(row[1], row[targetStart + 1]);
+  async function listAllProducts(page) {
+    await page.goto(GOODS_INDEX_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForTimeout(1500);
+    const products = [];
+    const seenPages = new Set();
+    for (let pageNumber = 0; pageNumber < 500; pageNumber += 1) {
+      const snapshot = await page.evaluate(() => {
+        const visible = (element) => Boolean(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
+        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope")].filter(visible);
+        const items = rows.map((row) => {
+          const edit = [...row.querySelectorAll("a[href]")].find((link) => /\/goods\/(?:add\?id=|edit)/i.test(link.getAttribute("href") || ""));
+          const nameCell = row.querySelector("td.lb, .goods-name, .product-name, [ng-bind*='name']");
+          return edit ? { name: (nameCell?.textContent || "").trim(), editUrl: edit.href } : null;
+        }).filter(Boolean);
+        const next = [...document.querySelectorAll("a,button")].find((element) => {
+          const text = (element.textContent || "").trim();
+          const marker = `${element.className || ""} ${element.getAttribute("aria-label") || ""}`;
+          return visible(element) && (/^(next|下一页|›|»|>)$/i.test(text) || /\bnext\b/i.test(marker));
+        });
+        const disabled = !next || next.disabled || next.getAttribute("aria-disabled") === "true" || /disabled/.test(next.className || "");
+        return { items, signature: items.map((item) => item.editUrl).join("|"), hasNext: !disabled };
+      });
+      if (!snapshot.signature || seenPages.has(snapshot.signature)) break;
+      seenPages.add(snapshot.signature);
+      products.push(...snapshot.items);
+      if (!snapshot.hasNext) break;
+      const previous = snapshot.signature;
+      await page.evaluate(() => {
+        const visible = (element) => Boolean(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
+        const next = [...document.querySelectorAll("a,button")].find((element) => {
+          const text = (element.textContent || "").trim();
+          const marker = `${element.className || ""} ${element.getAttribute("aria-label") || ""}`;
+          return visible(element) && (/^(next|下一页|›|»|>)$/i.test(text) || /\bnext\b/i.test(marker));
+        });
+        next?.click();
+      });
+      await page.waitForTimeout(1000);
+      const changed = await page.waitForFunction((signature) => {
+        const urls = [...document.querySelectorAll("tr a[href], .goods-item a[href]")]
+          .filter((link) => /\/goods\/(?:add\?id=|edit)/i.test(link.getAttribute("href") || ""))
+          .map((link) => link.href).join("|");
+        return urls && urls !== signature;
+      }, previous, { timeout: 10000 }).then(() => true).catch(() => false);
+      if (!changed) break;
     }
-    return {
-      localeHeader: normalize(rows[0][targetStart]),
-      entries: [...map.entries()].map(([source, target]) => ({ source, target }))
-    };
+    return [...new Map(products.map((item) => [item.editUrl, item])).values()];
   }
 
-  async function readSpecificationModel(page) {
+  async function readEditor(page) {
     await page.waitForFunction(() => {
       const element = document.querySelector("#replenish");
       const scope = window.angular && element ? window.angular.element(element).scope() : null;
       return Boolean(scope?.goodsId && scope?.vm?.pcView && typeof scope?.md?.toModel === "function");
     }, null, { timeout: 30000 });
     return page.evaluate(() => {
-      const normalizeField = (value) => String(value || "")
-        .trim().toLowerCase().replace(/[\s_-]+/g, "");
+      const normalized = (value) => String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
       const fields = scope.vm.pcView?.customs || [];
-      const field = ["specifications", "specification"]
-        .map((name) => fields.find((item) => normalizeField(item?.name) === name))
-        .find(Boolean);
-      if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
-      return {
-        goodsId: String(scope.goodsId),
-        html: String(field.value || ""),
-        isSearchable: Boolean(scope.vm.basic?.isSearchable)
-      };
+      const field = fields.find((item) => ["specification", "specifications"].includes(normalized(item?.name)));
+      return { goodsId: String(scope.goodsId), html: String(field?.value || ""), hasField: Boolean(field) };
     });
   }
 
-  async function translateSpecificationHtml(page, originalHtml, entries) {
-    return page.evaluate(({ originalHtml, entries }) => {
-      const doc = new DOMParser().parseFromString(`<body>${originalHtml}</body>`, "text/html");
-      const normalize = (value) => String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-      const translations = new Map(entries.map((item) => [normalize(item.source), item.target]));
-      const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
-      let node;
-      let replaced = 0;
-      while ((node = walker.nextNode())) {
-        if (node.parentElement?.closest("script,style")) continue;
-        const key = normalize(node.nodeValue);
-        if (!key || !translations.has(key)) continue;
-        const leading = node.nodeValue.match(/^\s*/)?.[0] || "";
-        const trailing = node.nodeValue.match(/\s*$/)?.[0] || "";
-        node.nodeValue = leading + translations.get(key) + trailing;
-        replaced += 1;
-      }
-      const generatedHtml = doc.body.innerHTML;
-      const originalImages = [...doc.body.querySelectorAll("img")].map((img) => ({ src: img.getAttribute("src") || "", alt: img.getAttribute("alt") || "" }));
-      const generatedDoc = new DOMParser().parseFromString(`<body>${generatedHtml}</body>`, "text/html");
-      const generatedImages = [...generatedDoc.body.querySelectorAll("img")].map((img) => ({ src: img.getAttribute("src") || "", alt: img.getAttribute("alt") || "" }));
-      if (JSON.stringify(originalImages) !== JSON.stringify(generatedImages)) throw new Error("Image src/alt preservation check failed.");
-      return { originalHtml, generatedHtml, replaced, images: originalImages };
-    }, { originalHtml, entries });
-  }
-
-  async function buildDirectSavePayload(page, specifications) {
-    return page.evaluate((nextSpecifications) => {
-      const normalizeField = (value) => String(value || "")
-        .trim().toLowerCase().replace(/[\s_-]+/g, "");
+  async function saveEditor(page, nextHtml) {
+    const payload = await page.evaluate((html) => {
+      const normalized = (value) => String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
-      const fields = scope.vm.pcView?.customs || [];
-      const field = ["specifications", "specification"]
-        .map((name) => fields.find((item) => normalizeField(item?.name) === name))
-        .find(Boolean);
-      if (!field) throw new Error("Detail 中没有找到 Specifications 字段。");
-      scope.vm.basic = scope.vm.basic || {};
-      scope.vm.basic.isSearchable = false;
-      field.value = nextSpecifications;
-      (scope.$root || scope).$applyAsync?.();
+      const field = (scope.vm.pcView?.customs || []).find((item) => ["specification", "specifications"].includes(normalized(item?.name)));
+      if (!field) throw new Error("产品没有 Specification 字段。");
+      field.value = html;
       const data = scope.md.toModel(scope.vm);
       data.goods_id = scope.goodsId;
       return data;
-    }, specifications);
-  }
-
-  async function postProductUpdate(page, payload) {
-    const requestUrl = "https://shop.ezvizlife.com/goods/do-edit-goods";
-    const response = await page.request.post(requestUrl, {
-      data: { data: payload },
-      headers: { "x-requested-with": "XMLHttpRequest" },
-      timeout: 60000
+    }, nextHtml);
+    const response = await page.request.post("https://shop.ezvizlife.com/goods/do-edit-goods", {
+      data: { data: payload }, headers: { "x-requested-with": "XMLHttpRequest" }, timeout: 60000
     });
-    const text = await response.text().catch(() => "");
-    let result;
-    try { result = JSON.parse(text); } catch {
-      throw new Error("产品保存接口返回的不是 JSON：" + text.slice(0, 200));
-    }
-    if (!response.ok() || Number(result?.status) !== 1) {
-      throw new Error(result?.msg || result?.message || `产品保存失败（HTTP ${response.status()}）`);
-    }
-    return {
-      requestUrl,
-      responseStatus: response.status(),
-      backendStatus: Number(result.status),
-      redirect: result.redirect || ""
-    };
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok() || Number(body.status) !== 1) throw new Error(body.msg || body.message || `保存失败（HTTP ${response.status()}）`);
   }
 
-  async function run(page, options, excelFile, logs) {
-    const translation = Array.isArray(options.translations) && options.translations.length
-      ? { localeHeader: options.localeHeader || options.locale || options.siteCode, entries: options.translations }
-      : buildTranslationMap(excelFile.path, options.locale || options.siteCode);
-    const productName = options.productName || "CP8";
-    const editInfo = await openProductEditorByName(page, productName, logs);
-    const before = await readSpecificationModel(page);
-    const result = await translateSpecificationHtml(page, before.html, translation.entries);
-    let save = null;
-    let verification = null;
-    if (options.submit === true) {
-      const payload = await buildDirectSavePayload(page, result.generatedHtml);
-      save = await postProductUpdate(page, payload);
-      await openProductEditorByName(page, productName, logs);
-      const after = await readSpecificationModel(page);
-      const htmlMatches = after.html === result.generatedHtml;
-      const searchableDisabled = after.isSearchable === false;
-      verification = { htmlMatches, searchableDisabled, goodsId: after.goodsId };
-      if (!htmlMatches || !searchableDisabled) {
-        throw new Error(
-          `Specification 直接保存回读失败：HTML ${htmlMatches ? "通过" : "不一致"}，`
-          + `isSearchable ${searchableDisabled ? "已关闭" : "未关闭"}。`
-        );
+  async function run(page, options, logs) {
+    const reference = await extractTranslatedTerm(page, options.referenceUrl);
+    logLine(logs, `已从参考详情页取得译文：${reference.text}`);
+    const products = await listAllProducts(page);
+    if (!products.length) throw new Error("当前站点产品列表为空，无法执行批量替换。");
+    const results = [];
+    for (const [index, product] of products.entries()) {
+      try {
+        await page.goto(product.editUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+        const before = await readEditor(page);
+        if (!before.hasField) {
+          results.push({ ...product, status: "skipped", reason: "无 Specification 字段", replaced: 0 });
+          continue;
+        }
+        const replacement = replaceSpecificationTerms(before.html, reference.text);
+        if (options.submit && replacement.replaced) {
+          await saveEditor(page, replacement.generatedHtml);
+          await page.goto(product.editUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+          const after = await readEditor(page);
+          if (after.html !== replacement.generatedHtml) throw new Error("保存后回读内容不一致");
+        }
+        results.push({ ...product, goodsId: before.goodsId, status: replacement.replaced ? (options.submit ? "saved" : "pending") : "unchanged", replaced: replacement.replaced });
+        logLine(logs, `[${index + 1}/${products.length}] ${product.name || before.goodsId}：命中 ${replacement.replaced} 处`);
+      } catch (error) {
+        const reason = error?.message || String(error);
+        results.push({ ...product, status: "failed", reason, replaced: 0 });
+        logLine(logs, `[${index + 1}/${products.length}] ${product.name || product.editUrl}：失败，${reason}`);
       }
-      logLine(logs, "Specification 翻译已通过直接请求保存并回读验证。");
     }
     return {
-      productName,
-      localeHeader: translation.localeHeader,
-      editUrl: editInfo.editUrl,
-      goodsId: before.goodsId,
-      ...result,
-      submitted: options.submit === true,
-      strategy: options.submit === true ? "direct-request" : "preview-only",
-      save,
-      verification
+      translatedTerm: reference.text,
+      referenceUrl: options.referenceUrl,
+      submitted: Boolean(options.submit),
+      total: products.length,
+      changed: results.filter((item) => item.replaced > 0).length,
+      failed: results.filter((item) => item.status === "failed").length,
+      replacements: results.reduce((sum, item) => sum + item.replaced, 0),
+      results
     };
   }
 
-  return {
-    buildTranslationMap,
-    readSpecificationModel,
-    translateSpecificationHtml,
-    buildDirectSavePayload,
-    postProductUpdate,
-    run
-  };
+  return { extractTranslatedTerm, listAllProducts, readEditor, saveEditor, run };
 }
 
-module.exports = { createSpecificationTranslationFeature };
+module.exports = { normalizeTerm, replaceSpecificationTerms, createSpecificationTranslationFeature };

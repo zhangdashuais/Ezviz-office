@@ -7,8 +7,7 @@ function buildProductNameTemplate() {
     "New_Address_1",
     "Old_Address_2",
     "New_Address_2",
-    "Delete_Code_Block",
-    "Product_Album_Image"
+    "Delete_Code_Block"
   ]]);
   worksheet["!cols"] = [
     { wch: 28 },
@@ -33,6 +32,14 @@ function registerDetailAddressReplacementRoutes(app, deps) {
       const result = await operation(req.body || {}, logs);
       res.json({ ok: true, logs, result });
     } catch (error) {
+      if (error?.code === "TASK_CANCELLED") {
+        return res.status(499).json({
+          ok: false,
+          cancelled: true,
+          error: "任务已由用户停止。",
+          logs
+        });
+      }
       const message = error?.message || String(error);
       logLine(logs, failureLabel + "：" + message);
       const status = /请填写|请选择|必须|不能|一次最多|只允许选择一个|缺少|重复|没有填写|没有可执行|最多只能/.test(message)
@@ -67,6 +74,7 @@ function registerDetailAddressReplacementRoutes(app, deps) {
 
   app.post("/api/detail-address-replacement/submit", (req, res) =>
     handle(req, res, feature.submit, "Detail 内容操作提交失败"));
+
 }
 
 module.exports = {

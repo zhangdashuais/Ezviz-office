@@ -10,7 +10,8 @@
     { pattern: /^\/api\/product-replacement\/(detail|details)$/, statusId: "productReplaceStatus", label: "后台产品读取" },
     { pattern: /^\/api\/product-revision-sync\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品修订同步" },
     { pattern: /^\/api\/product-publishing\/(preview|submit|batch-preview|batch-submit)$/, statusId: "revisionSyncStatus", label: "产品上架" },
-    { pattern: /^\/api\/product-delisting\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品下架" }
+    { pattern: /^\/api\/product-delisting\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品下架" },
+    { pattern: /^\/api\/detail-address-replacement\/(preview|submit)$/, statusId: "detailAddressStatus", label: "Detail 批量替换" }
   ];
 
   function requestPath(input) {

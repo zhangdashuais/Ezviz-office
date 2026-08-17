@@ -1228,8 +1228,109 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
+  async function submitPublishingLanguagePackageBatch(body, datasheetFiles, expectedFingerprints, logs) {
+    const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
+    const request = validateRevisionRequest(body, sites, { ignoreSourceSite: true });
+    const parsedDatasheets = datasheetFiles.map((entry) => ({
+      productName: entry.productName,
+      parsed: parseLanguageDatasheet(entry.file.path)
+    }));
+    const results = [];
+    logLine(logs, `开始合并 ${parsedDatasheets.length} 个产品的语言包译文。`);
+
+    for (const target of request.targets) {
+      let downloaded = null;
+      let generated = null;
+      try {
+        const session = await prepareSiteSession(target.site, body, logs);
+        downloaded = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
+          session.page,
+          target.site,
+          logs
+        );
+        let packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+        const expected = normalize(expectedFingerprints?.[target.site.siteCode]);
+        if (!expected || expected !== packageInfo.contentFingerprint) {
+          throw new Error(`${target.site.name} 当前语言包在预览后发生变化，请重新预览。`);
+        }
+
+        let changedCellCount = 0;
+        const verificationInputs = [];
+        for (const entry of parsedDatasheets) {
+          const translationHeader = resolveDatasheetLanguage(
+            entry.parsed,
+            target,
+            SITE_LANGUAGE_NEEDLES
+          );
+          const plan = planLanguagePackageUpdates(packageInfo, entry.parsed, translationHeader);
+          assertSafePlan(plan);
+          changedCellCount += plan.changedCellCount;
+          verificationInputs.push({ ...entry, translationHeader });
+          logLine(
+            logs,
+            `${target.site.name} 合并 ${entry.productName}：第 5 列覆盖 ${plan.changedCellCount} 个单元格。`
+          );
+          if (!plan.changedCellCount) continue;
+          const outputPath = path.resolve(
+            "runtime",
+            "language-package-revision",
+            `${Date.now()}-${target.site.siteCode}-batch-${verificationInputs.length}.xlsx`
+          );
+          const nextGenerated = writeUpdatedLanguagePackage(packageInfo, plan, outputPath);
+          if (generated) removeTemporaryFile(generated.filePath);
+          generated = nextGenerated;
+          packageInfo = readLanguagePackage(generated.filePath, downloaded.langCode);
+        }
+
+        if (generated) {
+          await languagePackageFeature.uploadLanguagePackageForPage(
+            session.page,
+            { ...generated, langCode: downloaded.langCode },
+            logs
+          );
+          const verification = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
+            session.page,
+            target.site,
+            logs
+          );
+          try {
+            const verifiedPackage = readLanguagePackage(verification.filePath, verification.langCode);
+            for (const entry of verificationInputs) {
+              const plan = planLanguagePackageUpdates(
+                verifiedPackage,
+                entry.parsed,
+                entry.translationHeader
+              );
+              assertSafePlan(plan);
+              if (plan.changedCellCount) {
+                throw new Error(
+                  `${entry.productName} 语言包上传后仍有 ${plan.changedCellCount} 个单元格未更新。`
+                );
+              }
+            }
+          } finally {
+            removeTemporaryFile(verification.filePath);
+          }
+        }
+        logLine(logs, `${target.site.name} 批量语言包已一次上传并回读核验通过。`);
+        results.push({ status: "completed", site: target.site, changedCellCount });
+      } catch (error) {
+        logLine(logs, `${target.site.name} 批量语言包处理失败：${error?.message || String(error)}`);
+        results.push({ status: "failed", site: target.site, error: error?.message || String(error) });
+      } finally {
+        removeTemporaryFile(downloaded?.filePath);
+        removeTemporaryFile(generated?.filePath);
+      }
+    }
+    if (results.some((item) => item.status === "failed")) {
+      throw new Error(results.find((item) => item.status === "failed").error);
+    }
+    return { results };
+  }
+
   async function submit(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
+    const skipLanguagePackage = options.skipLanguagePackage === true;
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
     const request = validateRevisionRequest(body, sites, { ignoreSourceSite: publishing });
     const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
@@ -1338,30 +1439,33 @@ function createProductRevisionSyncFeature(deps) {
         const specificationChanged = before.detail.specifications !== desired.specifications;
         const descriptionChanged = before.productDescription
           !== desired.productDescription.description;
-        languagePackage = await prepareLanguagePackage(
-          session,
-          target,
-          parsedDatasheet,
-          logs
-        );
-        const expectedPackageFingerprint = normalize(
-          expectedLanguagePackageFingerprints[target.site.siteCode]
-        );
-        if (!expectedPackageFingerprint
-          || expectedPackageFingerprint
-            !== languagePackage.packageInfo.contentFingerprint) {
-          throw new Error(
-            `${target.site.name} 当前语言包在预览后发生变化，请重新预览。`
+        if (!skipLanguagePackage) {
+          languagePackage = await prepareLanguagePackage(
+            session,
+            target,
+            parsedDatasheet,
+            logs
           );
+          const expectedPackageFingerprint = normalize(
+            expectedLanguagePackageFingerprints[target.site.siteCode]
+          );
+          if (!expectedPackageFingerprint
+            || expectedPackageFingerprint
+              !== languagePackage.packageInfo.contentFingerprint) {
+            throw new Error(
+              `${target.site.name} 当前语言包在预览后发生变化，请重新预览。`
+            );
+          }
+          assertSafePlan(languagePackage.plan);
         }
-        assertSafePlan(languagePackage.plan);
-        const languagePackageChanged = languagePackage.plan.changedCellCount > 0;
+        const languagePackageChanged = !skipLanguagePackage
+          && languagePackage.plan.changedCellCount > 0;
         if (!publishing && !detailChanged && !specificationChanged
           && !descriptionChanged && !languagePackageChanged) {
           components.detail = "no-change";
           components.specification = "no-change";
           components.description = "no-change";
-          components.languagePackage = "no-change";
+          components.languagePackage = skipLanguagePackage ? "batch-passed" : "no-change";
           results.push({
             status: "no-change",
             site: target.site,
@@ -1484,7 +1588,7 @@ function createProductRevisionSyncFeature(deps) {
             `${target.site.name} 语言包重新上传并再次下载核验通过。`
           );
         } else {
-          components.languagePackage = "no-change";
+          components.languagePackage = skipLanguagePackage ? "batch-passed" : "no-change";
         }
         results.push({
           status: "completed",
@@ -1492,7 +1596,7 @@ function createProductRevisionSyncFeature(deps) {
           goodsId: after.goodsId,
           editUrl: after.editUrl,
           localeHeader: desired.language.header,
-          languagePackageHeader: languagePackage.translationHeader,
+          languagePackageHeader: languagePackage?.translationHeader || target.languagePackageHeader,
           detailChanged,
           specificationChanged,
           descriptionChanged,
@@ -1501,7 +1605,7 @@ function createProductRevisionSyncFeature(deps) {
           copy,
           save,
           languagePackageUpload,
-          languagePackage: summarizeLanguagePackagePlan(languagePackage.plan),
+          languagePackage: languagePackage ? summarizeLanguagePackagePlan(languagePackage.plan) : null,
           components
         });
       } catch (error) {
@@ -1545,12 +1649,19 @@ function createProductRevisionSyncFeature(deps) {
     preview(body, excelFile, languageDatasheetFile, logs, { publishing: true });
   const submitPublishing = (body, excelFile, languageDatasheetFile, logs) =>
     submit(body, excelFile, languageDatasheetFile, logs, { publishing: true });
+  const submitPublishingWithoutLanguagePackage = (body, excelFile, languageDatasheetFile, logs) =>
+    submit(body, excelFile, languageDatasheetFile, logs, {
+      publishing: true,
+      skipLanguagePackage: true
+    });
 
   return {
     preview,
     submit,
     previewPublishing,
     submitPublishing,
+    submitPublishingWithoutLanguagePackage,
+    submitPublishingLanguagePackageBatch,
     previewDirectRevision,
     submitDirectRevision,
     previewCommonRevision,

@@ -46,78 +46,16 @@ test("Product Album replacement only touches album/gallery fields", () => {
   assert.equal(collectAlbumImageMatches({ pcView: { summary: oldUrl } }, oldUrl).length, 0);
 });
 
-test("Product Album local file selects the current album image before upload", (t) => {
-  const oldUrl = "https://old.example/hd.jpg";
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "detail-album-"));
-  const imagePath = path.join(tempDir, "CP8.jpg");
-  fs.writeFileSync(imagePath, "test-image");
-  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
+test("Detail batch ignores the removed Product Album image field", () => {
   const request = validateRequest({
-    operation: "replace-album-image-source",
-    productNames: "CP8\nH8c",
-    productAlbumImage: imagePath
+    items: [{
+      productName: "CP8",
+      replacements: [{ oldAddress: "old-image", newAddress: "new-image" }],
+      productAlbumImage: "https://mfs.ezvizlife.com/ignored.png"
+    }]
   });
-  const operation = request.items[0].operations[0];
-  const plan = planProductOperations({
-    pcView: {},
-    viewModel: {
-      productAlbum: [{ imageUrl: oldUrl }]
-    }
-  }, [operation]);
-
-  assert.equal(request.items.length, 2);
-  assert.equal(operation.sourceType, "local-file");
-  assert.equal(operation.imageSource, imagePath);
-  assert.equal(plan.matchCount, 1);
-  assert.equal(plan.steps[0].targetText, oldUrl);
-  assert.equal(plan.steps[0].matches[0].path, "vm.productAlbum[0].imageUrl");
-});
-
-test("Product Album accepts MFS and ordinary HTTPS image addresses", () => {
-  const mfs = validateRequest({
-    operation: "replace-album-image-source",
-    productNames: "CP8",
-    productAlbumImage: "https://mfs.ezvizlife.com/mall/cp8.jpg"
-  }).items[0].operations[0];
-  const remote = validateRequest({
-    operation: "replace-album-image-source",
-    productNames: "H8c",
-    productAlbumImage: "https://cdn.example.com/image?id=123"
-  }).items[0].operations[0];
-
-  assert.equal(mfs.sourceType, "mfs-url");
-  assert.equal(remote.sourceType, "remote-url");
-  assert.throws(() => validateRequest({
-    operation: "replace-album-image-source",
-    productNames: "CP8",
-    productAlbumImage: "http://example.com/cp8.jpg"
-  }), /HTTPS/);
-});
-
-test("Product Album uses the edit-page ng-model binding when the field is not named album", (t) => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "detail-album-binding-"));
-  const imagePath = path.join(tempDir, "HP7.jpg");
-  fs.writeFileSync(imagePath, "test-image");
-  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
-  const operation = validateRequest({
-    operation: "replace-album-image-source",
-    productNames: "HP7",
-    productAlbumImage: imagePath
-  }).items[0].operations[0];
-  const plan = planProductOperations({
-    pcView: {},
-    viewModel: {
-      basic: {
-        cover: "https://mfs.ezvizlife.com/cover.jpg",
-        mainPic: "https://mfs.ezvizlife.com/original.jpg"
-      }
-    },
-    albumModelPaths: ["vm.basic.mainPic"]
-  }, [operation]);
-
-  assert.equal(plan.matchCount, 1);
-  assert.equal(plan.steps[0].fieldPath, "vm.basic.mainPic");
-  assert.equal(plan.steps[0].targetText, "https://mfs.ezvizlife.com/original.jpg");
+  assert.equal(request.items[0].operations.length, 1);
+  assert.equal(request.items[0].operations[0].type, "replace");
 });
 
 test("Detail replacement accepts a relative path or fragment as address 1", () => {

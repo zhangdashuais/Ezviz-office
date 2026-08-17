@@ -1,4 +1,4 @@
-/** 批量执行产品 PC Detail 操作和 Product Album 高清图覆盖。 */
+/** 批量执行产品 PC Detail 地址替换和代码块删除。 */
 (function () {
   const serviceBase = window.location.origin;
   const operationSelect = document.getElementById("detailAddressOperationSelect");
@@ -19,12 +19,10 @@
   const replacementLabel = document.getElementById("detailAddressReplacementLabel");
   const deleteCodeInput = document.getElementById("detailAddressDeleteCodeInput");
   const deleteCodeLabel = document.getElementById("detailAddressDeleteCodeLabel");
-  const albumImageInput = document.getElementById("detailAddressAlbumImageInput");
-  const albumImageLabel = document.getElementById("detailAddressAlbumImageLabel");
   if (!operationSelect || !siteSelect || !productNamesInput || !excelInput
     || !oldUrlInput || !newUrlInput || !previewButton || !submitButton
     || !statusElement || !outputElement || !targetLabel || !replacementLabel
-    || !deleteCodeInput || !deleteCodeLabel || !albumImageInput || !albumImageLabel
+    || !deleteCodeInput || !deleteCodeLabel
     || !selectAllSitesButton || !clearSitesButton) return;
 
   const templateHeaders = [
@@ -33,8 +31,7 @@
     "New_Address_1",
     "Old_Address_2",
     "New_Address_2",
-    "Delete_Code_Block",
-    "Product_Album_Image"
+    "Delete_Code_Block"
   ];
   let importedItems = null;
   let validatedPreview = null;
@@ -85,16 +82,14 @@
     const operation = operationSelect.value;
     const productNames = productNamesInput.value.trim();
     const isAll = operation === "all";
-    const isAlbumImage = operation === "replace-album-image-source";
     const oldUrl = operation === "delete" ? oldUrlInput.value : oldUrlInput.value.trim();
     const newUrl = newUrlInput.value.trim();
     if (!productNames) throw new Error("请手工填写产品名称，或上传信息 Excel。");
     if (isAll) {
       if ((oldUrl && !newUrl) || (!oldUrl && newUrl)) throw new Error("地址替换前后必须同时填写。");
       const deleteCodeBlock = deleteCodeInput.value;
-      const productAlbumImage = albumImageInput.value.trim();
-      if (!oldUrl && !deleteCodeBlock.trim() && !productAlbumImage) {
-        throw new Error("全选模式请至少填写一项地址替换、代码块删除或高清图覆盖。");
+      if (!oldUrl && !deleteCodeBlock.trim()) {
+        throw new Error("全选模式请至少填写一项地址替换或代码块删除。");
       }
       const seen = new Set();
       const names = productNames.split(/[\n,;，；]+/).map((name) => name.trim()).filter((name) => {
@@ -109,8 +104,7 @@
         items: names.map((productName) => ({
           productName,
           replacements: oldUrl ? [{ oldAddress: oldUrl, newAddress: newUrl }] : [],
-          deleteCodeBlock,
-          productAlbumImage
+          deleteCodeBlock
         })),
         ...credentials
       };
@@ -118,12 +112,10 @@
     if (!oldUrl.trim()) {
       throw new Error(operation === "delete"
         ? "请填写要删除的完整代码块。"
-        : isAlbumImage
-          ? "请填写 Product Album 高清图本机路径或 HTTPS 地址。"
-          : "请填写被替换地址。");
+        : "请填写被替换地址。");
     }
-    if (operation !== "delete" && !isAlbumImage && !newUrl) throw new Error("请填写替换后的地址。");
-    if (operation !== "delete" && !isAlbumImage && oldUrl === newUrl) {
+    if (operation !== "delete" && !newUrl) throw new Error("请填写替换后的地址。");
+    if (operation !== "delete" && oldUrl === newUrl) {
       throw new Error("两个地址不能相同。");
     }
     return {
@@ -131,8 +123,7 @@
       sites,
       productNames,
       targetText: oldUrl,
-      replacementText: operation === "delete" || isAlbumImage ? "" : newUrl,
-      productAlbumImage: isAlbumImage ? oldUrl : "",
+      replacementText: operation === "delete" ? "" : newUrl,
       ...credentials
     };
   }
@@ -144,8 +135,7 @@
       items: payload.items,
       productNames: payload.productNames,
       targetText: payload.targetText,
-      replacementText: payload.replacementText,
-      productAlbumImage: payload.productAlbumImage
+      replacementText: payload.replacementText
     });
   }
 
@@ -197,22 +187,19 @@
         }
       });
       const deleteCodeBlock = readCell(row, indexes, "Delete_Code_Block");
-      const productAlbumImage = readCell(row, indexes, "Product_Album_Image").trim();
       if (!replacements.some((replacement) => replacement.oldAddress)
-        && !deleteCodeBlock.trim()
-        && !productAlbumImage) {
-        throw new Error(`${productName} 没有填写任何 Detail 或 Product Album 操作。`);
+        && !deleteCodeBlock.trim()) {
+        throw new Error(`${productName} 没有填写任何 Detail 操作。`);
       }
       items.push({
         productName,
         replacements,
-        deleteCodeBlock,
-        productAlbumImage
+        deleteCodeBlock
       });
     });
     if (!items.length) throw new Error("Excel 中没有可执行的产品数据。");
-    if (items.length > 50) {
-      throw new Error(`Excel 中有 ${items.length} 个产品，一次最多处理 50 个。`);
+    if (items.length > 60) {
+      throw new Error(`Excel 中有 ${items.length} 个产品，一次最多处理 60 个。`);
     }
 
     importedItems = items;
@@ -225,10 +212,9 @@
       0
     );
     const codeCount = items.filter((item) => item.deleteCodeBlock.trim()).length;
-    const albumCount = items.filter((item) => item.productAlbumImage).length;
     setStatus(
       `已导入 ${items.length} 个产品、${addressCount} 组地址替换、`
-      + `${codeCount} 个代码块删除、${albumCount} 组 Product Album 高清图替换。`
+      + `${codeCount} 个代码块删除。`
       + "将以 Excel 数据为准。",
       "ok"
     );
@@ -237,12 +223,10 @@
       `产品数：${items.length}`,
       `地址替换：${addressCount} 组`,
       `代码块删除：${codeCount} 个`,
-      `Product Album 高清图替换：${albumCount} 组`,
       "",
       ...items.map((item) => {
         const operationCount = item.replacements.filter((pair) => pair.oldAddress).length
-          + (item.deleteCodeBlock.trim() ? 1 : 0)
-          + (item.productAlbumImage ? 1 : 0);
+          + (item.deleteCodeBlock.trim() ? 1 : 0);
         return `- ${item.productName}：${operationCount} 项操作`;
       })
     ].join("\n");
@@ -408,35 +392,28 @@
     clearImportedItems();
     const isAll = operationSelect.value === "all";
     const isDelete = operationSelect.value === "delete";
-    const isAlbum = operationSelect.value === "replace-album-image-source";
     targetLabel.textContent = isAll
       ? "被替换地址（可留空）"
       : isDelete
       ? "要删除的完整代码块（手工模式）"
-      : isAlbum
-        ? "Product Album 高清图（本机路径或 HTTPS 地址，手工模式）"
-        : "被替换地址（手工模式）";
+      : "被替换地址（手工模式）";
     replacementLabel.textContent = isAll ? "替换后的完整地址（可留空）" : "替换后的完整地址";
     oldUrlInput.placeholder = isAll
       ? "需要地址替换时填写旧地址"
       : isDelete
       ? "粘贴需要精确删除的完整 HTML / script / style 代码块"
-      : isAlbum
-        ? "C:\\Users\\name\\Desktop\\product.jpg 或 https://mfs.ezvizlife.com/product.jpg"
-        : "https://mfs.ezvizlife.com/old-image.jpg";
+      : "https://mfs.ezvizlife.com/old-image.jpg";
     oldUrlInput.rows = isDelete ? 4 : 2;
-    replacementLabel.hidden = isDelete || isAlbum;
-    newUrlInput.hidden = isDelete || isAlbum;
+    replacementLabel.hidden = isDelete;
+    newUrlInput.hidden = isDelete;
     deleteCodeLabel.hidden = !isAll;
     deleteCodeInput.hidden = !isAll;
-    albumImageLabel.hidden = !isAll;
-    albumImageInput.hidden = !isAll;
-    if (isDelete || isAlbum) newUrlInput.value = "";
+    if (isDelete) newUrlInput.value = "";
     invalidatePreview();
   }
 
   siteSelect.addEventListener("change", invalidatePreview);
-  [productNamesInput, oldUrlInput, newUrlInput, deleteCodeInput, albumImageInput].forEach((element) => {
+  [productNamesInput, oldUrlInput, newUrlInput, deleteCodeInput].forEach((element) => {
     element.addEventListener("input", () => {
       clearImportedItems();
       invalidatePreview();

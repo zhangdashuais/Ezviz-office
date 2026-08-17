@@ -18,8 +18,7 @@ test("Detail temporary operation template contains all supported columns", () =>
     "New_Address_1",
     "Old_Address_2",
     "New_Address_2",
-    "Delete_Code_Block",
-    "Product_Album_Image"
+    "Delete_Code_Block"
   ]);
   assert.equal(rows.length, 1);
 });

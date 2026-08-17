@@ -86,3 +86,49 @@ test("batch preview stays disabled when every target failed", async () => {
   assert.equal(result.failedCount, 1);
   assert.equal(result.results[0].status, "failed");
 });
+
+test("batch submit uploads one merged language package before publishing products", async () => {
+  const calls = [];
+  const feature = createProductPublishingBatchFeature({
+    logLine() {},
+    revisionFeature: {
+      async submitPublishingLanguagePackageBatch(body, entries, fingerprints) {
+        calls.push(["language", entries.map((entry) => entry.productName), fingerprints]);
+      },
+      async submitPublishingWithoutLanguagePackage(body) {
+        calls.push(["product", body.productName]);
+        return { failedCount: 0 };
+      }
+    }
+  });
+  const files = [
+    { originalname: "0000__CP8_Datasheet.xlsx", path: "a" },
+    { originalname: "0001__CP8_Specifications.xlsx", path: "b" },
+    { originalname: "0002__HP8_Datasheet.xlsx", path: "c" },
+    { originalname: "0003__HP8_Specifications.xlsx", path: "d" }
+  ];
+  const batchManifest = JSON.stringify([
+    { uploadName: files[0].originalname, relativePath: "Products/CP8/CP8 Datasheet.xlsx" },
+    { uploadName: files[1].originalname, relativePath: "Products/CP8/CP8 Specifications.xlsx" },
+    { uploadName: files[2].originalname, relativePath: "Products/HP8/HP8 Datasheet.xlsx" },
+    { uploadName: files[3].originalname, relativePath: "Products/HP8/HP8 Specifications.xlsx" }
+  ]);
+  const preview = (productName) => ({
+    workbook: { fingerprint: `${productName}-spec` },
+    languageDatasheet: { fingerprint: `${productName}-data` },
+    results: [{
+      site: { siteCode: "fr" },
+      copySource: { sourceFingerprint: `${productName}-source` },
+      languagePackage: { sourceFingerprint: "fr-package" }
+    }]
+  });
+  await feature.submit({
+    batchManifest,
+    expectedBatchPreviews: JSON.stringify({ CP8: preview("CP8"), HP8: preview("HP8") })
+  }, files, []);
+  assert.deepEqual(calls, [
+    ["language", ["CP8", "HP8"], { fr: "fr-package" }],
+    ["product", "CP8"],
+    ["product", "HP8"]
+  ]);
+});

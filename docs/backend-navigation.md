@@ -73,7 +73,7 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 
 语言包页另有独立的“按单产品 Datasheet 更新站点语言包”功能。`datasheet-inspect` 识别第三列起的语种说明；`datasheet-preview` 按字段 Key 对比所选站点当前语言包；`datasheet-submit` 将所选语种覆盖到目标列，站点不存在的 Key 复制末行样式后追加。空译文跳过，英文原文差异只提示并以站点语言包固有列为准；预览后 Datasheet 或站点语言包发生变化时停止提交。旧 `.xls` 仍由本机 Excel 原生保存，上传后重新下载回读，失败时恢复原包。
 
-Detail 批量替换默认选择“全选”，可在一次预览中同时处理地址替换、代码块删除和高清图覆盖，也可切换为单项操作。替换前后值按精确文本处理，可填写完整 URL、相对路径或地址片段，不要求以 `http://` 或 `https://` 开头。页面和七列 Excel 均支持 `Product_Album_Image`：可填写本机绝对路径或 HTTPS 图片地址。预览会从 “Product Album” 行的 Angular 绑定精确定位高清图字段，兼容后台使用 `mainPic` 等非 album 字段名；提交时直接使用现成 MFS 地址，或将本机/其他 HTTPS 图片上传后覆盖现有高清图并回读。字段缺失或候选不唯一时不会保存。
+Detail 批量替换默认选择“全选”，可在一次预览中同时处理地址替换和代码块删除，也可切换为单项操作。替换前后值按精确文本处理，可填写完整 URL、相对路径或地址片段，不要求以 `http://` 或 `https://` 开头。页面和六列 Excel 不再包含或处理 Product Album 高清图。
 
 多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications。国际复制源的 Detail 标签会等待异步加载完成后再读取，找到复制源且至少有一个目标站可执行时即可确认提交；部分站点失败不会阻塞其他已通过预检的站点。Specification 和 Datasheet 的语言表头都从实际工作簿读取并由页面选择，不依赖固定名称。Datasheet 明确提供 Product Description 时写入目标译文；未提供时，首次上架保留国际复制源描述，已复制产品的修订同步则保留目标站当前描述。Detail 规格字段精确兼容英文 `Specification/Specifications` 和日本站 `仕様`。产品上架会下载目标站总语言包，以站点包的字段键和英文原文列为基准，只按稳定字段键覆盖 Datasheet 所选语种到目标列；英文原文差异提示但不改动前置列，字段键缺失仍阻止提交。生成文件统一使用真实 `.xlsx` 格式，上传后再次下载回读。产品下架使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`；只关闭 `isSearchable` 并把 `whenType` 设为 `0`（No Set Uptime），随后回读验证。
 

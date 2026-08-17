@@ -529,10 +529,9 @@
           <div class="form-grid">
             <label for="detailAddressOperationSelect">操作类型</label>
             <select id="detailAddressOperationSelect">
-              <option value="all" selected>全选（地址替换 + 删除代码块 + 高清图）</option>
+              <option value="all" selected>全选（地址替换 + 删除代码块）</option>
               <option value="delete">删除指定代码块</option>
               <option value="replace">替换完整地址</option>
-              <option value="replace-album-image-source">覆盖 Product Album 高清图</option>
             </select>
             <label for="detailAddressSiteSelect" style="grid-column:1 / -1;margin-top:8px;">国家站点</label>
             <div style="grid-column:1 / -1;">
@@ -548,7 +547,7 @@
             <div>
               <input id="detailAddressExcelInput" type="file" accept=".xlsx,.xls">
               <a class="button" id="detailAddressTemplateDownload" href="/api/detail-address-replacement/template" download="Detail临时功能信息模板.xlsx">下载信息模板</a>
-              <div class="desc">表头 7 列：<code>Product_Name</code>、<code>Old_Address_1</code>、<code>New_Address_1</code>、<code>Old_Address_2</code>、<code>New_Address_2</code>、<code>Delete_Code_Block</code>、<code>Product_Album_Image</code>。高清图可填写本机绝对路径或 HTTPS 图片地址；现成 MFS 地址直接使用，其他图片在提交时上传后覆盖原图。</div>
+              <div class="desc">表头 6 列：<code>Product_Name</code>、<code>Old_Address_1</code>、<code>New_Address_1</code>、<code>Old_Address_2</code>、<code>New_Address_2</code>、<code>Delete_Code_Block</code>。</div>
             </div>
             <label id="detailAddressTargetLabel" for="detailAddressOldUrlInput">被替换的完整地址</label>
             <textarea id="detailAddressOldUrlInput" class="detail-temporary-field" rows="3" placeholder="https://mfs.ezvizlife.com/old-image.jpg"></textarea>
@@ -556,8 +555,6 @@
             <textarea id="detailAddressNewUrlInput" class="detail-temporary-field" rows="3" placeholder="https://mfs.ezvizlife.com/new-image.jpg"></textarea>
             <label id="detailAddressDeleteCodeLabel" for="detailAddressDeleteCodeInput">要删除的完整代码块</label>
             <textarea id="detailAddressDeleteCodeInput" class="detail-temporary-field" rows="4" placeholder="仅“全选”模式使用；不删除可留空"></textarea>
-            <label id="detailAddressAlbumImageLabel" for="detailAddressAlbumImageInput">Product Album 高清图</label>
-            <input id="detailAddressAlbumImageInput" class="detail-temporary-field" type="text" placeholder="本机绝对路径或 HTTPS 图片地址；不替换可留空">
             <label for="detailAddressUsernameInput">商城账号</label>
             <input id="detailAddressUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
             <label for="detailAddressPasswordInput">商城密码</label>
@@ -1031,27 +1028,23 @@
 
       <div id="tab-specification-translation" class="tab-content">
         <div class="card">
-          <h3>Specification 翻译上架</h3>
-          <p class="desc">从商品 Detail 的 UEditor 读取现有 Specification HTML，使用 Excel 对应语言列替换文字，并原样保留所有 img 的 src 和 alt。请先预览，确认后再保存。</p>
-          <div class="row">
-            <label>站点</label>
-            <select id="specTranslationSite"><option value="fr" selected>France (fr)</option></select>
-            <label>产品</label>
-            <input id="specTranslationProduct" type="text" value="CP8" style="width:180px;">
-            <label>语言列</label>
-            <input id="specTranslationLocale" type="text" value="fr" style="width:100px;">
+          <h3>全站 Specification 语种替换</h3>
+          <p class="desc">从当前站点一个已翻译的产品详情页自动读取 Specification 译文，再扫描该站点全部产品，把 Specification 和 Specifications 统一替换为该译文。请先预览，确认后再批量保存。</p>
+          <div class="form-grid">
+            <label for="specTranslationSite">站点</label>
+            <select id="specTranslationSite"><option value="">正在加载站点...</option></select>
+            <label for="specTranslationReferenceUrl">已翻译详情页</label>
+            <input id="specTranslationReferenceUrl" type="url" placeholder="https://www.ezviz.com/..." style="min-width:420px;">
           </div>
           <div class="row">
-            <label>翻译 Excel</label>
-            <input id="specTranslationExcel" type="file" accept=".xlsx">
-            <button id="specTranslationPreview" type="button">生成预览</button>
-            <button id="specTranslationSubmit" type="button" disabled>Complete 保存</button>
+            <button id="specTranslationPreview" type="button">扫描全部产品并预览</button>
+            <button id="specTranslationSubmit" type="button" disabled>确认批量替换</button>
           </div>
         </div>
-        <div id="specTranslationStatus" class="status">请上传已包含目标语言列的 Spec Excel。</div>
+        <div id="specTranslationStatus" class="status">请选择站点，并填写该站点一个已翻译的产品详情页地址。</div>
         <div class="card spec-output-card">
-          <h3>生成的 Specification HTML</h3>
-          <textarea id="specTranslationHtml" placeholder="预览生成的 HTML…"></textarea>
+          <h3>批量扫描结果</h3>
+          <textarea id="specTranslationHtml" placeholder="译文、产品数量和每个产品的命中情况会显示在这里…"></textarea>
         </div>
         <div class="card spec-output-card">
           <h3>执行日志</h3>
@@ -1064,7 +1057,7 @@
   <script src="src/ui.js"></script>
   <script src="src/css-scope.js?v=20260731-1"></script>
   <script src="src/module-css-scope.js?v=20260731-1"></script>
-  <script src="src/module-task-progress.js?v=20260727-1"></script>
+  <script src="src/module-task-progress.js?v=20260814-2"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-pdf-upload.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1087,6 +1080,6 @@
   <script src="src/module-campaign-tools.js?v=20260724-4"></script>
   <script src="src/module-ezviz-site-audit.js"></script>
   <script src="src/module-ga4.js"></script>
-  <script src="src/module-specification-translation.js"></script>
+  <script src="src/module-specification-translation.js?v=20260814-2"></script>
 </body>
 </html>

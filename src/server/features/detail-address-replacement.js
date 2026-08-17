@@ -162,20 +162,54 @@ function collectAlbumImageEntries(value, pathText = "vm", entries = [], modelPat
   return entries;
 }
 
+function collectStringValueEntries(value, targets, pathText = "data", entries = []) {
+  if (typeof value === "string") {
+    if ((targets || []).includes(value.trim())) entries.push({ path: pathText, value: value.trim() });
+    return entries;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectStringValueEntries(item, targets, `${pathText}[${index}]`, entries));
+    return entries;
+  }
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, item]) =>
+      collectStringValueEntries(item, targets, `${pathText}.${key}`, entries));
+  }
+  return entries;
+}
+
+function describeCandidateArray(entries) {
+  const parsed = entries.map((entry) => {
+    const match = entry.path.match(/^(.*)\[(\d+)\](.*)$/);
+    return match ? { arrayPath: match[1], index: Number(match[2]), suffix: match[3] } : null;
+  });
+  const sameArray = parsed.length > 1 && parsed.every(Boolean)
+    && parsed.every((item) => item.arrayPath === parsed[0].arrayPath && item.suffix === parsed[0].suffix);
+  return {
+    arrayPath: sameArray ? parsed[0].arrayPath : "",
+    arrayIndexes: sameArray ? parsed.map((item) => item.index) : []
+  };
+}
+
 function selectAlbumImageEntry(viewModel, modelPaths = []) {
   const entries = collectAlbumImageEntries(viewModel, "vm", [], modelPaths);
   const bound = entries.filter((entry) => matchesAlbumBinding(entry.path, modelPaths));
   const scoped = bound.length ? bound : entries;
   const preferred = scoped.filter((entry) => /(?:hd|high|original|large|big|master)/i.test(entry.path));
   const candidates = preferred.length ? preferred : scoped;
-  if (candidates.length !== 1) {
-    throw new Error(
-      candidates.length
-        ? `Product Album 高清图字段不唯一，共找到 ${candidates.length} 个候选，请检查产品编辑页。`
-        : "产品编辑页没有找到 Product Album 高清图地址。"
-    );
-  }
-  return candidates[0];
+  if (!candidates.length) throw new Error("产品编辑页没有找到 Product Album 高清图地址。");
+  if (candidates.length === 1) return candidates[0];
+
+  const array = describeCandidateArray(candidates);
+  return {
+    ...candidates[0],
+    candidatePaths: candidates.map((entry) => entry.path),
+    targetTexts: [...new Set(candidates.map((entry) => entry.value))],
+    albumArrayPath: array.arrayPath,
+    albumArrayIndexes: array.arrayIndexes,
+    collapseCandidates: true
+  };
 }
 
 function validateAlbumImageSource(rawSource, productName) {
@@ -372,11 +406,6 @@ function normalizeBatchItem(item, index) {
     );
     if (operation) operations.push(operation);
   });
-  const albumOperation = validateAlbumImageSource(
-    item?.productAlbumImage ?? item?.Product_Album_Image ?? item?.productAlbumImagePath ?? item?.Product_Album_Image_Path,
-    productName
-  );
-  if (albumOperation) operations.push(albumOperation);
   if (!operations.length) {
     throw new Error(`${productName} 没有填写地址替换或待删除代码块。`);
   }
@@ -387,7 +416,7 @@ function normalizeBatchItem(item, index) {
 function validateRequest(body) {
   if (Array.isArray(body?.items)) {
     if (!body.items.length) throw new Error("Excel 中没有可执行的产品数据。");
-    if (body.items.length > 50) throw new Error("一次最多处理 50 个产品。");
+    if (body.items.length > 60) throw new Error("一次最多处理 60 个产品。");
     const items = body.items.map(normalizeBatchItem);
     const names = new Set();
     items.forEach((item) => {
@@ -404,7 +433,7 @@ function validateRequest(body) {
   }
 
   const productNames = parseProductNames(body?.productNames ?? body?.productName);
-  const operation = ["delete", "replace-album-image-source"].includes(body?.operation)
+  const operation = body?.operation === "delete"
     ? body.operation
     : "replace";
   const rawTargetText = String(body?.targetText ?? body?.codeBlock ?? body?.oldUrl ?? "");
@@ -413,7 +442,7 @@ function validateRequest(body) {
     ? ""
     : String(body?.replacementText ?? body?.newUrl ?? "").trim();
   if (!productNames.length) throw new Error("请填写至少一个产品名称。");
-  if (productNames.length > 50) throw new Error("一次最多处理 50 个产品。");
+  if (productNames.length > 60) throw new Error("一次最多处理 60 个产品。");
 
   let operationConfig;
   if (operation === "delete") {
@@ -425,9 +454,6 @@ function validateRequest(body) {
       targetText,
       replacementText: ""
     };
-  } else if (operation === "replace-album-image-source") {
-    operationConfig = validateAlbumImageSource(body?.productAlbumImage, "手工模式");
-    if (!operationConfig) throw new Error("请填写 Product Album 高清图本机路径或 HTTPS 地址。");
   } else {
     operationConfig = validateAddressPair(targetText, replacementText, "地址替换");
     if (!operationConfig) throw new Error("请填写被替换地址和替换后地址。");
@@ -527,17 +553,31 @@ function planAlbumOperations(viewModel, operations) {
   };
 }
 
-function planAlbumFileOperations(viewModel, operations, albumModelPaths = []) {
+function planAlbumFileOperations(viewModel, saveModel, operations, albumModelPaths = []) {
   const steps = operations.map((operation) => {
     const target = selectAlbumImageEntry(viewModel, albumModelPaths);
+    const targetTexts = target.targetTexts || [target.value];
+    const payloadCandidates = collectStringValueEntries(saveModel, targetTexts);
+    if (!payloadCandidates.length) {
+      throw new Error("Product Album 高清图在后台保存模型中没有找到对应字段。");
+    }
+    const payloadArray = describeCandidateArray(payloadCandidates);
     return {
       ...operation,
       targetText: target.value,
+      targetTexts,
       replacementText: "",
       fieldPath: target.path,
+      candidatePaths: target.candidatePaths || [target.path],
+      albumArrayPath: target.albumArrayPath || "",
+      albumArrayIndexes: target.albumArrayIndexes || [],
+      collapseCandidates: !!target.collapseCandidates,
+      payloadCandidatePaths: payloadCandidates.map((entry) => entry.path),
+      payloadArrayPath: payloadArray.arrayPath,
+      payloadArrayIndexes: payloadArray.arrayIndexes,
       matchingMode: "product-album-field",
-      matchCount: 1,
-      matches: [{ path: target.path, count: 1 }],
+      matchCount: (target.candidatePaths || [target.path]).length,
+      matches: (target.candidatePaths || [target.path]).map((path) => ({ path, count: 1 })),
       existingNewCount: 0,
       expectedNewCount: 1
     };
@@ -554,6 +594,7 @@ function planProductOperations(snapshot, operations) {
   const albumPlan = planAlbumOperations(snapshot.viewModel, albumOperations);
   const albumFilePlan = planAlbumFileOperations(
     snapshot.viewModel,
+    snapshot.saveModel || snapshot.viewModel,
     albumFileOperations,
     snapshot.albumModelPaths
   );
@@ -660,6 +701,7 @@ function createDetailAddressReplacementFeature(deps) {
       return {
         goodsId: String(scope.goodsId),
         viewModel: JSON.parse(JSON.stringify(scope.vm || {})),
+        saveModel: JSON.parse(JSON.stringify(scope.md.toModel(scope.vm) || {})),
         pcView: JSON.parse(JSON.stringify(scope.vm.pcView || {})),
         albumModelPaths
       };
@@ -673,6 +715,10 @@ function createDetailAddressReplacementFeature(deps) {
       const replacedCounts = [];
       function applyOperation(operation) {
         let replaced = 0;
+        if (operation.type === "replace-album-image-ui") {
+          replacedCounts.push(operation.matchCount || 1);
+          return;
+        }
         function update(value) {
           if (typeof value === "string") {
             const count = value.split(operation.targetText).length - 1;
@@ -689,6 +735,8 @@ function createDetailAddressReplacementFeature(deps) {
           return value;
         }
         function updateAlbum(value, path = "vm") {
+          const candidatePaths = operation.candidatePaths || [];
+          const candidateIndex = candidatePaths.indexOf(path);
           const isAlbumPath = operation.fieldPath
             ? path === operation.fieldPath
             : /(?:^|\.)(?:[^.[\]]*(?:album|gallery)[^.[\]]*)(?=$|[.\[])/i.test(path)
@@ -696,6 +744,10 @@ function createDetailAddressReplacementFeature(deps) {
           const isSelectedImage = !operation.imageIndex
             || path.includes(`[${operation.imageIndex - 1}]`);
           if (typeof value === "string") {
+            if (operation.collapseCandidates && candidateIndex >= 0) {
+              replaced += 1;
+              return candidateIndex === 0 ? operation.replacementText : "";
+            }
             if (!isAlbumPath || !isSelectedImage) return value;
             const count = value.split(operation.targetText).length - 1;
             replaced += count;
@@ -703,6 +755,11 @@ function createDetailAddressReplacementFeature(deps) {
           }
           if (Array.isArray(value)) {
             value.forEach((item, index) => { value[index] = updateAlbum(item, `${path}[${index}]`); });
+            if (operation.collapseCandidates && path === operation.albumArrayPath) {
+              const indexes = new Set(operation.albumArrayIndexes || []);
+              const keepIndex = (operation.albumArrayIndexes || [])[0];
+              value.splice(0, value.length, ...value.filter((_item, index) => !indexes.has(index) || index === keepIndex));
+            }
             return value;
           }
           if (value && typeof value === "object") {
@@ -716,14 +773,63 @@ function createDetailAddressReplacementFeature(deps) {
       }
       operationList.forEach(applyOperation);
       const data = scope.md.toModel(scope.vm);
+      function syncAlbumPayload(value, operation, path = "data") {
+        const candidatePaths = operation.payloadCandidatePaths || [];
+        const candidateIndex = candidatePaths.indexOf(path);
+        if (typeof value === "string") {
+          if (operation.collapseCandidates && candidateIndex >= 0) {
+            return candidateIndex === 0 ? operation.replacementText : "";
+          }
+          if (candidateIndex < 0) return value;
+          return value.split(operation.targetText).join(operation.replacementText);
+        }
+        if (Array.isArray(value)) {
+          value.forEach((item, index) => {
+            value[index] = syncAlbumPayload(item, operation, `${path}[${index}]`);
+          });
+          if (operation.collapseCandidates && path === operation.payloadArrayPath) {
+            const indexes = new Set(operation.payloadArrayIndexes || []);
+            const keepIndex = (operation.payloadArrayIndexes || [])[0];
+            value.splice(0, value.length, ...value.filter((_item, index) => !indexes.has(index) || index === keepIndex));
+          }
+          return value;
+        }
+        if (value && typeof value === "object") {
+          Object.keys(value).forEach((key) => {
+            value[key] = syncAlbumPayload(value[key], operation, `${path}.${key}`);
+          });
+        }
+        return value;
+      }
+      operationList
+        .filter((operation) => operation.type === "replace-album-image")
+        .forEach((operation) => syncAlbumPayload(data, operation));
       data.goods_id = scope.goodsId;
-      return { payload: data, replacedCounts };
-    }, operations.map(({ type, targetText, replacementText, imageIndex, fieldPath }) => ({
+      const payloadText = JSON.stringify(data);
+      const payloadChecks = operationList.map((operation) => ({
+        oldCount: (operation.targetTexts || [operation.targetText])
+          .reduce((sum, target) => sum + (target ? payloadText.split(target).length - 1 : 0), 0),
+        newCount: operation.replacementText ? payloadText.split(operation.replacementText).length - 1 : 0
+      }));
+      return { payload: data, replacedCounts, payloadChecks };
+    }, operations.map(({
+      type, targetText, replacementText, imageIndex, fieldPath, candidatePaths, matchCount,
+      albumArrayPath, albumArrayIndexes, collapseCandidates, payloadCandidatePaths,
+      payloadArrayPath, payloadArrayIndexes
+    }) => ({
       type,
+      matchCount,
       targetText,
       replacementText,
       imageIndex,
-      fieldPath
+      fieldPath,
+      candidatePaths,
+      albumArrayPath,
+      albumArrayIndexes,
+      collapseCandidates,
+      payloadCandidatePaths,
+      payloadArrayPath,
+      payloadArrayIndexes
     })));
   }
 
@@ -778,6 +884,7 @@ function createDetailAddressReplacementFeature(deps) {
           operations: plan.steps
         });
       } catch (error) {
+        if (error?.code === "TASK_CANCELLED") throw error;
         results.push({
           status: "failed",
           productName: item.productName,
@@ -829,17 +936,15 @@ function createDetailAddressReplacementFeature(deps) {
             saveSteps.push(step);
             continue;
           }
-          const uploadResult = await resolveAlbumImageSource(step);
-          logLine(
-            logs,
-            step.sourceType === "mfs-url"
-              ? "Product Album 高清图使用现有 MFS 地址。"
-              : `Product Album 高清图已上传：${step.sourceType === "local-file" ? path.basename(step.imageSource) : step.imageSource}`
-          );
+          const uploadResult = await replaceAlbumUsingUploader(session.page, step);
+          if (!uploadResult.thumbnail?.big_img) {
+            throw new Error("Product Album 上传组件没有返回高清图地址。");
+          }
+          logLine(logs, `Product Album 高清图已通过后台上传组件生成：${uploadResult.thumbnail.big_img}`);
           saveSteps.push({
             ...step,
-            type: "replace-album-image",
-            replacementText: uploadResult.url,
+            type: "replace-album-image-ui",
+            replacementText: uploadResult.thumbnail.big_img,
             expectedNewCount: 1
           });
         }
@@ -852,16 +957,26 @@ function createDetailAddressReplacementFeature(deps) {
               + `实际 ${update.replacedCounts[index]}。`
             );
           }
+          if (step.type === "replace-album-image" && update.payloadChecks[index]?.newCount < 1) {
+            throw new Error(
+              `${step.label}保存载荷生成失败：新图数量 ${update.payloadChecks[index]?.newCount ?? 0}。`
+            );
+          }
         });
         const save = await postProductUpdate(session.page, update.payload);
         const after = await readProductPcView(session.page, item.productName, logs);
         const operationChecks = saveSteps.map((step) => {
-          const remainingTargetCount = (step.type === "replace-album-image"
-            ? collectAlbumImageMatches(after.viewModel, step.targetText, "vm", [], step.imageIndex, step.fieldPath)
+          const isAlbumStep = ["replace-album-image", "replace-album-image-ui"].includes(step.type);
+          const remainingTargetCount = (isAlbumStep
+            ? (step.collapseCandidates
+              ? (step.targetTexts || [step.targetText]).flatMap((targetText) =>
+                (step.candidatePaths || [step.fieldPath]).flatMap((fieldPath) =>
+                  collectAlbumImageMatches(after.viewModel, targetText, "vm", [], step.imageIndex, fieldPath)))
+              : collectAlbumImageMatches(after.viewModel, step.targetText, "vm", [], step.imageIndex, step.fieldPath))
             : collectDetailAddressMatches(after.pcView, step.targetText)
           ).reduce((sum, match) => sum + match.count, 0);
           const finalReplacementCount = step.replacementText
-            ? (step.type === "replace-album-image"
+            ? (isAlbumStep
               ? collectAlbumImageMatches(after.viewModel, step.replacementText, "vm", [], step.imageIndex, step.fieldPath)
               : collectDetailAddressMatches(after.pcView, step.replacementText)
             ).reduce((sum, match) => sum + match.count, 0)
@@ -902,6 +1017,7 @@ function createDetailAddressReplacementFeature(deps) {
         }
         logLine(logs, `Detail 临时操作并回读通过：${item.productName} / ${plan.matchCount} 处。`);
       } catch (error) {
+        if (error?.code === "TASK_CANCELLED") throw error;
         results.push({
           status: "failed",
           productName: item.productName,
@@ -938,6 +1054,7 @@ function createDetailAddressReplacementFeature(deps) {
       try {
         results.push(await previewSingle({ ...(body || {}), sites: [site.siteCode] }, logs));
       } catch (error) {
+        if (error?.code === "TASK_CANCELLED") throw error;
         results.push({
           mode: "detail-temporary-operation-preview",
           site,
@@ -971,6 +1088,7 @@ function createDetailAddressReplacementFeature(deps) {
       try {
         results.push(await submitSingle({ ...(body || {}), sites: [site.siteCode] }, logs));
       } catch (error) {
+        if (error?.code === "TASK_CANCELLED") throw error;
         results.push({
           mode: "authenticated-detail-temporary-operation",
           site,
@@ -997,7 +1115,104 @@ function createDetailAddressReplacementFeature(deps) {
     };
   }
 
-  return { preview, submit };
+  async function replaceAlbumUsingUploader(page, operation) {
+    let filePath = operation.imageSource;
+    let tempDir = "";
+    if (operation.sourceType !== "local-file") {
+      const response = await fetch(operation.imageSource, {
+        signal: AbortSignal.timeout(30000)
+      });
+      if (!response.ok) throw new Error(`下载 Product Album 高清图失败：HTTP ${response.status}`);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.length > 25 * 1024 * 1024) throw new Error("Product Album 高清图不能超过 25 MB。");
+      const ext = String(new URL(operation.imageSource).pathname).match(/\.(png|jpe?g|webp)$/i)?.[1] || "png";
+      tempDir = path.join(process.cwd(), "runtime_uploads", `album-ui-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      fs.mkdirSync(tempDir, { recursive: true });
+      filePath = path.join(tempDir, `product-album.${ext}`);
+      fs.writeFileSync(filePath, buffer);
+    }
+    try {
+      const before = await page.evaluate(() => {
+        const scope = window.angular.element(document.querySelector("#replenish")).scope();
+        return JSON.parse(JSON.stringify(scope.vm?.basic?.thumbnails || []));
+      });
+      await page.setInputFiles("#picker input[type=file]", filePath);
+      await page.waitForFunction((oldSources) => {
+        const scope = window.angular.element(document.querySelector("#replenish")).scope();
+        const thumbnails = scope.vm?.basic?.thumbnails || [];
+        return thumbnails.some((item) => item?.src && !oldSources.includes(item.src));
+      }, before.map((item) => item.src), { timeout: 60000 });
+      return page.evaluate((oldSources) => {
+        const scope = window.angular.element(document.querySelector("#replenish")).scope();
+        const thumbnails = scope.vm.basic.thumbnails || [];
+        const uploaded = [...thumbnails].reverse().find((item) => item?.src && !oldSources.includes(item.src));
+        if (!uploaded) throw new Error("上传组件没有返回新的 Product Album 图片记录。");
+        delete uploaded.id;
+        uploaded.big_img = uploaded.big_img || uploaded.src;
+        uploaded.middle_img = uploaded.middle_img || uploaded.src;
+        uploaded.small_img = uploaded.small_img || uploaded.src;
+        ["src", "big_img", "middle_img", "small_img"].forEach((key) => {
+          if (String(uploaded[key] || "").startsWith("//")) uploaded[key] = "https:" + uploaded[key];
+        });
+        uploaded.is_default = 1;
+        uploaded.isDefault = true;
+        scope.vm.basic.thumbnails.splice(0, scope.vm.basic.thumbnails.length, uploaded);
+        (scope.$root || scope).$applyAsync?.();
+        const saveModel = scope.md.toModel(scope.vm);
+        return {
+          thumbnail: JSON.parse(JSON.stringify(uploaded)),
+          saveImage: JSON.parse(JSON.stringify(saveModel?.images?.[0] || null))
+        };
+      }, before.map((item) => item.src));
+    } finally {
+      if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  async function diagnoseAlbum(body, logs) {
+    const productName = String(body?.productName || "").trim();
+    if (!productName) throw new Error("请填写产品名称。");
+    const session = await prepareSession(body, logs);
+    const snapshot = await readProductPcView(session.page, productName, logs);
+    const pageDetails = await session.page.evaluate(() => {
+      const scope = window.angular.element(document.querySelector("#replenish")).scope();
+      const saveModel = scope.md.toModel(scope.vm);
+      const labels = [...document.querySelectorAll("label, th, td, span, div")]
+        .filter((element) => /^product\s+album\s*[:：*]?$/i.test((element.textContent || "").trim()));
+      const containers = labels.map((label) =>
+        label.closest("tr, .form-group, .control-group, .row") || label.parentElement).filter(Boolean);
+      const methodNames = [];
+      let current = scope;
+      for (let depth = 0; current && depth < 3; depth += 1, current = Object.getPrototypeOf(current)) {
+        Object.getOwnPropertyNames(current).forEach((key) => {
+          if (/(?:image|img|thumb|upload|album)/i.test(key) && typeof scope[key] === "function" && !methodNames.includes(key)) {
+            methodNames.push(key);
+          }
+        });
+      }
+      return {
+        thumbnail: JSON.parse(JSON.stringify(scope.vm?.basic?.thumbnails?.[0] || null)),
+        saveImage: JSON.parse(JSON.stringify(saveModel?.images?.[0] || null)),
+        saveImagesCount: Array.isArray(saveModel?.images) ? saveModel.images.length : 0,
+        albumHtml: containers.map((container) => container.outerHTML).join("\n").slice(0, 20000),
+        thumbnailBindings: [...document.querySelectorAll("*")]
+          .filter((element) => [...element.attributes].some((attribute) =>
+            /vm\.basic\.thumbnails|basic\.setDefault|basic\.deleteItem/.test(attribute.value)))
+          .map((element) => element.outerHTML).join("\n").slice(0, 30000),
+        scripts: [...document.scripts].map((script) => script.src).filter(Boolean),
+        methodNames
+      };
+    });
+    return {
+      site: session.site,
+      productName,
+      goodsId: snapshot.goodsId,
+      albumModelPaths: snapshot.albumModelPaths,
+      ...pageDetails
+    };
+  }
+
+  return { preview, submit, diagnoseAlbum };
 }
 
 module.exports = {
