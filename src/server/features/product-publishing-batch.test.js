@@ -93,7 +93,7 @@ test("batch submit uploads one merged language package before publishing product
     logLine() {},
     revisionFeature: {
       async submitPublishingLanguagePackageBatch(body, entries, fingerprints) {
-        calls.push(["language", entries.map((entry) => entry.productName), fingerprints]);
+        calls.push(["language", body.productName, entries.map((entry) => entry.productName), fingerprints]);
       },
       async submitPublishingWithoutLanguagePackage(body) {
         calls.push(["product", body.productName]);
@@ -127,7 +127,7 @@ test("batch submit uploads one merged language package before publishing product
     expectedBatchPreviews: JSON.stringify({ CP8: preview("CP8"), HP8: preview("HP8") })
   }, files, []);
   assert.deepEqual(calls, [
-    ["language", ["CP8", "HP8"], { fr: "fr-package" }],
+    ["language", "CP8", ["CP8", "HP8"], { fr: "fr-package" }],
     ["product", "CP8"],
     ["product", "HP8"]
   ]);

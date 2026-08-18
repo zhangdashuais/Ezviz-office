@@ -1230,7 +1230,12 @@ function createProductRevisionSyncFeature(deps) {
 
   async function submitPublishingLanguagePackageBatch(body, datasheetFiles, expectedFingerprints, logs) {
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
-    const request = validateRevisionRequest(body, sites, { ignoreSourceSite: true });
+    const batchProductName = normalize(datasheetFiles?.[0]?.productName);
+    const request = validateRevisionRequest(
+      { ...(body || {}), productName: batchProductName },
+      sites,
+      { ignoreSourceSite: true }
+    );
     const parsedDatasheets = datasheetFiles.map((entry) => ({
       productName: entry.productName,
       parsed: parseLanguageDatasheet(entry.file.path)

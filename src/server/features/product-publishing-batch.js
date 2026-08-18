@@ -139,7 +139,7 @@ function createProductPublishingBatchFeature(deps) {
     });
     logLine(logs, "先合并本批次全部产品译文，并按站点一次上传语言包。");
     await revisionFeature.submitPublishingLanguagePackageBatch(
-      body,
+      { ...(body || {}), productName: products[0].productName },
       products.map((product) => ({
         productName: product.productName,
         file: product.files.datasheet
