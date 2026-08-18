@@ -26,6 +26,34 @@ const SITE_LANGUAGE_NEEDLES = {
 };
 const ENGLISH_SOURCE_HEADER = "English (Source)";
 
+function normalizedLanguageText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function languageRowScore(candidate, siteCode) {
+  const code = String(siteCode || "").trim().toLowerCase();
+  const langCode = String(candidate?.langCode || "").trim().toLowerCase();
+  const text = normalizedLanguageText(candidate?.rowText);
+  const needles = (SITE_LANGUAGE_NEEDLES[code] || [code]).map(normalizedLanguageText);
+  let score = needles.reduce((total, needle) => total + (needle && text.includes(needle) ? 20 : 0), 0);
+
+  // The backend can expose two packages in the same account, e.g. fr-CA and
+  // fr-FR. The locale region is the strongest signal for the target site.
+  if (code && new RegExp(`-${code}$`, "i").test(langCode)) score += 100;
+  if (code && text.includes(`-${code}store`)) score += 40;
+  return score;
+}
+
+function chooseLanguageRowCandidate(candidates, siteCode) {
+  if (!Array.isArray(candidates) || !candidates.length) return null;
+  return candidates
+    .map((candidate, index) => ({ candidate, index, score: languageRowScore(candidate, siteCode) }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)[0].candidate;
+}
+
 function createLanguagePackageFeature(deps) {
   const {
     fs,
@@ -62,6 +90,7 @@ function multipartField(postData, fieldName) {
 async function findLanguageRow(page, siteCode) {
   const rows = page.locator("tr");
   const rowCount = await rows.count();
+  const rowCandidates = [];
   for (let index = 0; index < rowCount; index += 1) {
     const row = rows.nth(index);
     const actions = row.locator("a,button,[ng-click]");
@@ -83,15 +112,16 @@ async function findLanguageRow(page, siteCode) {
           return "";
         }
       }).catch(() => "");
-      return {
+      rowCandidates.push({
         row,
         rowText: (await row.innerText().catch(() => "")).replace(/\s+/g, " ").trim(),
         langCode,
         downloadAction: actions.nth(downloadIndex),
         editAction: actions.nth(editIndex)
-      };
+      });
     }
   }
+  if (rowCandidates.length) return chooseLanguageRowCandidate(rowCandidates, siteCode);
   const globalActions = page.locator("a:visible,button:visible,[ng-click]:visible");
   const globalMetadata = await globalActions.evaluateAll((elements) => elements.map((element) => ({
     text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim(),
@@ -118,13 +148,18 @@ async function findLanguageRow(page, siteCode) {
   const downloadIndexes = globalMetadata
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => /^download$/i.test(item.text) || /^download\s*\(/i.test(item.ngClick));
-  const siteNeedles = {
-    es: ["es-es", "esstore", "español", "spanish"]
-  }[String(siteCode || "").toLowerCase()] || [String(siteCode || "").toLowerCase()];
-  const matchedDownload = downloadIndexes.find(({ item }) => {
-    const haystack = JSON.stringify(item).toLowerCase();
-    return siteNeedles.some((needle) => needle && haystack.includes(needle));
-  }) || downloadIndexes[0];
+  const selectedCandidate = chooseLanguageRowCandidate(
+    downloadIndexes.map(({ item, index }) => ({
+      rowText: item.rowText || item.text || item.ngClick,
+      langCode: item.langCode,
+      actionIndex: index,
+      metadata: item
+    })),
+    siteCode
+  );
+  const matchedDownload = selectedCandidate
+    ? { item: selectedCandidate.metadata, index: selectedCandidate.actionIndex }
+    : downloadIndexes[0];
   const downloadIndex = matchedDownload?.index ?? -1;
   const selectedDownload = matchedDownload?.item;
   const editIndex = globalMetadata.findIndex((item) => {
@@ -1043,4 +1078,8 @@ async function reviseHg24004(body, logs, submit = false) {
   };
 }
 
-module.exports = { createLanguagePackageFeature };
+module.exports = {
+  createLanguagePackageFeature,
+  chooseLanguageRowCandidate,
+  languageRowScore
+};
