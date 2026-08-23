@@ -76,17 +76,17 @@ test("containment spans adjacent HTML blocks in the same section and reports its
   const result = compareTextContent({
     pdfPages: [{
       page: 2,
-      lines: ["camera always on, so you never have to worry about charging. Powered by AOV 2.0 technology, HB90 Dual records"]
+      lines: ["keeps the camera always on powered by AOV 2.0 technology"]
     }],
     htmlSegments: [
       {
         tag: "p",
-        text: "The built-in battery keeps the camera always on, so you never have to worry about charging.",
+        text: "The built-in battery keeps the camera always on",
         section: { index: 2, id: "overview", className: "overview-section", heading: "HB90 Dual Kit" }
       },
       {
         tag: "p",
-        text: "Powered by AOV 2.0 technology, HB90 Dual records non-stop.",
+        text: "powered by AOV 2.0 technology, HB90 Dual records non-stop.",
         section: { index: 2, id: "overview", className: "overview-section", heading: "HB90 Dual Kit" }
       }
     ]
@@ -110,6 +110,24 @@ test("containment searches all visible HTML text and reports a cross-section loc
   assert.equal(result.summary.missing, 0);
   assert.match(result.items[0].htmlSection, /Section 1/);
   assert.match(result.items[0].htmlSection, /Section 2/);
+});
+
+test("short PDF lines split on sentence boundaries before HTML containment", () => {
+  const result = compareTextContent({
+    pdfPages: [{
+      page: 5,
+      lines: ["viewing angle. You can pinpoint up to 12 angles via"]
+    }],
+    htmlSegments: [{
+      tag: "p",
+      text: "You can pinpoint up to 12 angles via the EZVIZ App."
+    }]
+  });
+
+  const pinpointItem = result.items.find((item) => item.pdfText.includes("pinpoint"));
+  assert.equal(result.summary.match, 1);
+  assert.equal(result.summary.missing, 1);
+  assert.equal(pinpointItem?.type, "match");
 });
 
 test("the Specification heading page and every following PDF page are excluded", () => {
@@ -147,4 +165,25 @@ test("units match when HTML and PDF split 2.8 and mm in either direction", () =>
   });
   assert.equal(splitPdf.summary.match, 2);
   assert.equal(splitPdf.summary.missing, 0);
+});
+
+test("missing PDF text suggests the closest language package field to update", () => {
+  const result = compareTextContent({
+    pdfPages: [{ page: 1, lines: ["Up to 12x Mixed Zoom"] }],
+    htmlSegments: [{
+      tag: "p",
+      text: "Up to 10x Mixed Zoom",
+      languageKeys: ["goods.zoom_copy"]
+    }]
+  });
+
+  assert.equal(result.summary.missing, 1);
+  assert.equal(result.summary.languageFieldSuggestionCount, 1);
+  assert.deepEqual(result.items[0].languageFieldSuggestions, [{
+    key: "goods.zoom_copy",
+    currentText: "Up to 10x Mixed Zoom",
+    suggestedText: "Up to 12x Mixed Zoom",
+    similarity: result.items[0].languageFieldSuggestions[0].similarity
+  }]);
+  assert.match(result.items[0].suggestion, /goods\.zoom_copy/);
 });

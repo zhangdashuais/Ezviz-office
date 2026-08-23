@@ -104,9 +104,28 @@ function extractHtmlSegments(html) {
 
   const $ = cheerio.load(source, { decodeEntities: true });
   $("script,style,noscript,template,svg,canvas,[hidden],[aria-hidden='true']").remove();
+
+  function isAnimationInitialHidden(node) {
+    const element = $(node);
+    const attrs = node.attribs || {};
+    const className = String(attrs.class || "");
+    const dataAttributes = Object.keys(attrs).filter((key) => key.startsWith("data-"));
+    return Boolean(
+      attrs["data-lp-animate-section"]
+      || attrs["data-aos"]
+      || attrs["data-w-id"]
+      || dataAttributes.some((key) => /animate|animation|motion|reveal/i.test(key))
+      || /(?:^|\s)(?:wow|animated|animate|animation|fade|slide|reveal)[\w-]*(?:\s|$)/i.test(className)
+      || element.find("[data-lp-animate-section],[data-aos],[data-w-id]").length
+    );
+  }
+
   $("[style]").each((_index, node) => {
     const style = String($(node).attr("style") || "").toLowerCase();
-    if (/display\s*:\s*none|visibility\s*:\s*hidden/.test(style)) $(node).remove();
+    if (/display\s*:\s*none/.test(style)) $(node).remove();
+    else if (/visibility\s*:\s*hidden/.test(style) && !isAnimationInitialHidden(node)) {
+      $(node).remove();
+    }
   });
 
   const preferredBlocks = new Set([
@@ -139,6 +158,17 @@ function extractHtmlSegments(html) {
     return null;
   }
 
+  function languageKeysFor(node) {
+    const keys = [];
+    let current = node;
+    while (current && current.type !== "root") {
+      const key = current.attribs?.["data-text-compare-language-key"];
+      if (key && !keys.includes(key)) keys.push(key);
+      current = current.parent;
+    }
+    return keys;
+  }
+
   function ownerFor(node) {
     let parent = node.parent;
     let fallback = null;
@@ -160,10 +190,13 @@ function extractHtmlSegments(html) {
           groups.set(owner, {
             tag: String(owner?.name || "body").toLowerCase(),
             section: sectionFor(owner),
-            parts: []
+            parts: [],
+            languageKeys: new Set()
           });
         }
-        groups.get(owner).parts.push(text);
+        const group = groups.get(owner);
+        group.parts.push(text);
+        languageKeysFor(node.parent).forEach((key) => group.languageKeys.add(key));
       }
       return;
     }
@@ -176,6 +209,7 @@ function extractHtmlSegments(html) {
     .map((item) => ({
       tag: item.tag,
       text: normalizeDisplayText(item.parts.join(" ")),
+      ...(item.languageKeys?.size ? { languageKeys: [...item.languageKeys] } : {}),
       ...(item.section ? { section: item.section } : {})
     }))
     .filter((item) => item.text && /[\p{L}\p{N}]/u.test(item.text));

@@ -3,9 +3,12 @@
   const elements = {
     pdf: $("textComparePdfInput"),
     html: $("textCompareHtmlInput"),
+    languagePackage: $("textCompareLanguageInput"),
+    languageColumn: $("textCompareLanguageColumn"),
     compare: $("textCompareRunBtn"),
     clear: $("textCompareClearBtn"),
     download: $("textCompareDownloadBtn"),
+    downloadFieldEdits: $("textCompareDownloadFieldEditsBtn"),
     status: $("textCompareStatus"),
     summary: $("textCompareSummary"),
     recommendations: $("textCompareRecommendations"),
@@ -52,18 +55,30 @@
   }
 
   function renderSummary(summary) {
-    elements.summary.replaceChildren(
+    const languageReplacement = lastResult?.languageReplacement || null;
+    const cards = [
       summaryCard("PDF 页数", summary.pdfPages),
       summaryCard("已排除 Specification", `${summary.excludedSpecificationPages || 0} 页 / ${summary.excludedSpecificationSegments || 0} 条`),
       summaryCard("HTML 已包含", summary.match, "is-match"),
       summaryCard("HTML 未包含", summary.missing, "is-missing"),
       summaryCard("数值/单位风险", summary.critical, "is-critical"),
+      summaryCard("字段修改建议", summary.languageFieldSuggestionCount || 0, summary.languageFieldSuggestionCount ? "is-changed" : ""),
       summaryCard("PDF 包含率", `${summary.matchRate}%`),
       summaryCard("核验结论", {
         pass: "通过",
         warning: "需确认",
         fail: "需修正"
       }[summary.verdict] || "-")
+    ];
+    if (languageReplacement) {
+      cards.splice(2, 0, summaryCard(
+        "语言字段还原",
+        `${languageReplacement.replacementCount || 0} 处 / 缺 ${languageReplacement.missingFieldCount || 0}`,
+        languageReplacement.missingFieldCount ? "is-changed" : "is-match"
+      ));
+    }
+    elements.summary.replaceChildren(
+      ...cards
     );
     elements.summary.hidden = false;
   }
@@ -136,6 +151,16 @@
       similarityCell.textContent = item.type === "match" ? "包含" : "未包含";
       const suggestionCell = document.createElement("td");
       suggestionCell.textContent = item.suggestion || "-";
+      if (item.languageFieldSuggestions?.length) {
+        suggestionCell.textContent = "";
+        item.languageFieldSuggestions.forEach((fieldSuggestion) => {
+          const key = document.createElement("small");
+          key.textContent = `${fieldSuggestion.key} ->`;
+          const value = document.createElement("div");
+          value.textContent = fieldSuggestion.suggestedText || item.pdfText || "-";
+          suggestionCell.append(key, value);
+        });
+      }
       row.append(
         typeCell,
         pageCell,
@@ -161,6 +186,7 @@
 
     elements.compare.disabled = true;
     elements.download.disabled = true;
+    if (elements.downloadFieldEdits) elements.downloadFieldEdits.disabled = true;
     elements.summary.hidden = true;
     elements.recommendations.hidden = true;
     elements.filters.hidden = true;
@@ -171,6 +197,11 @@
       const formData = new FormData();
       formData.append("pdfFile", pdfFile, pdfFile.name);
       formData.append("htmlFile", htmlFile, htmlFile.name);
+      const languagePackageFile = elements.languagePackage?.files?.[0];
+      if (languagePackageFile) {
+        formData.append("languagePackageFile", languagePackageFile, languagePackageFile.name);
+        formData.append("languageColumn", elements.languageColumn?.value || "");
+      }
       const response = await fetch("/api/text-comparison/verify", {
         method: "POST",
         body: formData
@@ -188,9 +219,18 @@
       elements.search.value = "";
       renderTable();
       elements.download.disabled = false;
+      if (elements.downloadFieldEdits) {
+        elements.downloadFieldEdits.disabled = collectLanguageFieldEdits(lastResult).length === 0;
+      }
       const differenceCount = lastResult.summary.missing;
+      const languageReplacement = lastResult.languageReplacement;
+      const languageMessage = languageReplacement
+        ? `语言字段已先还原 ${languageReplacement.replacementCount || 0} 处`
+          + (languageReplacement.missingFieldCount ? `，缺失 ${languageReplacement.missingFieldCount} 个字段` : "")
+          + "；"
+        : "";
       setStatus(
-        `${lastResult.summary.verdictText} 共发现 ${differenceCount} 条未包含片段，其中 ${lastResult.summary.critical} 条包含数值或单位风险。`,
+        `${languageMessage}${lastResult.summary.verdictText} 共发现 ${differenceCount} 条未包含片段，其中 ${lastResult.summary.critical} 条包含数值或单位风险。`,
         lastResult.summary.verdict === "pass" ? "ok" : "warn"
       );
     } catch (error) {
@@ -205,12 +245,15 @@
     lastResult = null;
     elements.pdf.value = "";
     elements.html.value = "";
+    if (elements.languagePackage) elements.languagePackage.value = "";
+    if (elements.languageColumn) elements.languageColumn.value = "";
     elements.summary.hidden = true;
     elements.recommendations.hidden = true;
     elements.filters.hidden = true;
     elements.tableBody.replaceChildren();
     elements.empty.hidden = true;
     elements.download.disabled = true;
+    if (elements.downloadFieldEdits) elements.downloadFieldEdits.disabled = true;
     setStatus("请选择需要对比的 PDF 和 HTML 文件。");
   }
 
@@ -229,9 +272,81 @@
     setTimeout(() => URL.revokeObjectURL(link.href), 0);
   }
 
+  function collectLanguageFieldEdits(result) {
+    const byKey = new Map();
+    (result?.items || []).forEach((item) => {
+      (item.languageFieldSuggestions || []).forEach((suggestion) => {
+        if (!suggestion.key || !suggestion.suggestedText) return;
+        const existing = byKey.get(suggestion.key);
+        const score = Number(suggestion.similarity || 0);
+        if (existing && Number(existing.similarity || 0) >= score) return;
+        byKey.set(suggestion.key, {
+          key: suggestion.key,
+          currentText: suggestion.currentText || "",
+          suggestedText: suggestion.suggestedText || "",
+          page: item.page || "",
+          critical: item.critical ? "数值/单位风险" : "",
+          similarity: score
+        });
+      });
+    });
+    return [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key));
+  }
+
+  function safeSheetName(value) {
+    return String(value || "字段英文修订")
+      .replace(/[\\/?*[\]:]/g, " ")
+      .slice(0, 31) || "字段英文修订";
+  }
+
+  function downloadFieldEdits() {
+    const edits = collectLanguageFieldEdits(lastResult);
+    if (!edits.length) {
+      setStatus("当前对比结果没有可导出的语言字段修改建议。", "warn");
+      return;
+    }
+    if (!window.XLSX) {
+      setStatus("缺少 XLSX 表格库，无法生成字段英文修订表。", "warn");
+      return;
+    }
+
+    const rows = [
+      ["字段名", "当前语言包文案", "建议英文文案", "PDF 页码", "风险类型", "相似度"],
+      ...edits.map((item) => [
+        item.key,
+        item.currentText,
+        item.suggestedText,
+        item.page,
+        item.critical,
+        Number(item.similarity || 0).toFixed(3)
+      ])
+    ];
+    const workbook = window.XLSX.utils.book_new();
+    const sheet = window.XLSX.utils.aoa_to_sheet(rows);
+    sheet["!cols"] = [
+      { wch: 42 },
+      { wch: 72 },
+      { wch: 72 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 10 }
+    ];
+    sheet["!autofilter"] = {
+      ref: window.XLSX.utils.encode_range(
+        { r: 0, c: 0 },
+        { r: rows.length - 1, c: rows[0].length - 1 }
+      )
+    };
+    window.XLSX.utils.book_append_sheet(workbook, sheet, safeSheetName("字段英文修订"));
+    const baseName = `${lastResult?.files?.pdf || "PDF"}-vs-${lastResult?.files?.html || "HTML"}`
+      .replace(/[\\/:*?"<>|]/g, "-");
+    window.XLSX.writeFile(workbook, `${baseName}-字段英文修订表.xlsx`);
+  }
+
   elements.compare.addEventListener("click", runComparison);
   elements.clear.addEventListener("click", clearResult);
   elements.download.addEventListener("click", downloadResult);
+  elements.downloadFieldEdits?.addEventListener("click", downloadFieldEdits);
   elements.typeFilter.addEventListener("change", renderTable);
   elements.search.addEventListener("input", renderTable);
 })();

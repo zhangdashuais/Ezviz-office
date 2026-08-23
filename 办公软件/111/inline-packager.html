@@ -118,7 +118,7 @@
       <div id="tab-css-scope" class="tab-content">
         <div class="card">
           <h3>Webflow CSS 作用域处理</h3>
-          <p class="desc">选择 Webflow 导出的项目 CSS，系统会添加页面作用域并返回可直接使用的 CSS 文件。</p>
+          <p class="desc">选择 Webflow 导出的项目 CSS，系统会添加页面作用域并返回可直接使用的 CSS 文件；也可以按 HTML 中实际出现的 class 清理未使用的 CSS selector。</p>
 
           <div class="row">
             <label for="cssScopeFileInput">选择 CSS 文件</label>
@@ -132,6 +132,22 @@
 
           <div class="row" style="margin-bottom: 0;">
             <button id="cssScopeRunBtn" type="button" disabled>生成并下载 CSS</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>删除未使用 CSS 类</h3>
+          <p class="desc">上传 HTML 后，系统会检测其中的 class；如果 CSS 写在 HTML 的 style 标签里，可直接清理并下载新的 HTML。如果 CSS 是单独文件，再选择 CSS 文件并下载清理后的 CSS。</p>
+
+          <div class="form-grid">
+            <label for="cssCleanHtmlInput">HTML 文件</label>
+            <input id="cssCleanHtmlInput" type="file" accept=".html,.htm,text/html">
+            <label for="cssCleanFileInput">CSS 文件（可选）</label>
+            <input id="cssCleanFileInput" type="file" accept=".css,text/css">
+            <label for="cssCleanSafelistInput">保留类名</label>
+            <input id="cssCleanSafelistInput" type="text" value="w-,w--,w-mod-,w-condition-,w-dyn-" placeholder="逗号分隔；支持前缀">
+            <label></label>
+            <button id="cssCleanRunBtn" type="button" disabled>清理并下载</button>
           </div>
         </div>
 
@@ -163,16 +179,21 @@
       <div id="tab-text-comparison" class="tab-content">
         <div class="card">
           <h3>PDF / HTML 文字对比</h3>
-          <p class="desc">上传电子版 PDF 与 HTML 后，先汇总 HTML 全部可见文字，再逐条检查 PDF 正文片段是否包含。PDF 从 Specification / Specifications 标题页开始到文件末尾全部排除；HTML 可以有额外内容，只有未匹配的 PDF 正文片段会提示风险。</p>
+          <p class="desc">上传电子版 PDF 与 HTML 后，先汇总 HTML 全部可见文字，再逐条检查 PDF 正文片段是否包含。若 HTML 已转换成语言包字段，可上传总语言包 Excel，系统会先把字段还原成文字再对比。</p>
           <div class="form-grid">
             <label for="textComparePdfInput">PDF 文件</label>
             <input id="textComparePdfInput" type="file" accept=".pdf,application/pdf">
             <label for="textCompareHtmlInput">HTML 文件</label>
             <input id="textCompareHtmlInput" type="file" accept=".html,.htm,text/html">
+            <label for="textCompareLanguageInput">总语言包 Excel（可选）</label>
+            <input id="textCompareLanguageInput" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <label for="textCompareLanguageColumn">替换列（可选）</label>
+            <input id="textCompareLanguageColumn" type="text" placeholder="默认使用 en-US 原文列；也可填 fr-FR 等列名">
           </div>
           <div class="row">
             <button id="textCompareRunBtn" type="button">上传并检验</button>
             <button id="textCompareDownloadBtn" type="button" disabled>下载 JSON 报告</button>
+            <button id="textCompareDownloadFieldEditsBtn" type="button" disabled>下载字段英文修订表</button>
             <button id="textCompareClearBtn" type="button">清空</button>
           </div>
         </div>
@@ -1055,15 +1076,15 @@
   </div>
 
   <script src="src/ui.js"></script>
-  <script src="src/css-scope.js?v=20260731-1"></script>
-  <script src="src/module-css-scope.js?v=20260731-1"></script>
+  <script src="src/css-scope.js?v=20260821-1"></script>
+  <script src="src/module-css-scope.js?v=20260821-1"></script>
   <script src="src/module-task-progress.js?v=20260814-2"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-pdf-upload.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="src/module-text-comparison.js?v=20260729-2"></script>
+  <script src="src/module-text-comparison.js?v=20260821-3"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
   <script src="src/language-column-filter-rules.js?v=20260814-1"></script>

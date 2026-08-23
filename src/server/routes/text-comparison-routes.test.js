@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { validateFiles } = require("./text-comparison-routes");
+const { validateFiles, validateLanguagePackageFile } = require("./text-comparison-routes");
 
 test("multipart text comparison accepts PDF and HTML files", () => {
   assert.doesNotThrow(() => validateFiles(
@@ -19,4 +19,16 @@ test("multipart text comparison rejects missing or wrong file types", () => {
     { originalname: "datasheet.pdf", size: 10 },
     { originalname: "detail.txt", size: 10 }
   ), /HTML 文件格式/);
+});
+
+test("multipart text comparison accepts an optional language package excel", () => {
+  assert.doesNotThrow(() => validateLanguagePackageFile(null));
+  assert.doesNotThrow(() => validateLanguagePackageFile({
+    originalname: "en-US.xlsx",
+    size: 1024
+  }));
+  assert.throws(() => validateLanguagePackageFile({
+    originalname: "en-US.csv",
+    size: 1024
+  }), /语言包 Excel 文件格式/);
 });

@@ -173,6 +173,10 @@ function normalizeSourceForComparison(value) {
   return normalize(value).toLocaleLowerCase().replace(/\s+/g, "");
 }
 
+function normalizeTranslationForComparison(value) {
+  return String(value == null ? "" : value).replace(/\r\n?/g, "\n");
+}
+
 function readLanguagePackage(input, langCode) {
   const buffer = readInputBuffer(input);
   const workbook = XLSX.read(buffer, {
@@ -251,7 +255,8 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
     }
     candidates.forEach((candidate) => {
       const item = { ...candidate, key: entry.key, translation };
-      if (candidate.current === translation) unchanged.push(item);
+      if (normalizeTranslationForComparison(candidate.current)
+        === normalizeTranslationForComparison(translation)) unchanged.push(item);
       else updates.push(item);
     });
   });
@@ -338,7 +343,8 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
   plan.updates.forEach((update) => {
     const sheet = verified.workbook.Sheets[update.sheetName];
     const actual = String(cellValue(sheet, update.row, update.targetColumn) ?? "");
-    if (actual !== update.translation) {
+    if (normalizeTranslationForComparison(actual)
+      !== normalizeTranslationForComparison(update.translation)) {
       failures.push({
         key: update.key,
         sheetName: update.sheetName,
@@ -351,7 +357,8 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
   appended.forEach((update) => {
     const sheet = verified.workbook.Sheets[update.sheetName];
     const actual = String(cellValue(sheet, update.row, update.targetColumn) ?? "");
-    if (actual !== update.translation) {
+    if (normalizeTranslationForComparison(actual)
+      !== normalizeTranslationForComparison(update.translation)) {
       failures.push({
         key: update.key,
         sheetName: update.sheetName,
@@ -449,6 +456,7 @@ module.exports = {
   resolveDatasheetLanguage,
   findLanguagePackageSections,
   normalizeSourceForComparison,
+  normalizeTranslationForComparison,
   workbookContentFingerprint,
   readLanguagePackage,
   planLanguagePackageUpdates,

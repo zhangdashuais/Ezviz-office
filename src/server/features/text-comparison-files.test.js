@@ -43,3 +43,25 @@ test("HTML extraction records the containing section position", () => {
     heading: "Features"
   });
 });
+
+test("HTML extraction preserves language package field keys on visible text", () => {
+  const segments = extractHtmlSegments(`
+    <h1><span data-text-compare-language-key="goods.camera_title">Smart Camera</span></h1>
+  `);
+
+  assert.deepEqual(segments[0].languageKeys, ["goods.camera_title"]);
+});
+
+test("HTML extraction keeps page-builder animation-initial hidden content", () => {
+  const segments = extractHtmlSegments(`
+    <section>
+      <div data-lp-animate-section="slideInUp" style="visibility: hidden;">
+        <p>You can pinpoint up to 12 angles</p>
+      </div>
+      <p style="visibility: hidden;">Real hidden copy</p>
+    </section>
+  `);
+
+  assert.equal(segments.some((item) => item.text.includes("pinpoint")), true);
+  assert.equal(segments.some((item) => item.text.includes("Real hidden")), false);
+});

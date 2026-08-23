@@ -37,7 +37,6 @@ function compactComparableText(value, options = {}) {
 function splitLongText(value) {
   const text = normalizeDisplayText(value);
   if (!text) return [];
-  if (text.length <= 320) return [text];
 
   const sentences = text
     .split(/(?<=[.!?;。！？；])\s+/u)
@@ -46,6 +45,8 @@ function splitLongText(value) {
   if (sentences.length > 1 && sentences.every((item) => item.length <= 420)) {
     return sentences;
   }
+
+  if (text.length <= 320) return [text];
 
   const words = text.split(/\s+/);
   const chunks = [];
@@ -111,6 +112,9 @@ function prepareHtmlSegments(htmlSegments) {
         segments.push({
           text,
           tag: typeof item === "object" ? String(item?.tag || "") : "",
+          languageKeys: typeof item === "object" && Array.isArray(item?.languageKeys)
+            ? item.languageKeys.map(String).filter(Boolean)
+            : [],
           section: typeof item === "object" ? item?.section || null : null
         });
       }
@@ -339,6 +343,7 @@ function findHtmlContainment(htmlSegments, pdfText, options = {}) {
   return {
     text: matched.map((candidate) => candidate.text).join(" "),
     tag: matched.length === 1 ? matched[0].tag : "document",
+    languageKeys: [...new Set(matched.flatMap((candidate) => candidate.languageKeys || []))],
     section: matched[0].section,
     sectionText: locations
       .map((location) => formatHtmlSection(
@@ -350,9 +355,29 @@ function findHtmlContainment(htmlSegments, pdfText, options = {}) {
   };
 }
 
+function suggestLanguageFieldChange(htmlSegments, pdfText, changedThreshold) {
+  const candidates = htmlSegments
+    .filter((segment) => Array.isArray(segment.languageKeys) && segment.languageKeys.length)
+    .map((segment) => ({
+      segment,
+      similarity: textSimilarity(pdfText, segment.text)
+    }))
+    .filter((candidate) => candidate.similarity >= changedThreshold)
+    .sort((left, right) => right.similarity - left.similarity);
+  const best = candidates[0];
+  if (!best) return [];
+  return [...new Set(best.segment.languageKeys)].map((key) => ({
+    key,
+    currentText: best.segment.text,
+    suggestedText: pdfText,
+    similarity: best.similarity
+  }));
+}
+
 function compareTextContent(input = {}) {
   const pdfSegments = preparePdfSegments(input.pdfPages, input.options);
   const htmlSegments = prepareHtmlSegments(input.htmlSegments);
+  const changedThreshold = Number(input.options?.changedThreshold || DEFAULT_CHANGED_THRESHOLD);
   const excludedSpecificationPages = input.options?.excludeSpecifications === false
     ? []
     : (() => {
@@ -376,12 +401,18 @@ function compareTextContent(input = {}) {
         htmlText: htmlSegment.text,
         htmlTag: htmlSegment.tag,
         htmlSection: htmlSegment.sectionText,
+        htmlLanguageKeys: htmlSegment.languageKeys || [],
         similarity: 1,
         critical: false,
         suggestion: "HTML 已包含该 PDF 文字片段，无需修改。"
       };
     }
     const critical = extractFacts(pdfSegment.text).length > 0;
+    const languageFieldSuggestions = suggestLanguageFieldChange(
+      htmlSegments,
+      pdfSegment.text,
+      changedThreshold
+    );
     return {
       type: "missing",
       page: pdfSegment.page,
@@ -390,9 +421,12 @@ function compareTextContent(input = {}) {
       htmlSection: "",
       similarity: 0,
       critical,
-      suggestion: critical
-        ? "HTML 未包含该 PDF 数值或单位片段，请优先核对风险。"
-        : "HTML 未包含该 PDF 文字片段，请人工确认风险。"
+      languageFieldSuggestions,
+      suggestion: languageFieldSuggestions.length
+        ? `建议修改语言字段 ${languageFieldSuggestions.map((item) => item.key).join("、")} 为“${shortQuote(pdfSegment.text)}”。`
+        : critical
+          ? "HTML 未包含该 PDF 数值或单位片段，请优先核对风险。"
+          : "HTML 未包含该 PDF 文字片段，请人工确认风险。"
     };
   });
 
@@ -419,6 +453,10 @@ function compareTextContent(input = {}) {
     excludedSpecificationSegments,
     matchRate,
     differenceCount,
+    languageFieldSuggestionCount: items.reduce(
+      (sum, item) => sum + (item.languageFieldSuggestions?.length || 0),
+      0
+    ),
     verdict,
     verdictText
   };
@@ -426,8 +464,10 @@ function compareTextContent(input = {}) {
   return {
     files: {
       pdf: String(input.files?.pdf || ""),
-      html: String(input.files?.html || "")
+      html: String(input.files?.html || ""),
+      languagePackage: String(input.files?.languagePackage || "")
     },
+    languageReplacement: input.languageReplacement || null,
     summary,
     recommendations: differenceCount
       ? [{ level: counts.critical ? "high" : "medium", message: `HTML 未包含 ${differenceCount} 条 PDF 已提取文字，请逐条确认。` }]

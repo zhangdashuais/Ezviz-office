@@ -12,7 +12,8 @@ const {
   assertSafePlan,
   writeUpdatedLanguagePackage,
   writeUpdatedLanguagePackageNative,
-  normalizeSourceForComparison
+  normalizeSourceForComparison,
+  normalizeTranslationForComparison
 } = require("./language-package-workbook");
 
 test("source comparison ignores casing and whitespace but not changed words", () => {
@@ -27,6 +28,13 @@ test("source comparison ignores casing and whitespace but not changed words", ()
   assert.notEqual(
     normalizeSourceForComparison("ULTRA HD"),
     normalizeSourceForComparison("ULTRA UD")
+  );
+});
+
+test("translation comparison ignores Excel line-ending conversion", () => {
+  assert.equal(
+    normalizeTranslationForComparison("restez connecté\r\n\r\nà tout moment"),
+    normalizeTranslationForComparison("restez connecté\n\nà tout moment")
   );
 });
 
@@ -95,6 +103,20 @@ test("plans exact field and source matches, including identical duplicates", () 
   assert.equal(plan.matchedFieldCount, 2);
   assert.equal(plan.changedCellCount, 3);
   assert.equal(plan.skippedBlankCount, 1);
+});
+
+test("does not plan an update when only translation line endings differ", () => {
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "French"],
+    ["HP8_2", "Doorbell description", "Première ligne\r\n\r\nDeuxième ligne"]
+  ]));
+  const languagePackage = readLanguagePackage(workbookBuffer([
+    ["Category", "Serial", "Single word", "en-US", "fr-FR(need translation)"],
+    ["goods", "G1", "HP8_2", "Doorbell description", "Première ligne\n\nDeuxième ligne"]
+  ], "biff8"), "fr-FR");
+  const plan = planLanguagePackageUpdates(languagePackage, datasheet, "French");
+  assert.equal(plan.changedCellCount, 0);
+  assert.equal(plan.unchangedCellCount, 1);
 });
 
 test("plans new Datasheet fields for append and treats the site package source as authoritative", () => {

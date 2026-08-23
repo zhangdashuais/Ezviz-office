@@ -2,6 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  extractHtmlClassNames,
+  pruneInlineStyleTags,
+  pruneUnusedCssClasses,
   scopeCss
 } = require("../../../办公软件/111/src/css-scope.js");
 
@@ -45,4 +48,54 @@ test("does not add the same scope twice", () => {
 
   assert.equal((result.match(/\.page\.page-webflow/g) || []).length, 1);
   assert.doesNotMatch(result, /\.page\.page-webflow \.page\.page-webflow/);
+});
+
+test("extracts class names from html", () => {
+  const classNames = extractHtmlClassNames('<section class="hero card"><div class="card active"></div></section>');
+
+  assert.deepEqual([...classNames].sort(), ["active", "card", "hero"]);
+});
+
+test("prunes unused class selectors while keeping used selector list items", () => {
+  const result = pruneUnusedCssClasses(
+    ".card, .unused:hover { color: red; }\n#root { color: blue; }\n.unused-only { color: gray; }",
+    '<div class="card"></div>'
+  );
+
+  assert.match(result.css, /\.card\{ color: red; \}/);
+  assert.match(result.css, /#root\{ color: blue; \}/);
+  assert.doesNotMatch(result.css, /unused/);
+  assert.equal(result.removedSelectorCount, 2);
+  assert.equal(result.removedRuleCount, 1);
+});
+
+test("prunes unused class selectors inside grouping at-rules", () => {
+  const result = pruneUnusedCssClasses(
+    "@media (max-width: 767px) { .used { width: 100%; } .missing { width: 50%; } }",
+    '<div class="used"></div>'
+  );
+
+  assert.match(result.css, /@media \(max-width: 767px\)\s*\{\s*\.used/);
+  assert.doesNotMatch(result.css, /missing/);
+});
+
+test("keeps default webflow dynamic classes even when absent from html", () => {
+  const result = pruneUnusedCssClasses(
+    ".w-nav-button.w--open { color: white; }\n.custom-missing { color: red; }",
+    "<nav></nav>"
+  );
+
+  assert.match(result.css, /\.w-nav-button\.w--open/);
+  assert.doesNotMatch(result.css, /custom-missing/);
+});
+
+test("prunes unused class selectors from inline html style tags", () => {
+  const result = pruneInlineStyleTags(
+    '<html><head><style>.used { color: green; } .missing { color: red; }</style></head><body><div class="used"></div></body></html>'
+  );
+
+  assert.equal(result.styleBlockCount, 1);
+  assert.match(result.html, /\.used\s*\{ color: green; \}/);
+  assert.doesNotMatch(result.html, /missing/);
+  assert.equal(result.removedRuleCount, 1);
 });
