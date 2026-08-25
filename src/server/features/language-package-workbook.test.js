@@ -191,6 +191,48 @@ test("appends new Datasheet fields to the language package end", () => {
   }
 });
 
+test("appends each new field only once when a package has multiple language sheets", () => {
+  const workbook = XLSX.utils.book_new();
+  const header = ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"];
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    header,
+    ["goods", "G1", "existing", "Existing", "Anterior"]
+  ]), "Primary");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    header,
+    ["common", "C1", "shared", "Shared", "Compartido"]
+  ]), "Secondary");
+  const languagePackage = readLanguagePackage(
+    XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }),
+    "es-ES"
+  );
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["existing", "Existing", "Actualizado"],
+    ["new_field", "New source", "Nuevo"]
+  ]));
+  const plan = planLanguagePackageUpdates(languagePackage, datasheet, "Spanish");
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "language-package-multi-"));
+  try {
+    const outputPath = path.join(temporaryDirectory, "es-ES.xlsx");
+    const result = writeUpdatedLanguagePackage(languagePackage, plan, outputPath);
+    assert.equal(result.appendedFieldCount, 1);
+    const verified = readLanguagePackage(outputPath, "es-ES");
+    const occurrences = verified.sections.flatMap((section) => {
+      const sheet = verified.workbook.Sheets[section.sheetName];
+      const found = [];
+      for (let row = section.firstDataRow; row <= section.lastDataRow; row += 1) {
+        const address = XLSX.utils.encode_cell({ r: row, c: section.keyColumn });
+        if (sheet[address]?.v === "new_field") found.push(section.sheetName);
+      }
+      return found;
+    });
+    assert.deepEqual(occurrences, ["Primary"]);
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
 test("uses native Excel to update and append fields without rebuilding the xls", {
   skip: process.platform !== "win32",
   timeout: 30000

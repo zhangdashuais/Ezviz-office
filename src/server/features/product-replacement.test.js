@@ -72,3 +72,15 @@ test("Detail 规格字段兼容单数并优先复数命名", () => {
   assert.equal(both.specifications, "plural");
   assert.equal(both.specificationsFieldName, "Specifications");
 });
+
+test("Detail 规格字段兼容已记录的本地化命名", () => {
+  const result = readDetailFieldsFromModel({
+    pcView: {
+      summary: "",
+      customs: [{ name: "Spécifications", value: "contenu" }]
+    }
+  });
+  assert.equal(result.specificationsFound, true);
+  assert.equal(result.specifications, "contenu");
+  assert.equal(result.specificationsFieldName, "Spécifications");
+});

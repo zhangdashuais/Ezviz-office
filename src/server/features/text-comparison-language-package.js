@@ -159,9 +159,33 @@ function replaceLanguageFieldsInHtml(htmlText, replacementMap, options = {}) {
   };
 }
 
+function applyLanguageFieldSuggestionsToHtml(htmlText, items = []) {
+  const suggestions = new Map();
+  items.forEach((item) => {
+    (item?.languageFieldSuggestions || []).forEach((suggestion) => {
+      const normalizedKey = normalizeLanguageKey(suggestion.key);
+      if (!normalizedKey || !normalize(suggestion.suggestedText)) return;
+      const existing = suggestions.get(normalizedKey.full);
+      if (existing && Number(existing.similarity || 0) >= Number(suggestion.similarity || 0)) return;
+      suggestions.set(normalizedKey.full, suggestion);
+    });
+  });
+
+  let replacementCount = 0;
+  const html = String(htmlText || "").replace(languageTokenPattern(), (full, rawKey) => {
+    const normalizedKey = normalizeLanguageKey(rawKey);
+    const suggestion = normalizedKey ? suggestions.get(normalizedKey.full) : null;
+    if (!suggestion) return full;
+    replacementCount += 1;
+    return escapeHtmlText(suggestion.suggestedText);
+  });
+  return { html, replacementCount, fieldCount: suggestions.size };
+}
+
 module.exports = {
   normalize,
   normalizeLanguageKey,
   readLanguageReplacementMap,
-  replaceLanguageFieldsInHtml
+  replaceLanguageFieldsInHtml,
+  applyLanguageFieldSuggestionsToHtml
 };

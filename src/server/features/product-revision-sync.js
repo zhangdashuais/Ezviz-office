@@ -59,8 +59,8 @@ const SITE_SPECIFICATION_TITLES = {
   kr: "사양",
   cn: "规格参数",
   cis: "Технические характеристики",
-  de: "Technische Daten",
-  fr: "Caractéristiques", be: "Caractéristiques",
+  de: "Spezifikationen",
+  fr: "Spécifications", be: "Specificaties",
   it: "Specifiche",
   pl: "Specyfikacja",
   cz: "Specifikace",
@@ -80,10 +80,26 @@ const SPECIFICATION_DETAIL_FIELD_NAMES = [
   "specifications",
   "specification",
   "specs",
+  "especificaciones",
+  "especificación",
+  "especificaiones",
+  "especificacao",
+  "especificação",
+  "especifica",
+  "spezifikation",
+  "spécification",
+  "specyfikacje",
+  "specificații",
+  "specificatii",
+  "presupuesto",
+  "รายละเอียด",
+  "สเปค",
   "\u4ed5\u69d8"
 ];
 
-const MAX_FRAME_RATE_PATTERN = /\bMax\s*[.:：]?\s*\d+(?:\.\d+)?\s*fps\b/i;
+const MAX_FRAME_RATE_SOURCE = String.raw`(?:\bM[aá]x(?:imum|imo)?\.?|\bMaks(?:imum|ymalnie)?\.?|\bTối\s*đa|Макс(?:имум)?\.?|最大|สูงสุด|최대)\s*[.:：]?\s*\d+(?:\.\d+)?\s*fps\b`;
+const MAX_FRAME_RATE_PATTERN = new RegExp(MAX_FRAME_RATE_SOURCE, "i");
+const MAX_FRAME_RATE_DELETE_PATTERN = new RegExp(`${MAX_FRAME_RATE_SOURCE}\\s*[;；]?\\s*`, "gi");
 
 function normalize(value) {
   return String(value == null ? "" : value)
@@ -96,12 +112,16 @@ function normalizeDetailFieldName(value) {
   return normalize(value).toLowerCase().replace(/[\s_-]+/g, "");
 }
 
-function findSpecificationDetailField(customFields) {
-  const fields = Array.isArray(customFields) ? customFields : [];
-  const knownNames = [
-    ...SPECIFICATION_DETAIL_FIELD_NAMES,
+function specificationDetailFieldNames() {
+  return [
+    ...SPECIFICATION_DETAIL_FIELD_NAMES.map(normalizeDetailFieldName),
     ...Object.values(SITE_SPECIFICATION_TITLES).map(normalizeDetailFieldName)
   ];
+}
+
+function findSpecificationDetailField(customFields) {
+  const fields = Array.isArray(customFields) ? customFields : [];
+  const knownNames = specificationDetailFieldNames();
   for (const fieldName of knownNames) {
     const field = fields.find(
       (item) => normalizeDetailFieldName(item?.name) === fieldName
@@ -416,6 +436,16 @@ function revisionPreviewStatus({
     : "no-change";
 }
 
+function isSpecificationLanguageOnly(body) {
+  return normalize(body?.updateScope).toLowerCase() === "specification-language";
+}
+
+function effectiveProductDescriptionForScope(specificationLanguageOnly, currentDescription, desiredProductDescription) {
+  return specificationLanguageOnly && desiredProductDescription?.inherited
+    ? currentDescription
+    : desiredProductDescription.description;
+}
+
 function normalizeInternationalImageUrl(value) {
   const imageUrl = normalize(value);
   return imageUrl.startsWith("//") ? `https:${imageUrl}` : imageUrl;
@@ -466,6 +496,27 @@ function resolveProductDescription(parsedDatasheet, target, options = {}) {
   const candidates = parsedDatasheet.rows.filter((row) =>
     acceptedKeys.has(normalizeDatasheetKey(row.key))
   );
+  if (!candidates.length && normalize(options.currentDescription)) {
+    const currentDescription = normalize(options.currentDescription);
+    const currentMatches = parsedDatasheet.rows.filter((row) =>
+      normalize(row.source) === currentDescription
+      || Object.values(row.translations || {}).some((value) =>
+        normalize(value) === currentDescription)
+    );
+    if (currentMatches.length === 1) {
+      const description = normalize(currentMatches[0].translations[translationHeader]);
+      if (!description) {
+        throw new Error(`${translationHeader} 的 Product Description 译文为空。`);
+      }
+      return {
+        description,
+        translationHeader,
+        key: currentMatches[0].key,
+        rowNumber: currentMatches[0].rowNumber,
+        inferredFromCurrentDescription: true
+      };
+    }
+  }
   if (!candidates.length && Object.prototype.hasOwnProperty.call(options, "fallbackDescription")) {
     return {
       description: normalize(options.fallbackDescription),
@@ -499,6 +550,13 @@ function validateDirectRevision(body) {
   const siteCode = String(body?.siteCode || "").trim();
   const revisionType = body?.revisionType === "specification" ? "specification" : "detail";
   const detailHtml = String(body?.detailHtml ?? "");
+  const productDescriptionProvided = Object.prototype.hasOwnProperty.call(body || {}, "productDescription");
+  const productDescription = String(body?.productDescription ?? "");
+  const specificationFieldNameProvided = Object.prototype.hasOwnProperty.call(body || {}, "specificationFieldName");
+  const specificationFieldName = normalize(body?.specificationFieldName);
+  if (specificationFieldNameProvided && !specificationFieldName) {
+    throw new Error("请填写 Specification 自定义字段名称。");
+  }
   let operations = revisionType === "detail"
     ? body?.detailOperations || []
     : body?.specificationOperations || [];
@@ -508,10 +566,14 @@ function validateDirectRevision(body) {
   if (!siteCode) throw new Error("请选择国家站点。");
   if (!productName) throw new Error("请填写产品名称。");
   if (!Array.isArray(operations)) throw new Error("修订操作格式不正确。");
-  if (revisionType === "detail" && !detailHtml.trim() && !operations.length) {
-    throw new Error("请填写替换后的 Detail 代码，或至少填写一条 Detail 局部操作。");
+  if (revisionType === "detail" && !detailHtml.trim()
+    && !operations.length && !productDescriptionProvided && !specificationFieldNameProvided) {
+    throw new Error("请填写替换后的 Detail 代码、Product Description、Specification 字段名称，或至少填写一条 Detail 局部操作。");
   }
-  if (revisionType === "specification" && !operations.length) throw new Error("请至少填写一条 Specification 操作。");
+  if (revisionType === "specification" && !operations.length
+    && !productDescriptionProvided && !specificationFieldNameProvided) {
+    throw new Error("请至少填写一条 Specification 操作、Product Description 或 Specification 字段名称。");
+  }
   const fieldLabel = revisionType === "detail" ? "Detail" : "Specification";
   operations = operations.map((item, index) => {
     const type = item?.type === "delete-frame-rate"
@@ -530,17 +592,26 @@ function validateDirectRevision(body) {
     if (type === "replace" && targetText === replacementText) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 新旧内容不能相同。`);
     return { type, targetText, replacementText };
   });
-  return { siteCode, productName, revisionType, detailHtml, operations };
+  return {
+    siteCode,
+    productName,
+    revisionType,
+    detailHtml,
+    operations,
+    productDescription,
+    productDescriptionProvided,
+    specificationFieldName,
+    specificationFieldNameProvided
+  };
 }
 
 function applyContentOperations(source, operations, fieldLabel = "Specification") {
   let value = source;
   const results = operations.map((operation) => {
     if (operation.type === "delete-frame-rate") {
-      const frameRate = /\bMax\s*[.:：]?\s*\d+(?:\.\d+)?\s*fps\b\s*[;；]?\s*/gi;
-      const matchCount = value.match(frameRate)?.length || 0;
+      const matchCount = value.match(MAX_FRAME_RATE_DELETE_PATTERN)?.length || 0;
       if (!matchCount) throw new Error(`${fieldLabel} 中未找到目标内容，已停止操作。`);
-      value = value.replace(frameRate, "");
+      value = value.replace(MAX_FRAME_RATE_DELETE_PATTERN, "");
       return { ...operation, matchCount };
     }
     const matchCount = value.split(operation.targetText).length - 1;
@@ -695,14 +766,16 @@ function createProductRevisionSyncFeature(deps) {
     overview,
     specifications,
     productDescription,
-    specificationFieldName = ""
+    specificationFieldName = "",
+    nextSpecificationFieldName = ""
   ) {
     return page.evaluate(({
       overview,
       specifications,
       productDescription,
       specificationFieldNames,
-      specificationFieldName
+      specificationFieldName,
+      nextSpecificationFieldName
     }) => {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -720,6 +793,7 @@ function createProductRevisionSyncFeature(deps) {
       }
       if (!field) throw new Error("Detail 中没有找到 Specification/Specifications 字段。");
       scope.vm.pcView.summary = overview;
+      if (nextSpecificationFieldName) field.name = nextSpecificationFieldName;
       field.value = specifications;
       scope.vm.basic.summary = productDescription;
       (scope.$root || scope).$applyAsync?.();
@@ -730,11 +804,9 @@ function createProductRevisionSyncFeature(deps) {
       overview,
       specifications,
       productDescription,
-      specificationFieldNames: [
-        ...SPECIFICATION_DETAIL_FIELD_NAMES,
-        ...Object.values(SITE_SPECIFICATION_TITLES).map(normalizeDetailFieldName)
-      ],
-      specificationFieldName
+      specificationFieldNames: specificationDetailFieldNames(),
+      specificationFieldName,
+      nextSpecificationFieldName
     });
   }
 
@@ -796,6 +868,9 @@ function createProductRevisionSyncFeature(deps) {
       : options.allowSourceDescriptionFallback
         ? { fallbackDescription: source.snapshot.productDescription }
         : {};
+    if (Object.prototype.hasOwnProperty.call(options, "currentDescription")) {
+      fallbackOptions.currentDescription = options.currentDescription;
+    }
     const productDescription = resolveProductDescription(parsedDatasheet, target, fallbackOptions);
     return { language: { ...language, title: specificationTitle }, specifications, productDescription };
   }
@@ -830,6 +905,56 @@ function createProductRevisionSyncFeature(deps) {
     );
   }
 
+  async function saveProductContentAndVerify({
+    page,
+    productName,
+    logs,
+    overview,
+    specifications,
+    productDescription,
+    currentSpecificationFieldName,
+    nextSpecificationFieldName
+  }) {
+    const payload = await buildSavePayload(
+      page,
+      overview,
+      specifications,
+      productDescription,
+      currentSpecificationFieldName,
+      nextSpecificationFieldName
+    );
+    const save = await postProductUpdate(page, payload);
+    const readback = await verifySavedProduct(
+      page,
+      productName,
+      logs,
+      (snapshot) => {
+        const detail = snapshot.detail.overview === overview;
+        const specification = snapshot.detail.specifications === specifications;
+        const specificationName = normalize(snapshot.detail.specificationsFieldName)
+          === normalize(nextSpecificationFieldName);
+        const description = snapshot.productDescription === productDescription;
+        return {
+          passed: detail && specification && specificationName && description,
+          detail,
+          specification,
+          specificationName,
+          description
+        };
+      }
+    );
+    if (!readback.verification.passed) {
+      const { detail, specification, specificationName, description } = readback.verification;
+      throw new Error(
+        `保存后回读不一致：Detail ${detail ? "通过" : "失败"}，`
+        + `Specification 内容 ${specification ? "通过" : "失败"}，`
+        + `Specification 字段名 ${specificationName ? "通过" : "失败"}，`
+        + `Product Description ${description ? "通过" : "失败"}。`
+      );
+    }
+    return { save, readback, after: readback.snapshot };
+  }
+
   async function prepareDirectRevision(body, logs, existingSession) {
     const request = validateDirectRevision(body);
     const site = getCampaignSites(readCampaignConfig()).find((item) => item.siteCode === request.siteCode);
@@ -842,14 +967,32 @@ function createProductRevisionSyncFeature(deps) {
     const detail = request.revisionType === "detail"
       ? (request.operations.length
         ? applyContentOperations(before.detail.overview, request.operations, "Detail")
-        : { value: request.detailHtml, results: [] })
+        : { value: request.detailHtml.trim() ? request.detailHtml : before.detail.overview, results: [] })
       : { value: before.detail.overview, results: [] };
+    const productDescription = request.productDescriptionProvided
+      ? request.productDescription
+      : before.productDescription;
+    const specificationFieldName = request.specificationFieldNameProvided
+      ? request.specificationFieldName
+      : before.detail.specificationsFieldName;
     const fingerprint = hashValue(JSON.stringify({
       goodsId: before.goodsId,
       detail: before.detail.overview,
-      specifications: before.detail.specifications
+      specifications: before.detail.specifications,
+      specificationFieldName: before.detail.specificationsFieldName,
+      productDescription: before.productDescription
     }));
-    return { request, site, session, before, detail, specification, fingerprint };
+    return {
+      request,
+      site,
+      session,
+      before,
+      detail,
+      specification,
+      specificationFieldName,
+      productDescription,
+      fingerprint
+    };
   }
 
   async function previewDirectRevision(body, logs, existingSession) {
@@ -863,6 +1006,13 @@ function createProductRevisionSyncFeature(deps) {
       revisionType: prepared.request.revisionType,
       detailChanged: prepared.before.detail.overview !== prepared.detail.value,
       specificationChanged: prepared.before.detail.specifications !== prepared.specification.value,
+      specificationFieldNameChanged: normalize(prepared.before.detail.specificationsFieldName)
+        !== normalize(prepared.specificationFieldName),
+      currentSpecificationFieldName: prepared.before.detail.specificationsFieldName,
+      desiredSpecificationFieldName: prepared.specificationFieldName,
+      descriptionChanged: prepared.before.productDescription !== prepared.productDescription,
+      currentProductDescription: prepared.before.productDescription,
+      desiredProductDescription: prepared.productDescription,
       detailOperations: prepared.detail.results,
       specificationOperations: prepared.specification.results
     };
@@ -873,35 +1023,29 @@ function createProductRevisionSyncFeature(deps) {
     if (!body?.fingerprint || body.fingerprint !== prepared.fingerprint) {
       throw new Error("产品内容在预览后发生变化，请重新预览后再提交。");
     }
-    const payload = await buildSavePayload(
-      prepared.session.page,
-      prepared.detail.value,
-      prepared.specification.value,
-      prepared.before.productDescription,
-      prepared.before.detail.specificationsFieldName
-    );
-    const save = await postProductUpdate(prepared.session.page, payload);
-    const readback = await verifySavedProduct(
-      prepared.session.page,
-      prepared.request.productName,
+    const { save, after } = await saveProductContentAndVerify({
+      page: prepared.session.page,
+      productName: prepared.request.productName,
       logs,
-      (snapshot) => {
-        const detail = snapshot.detail.overview === prepared.detail.value;
-        const specification = snapshot.detail.specifications === prepared.specification.value;
-        return { passed: detail && specification, detail, specification };
-      }
-    );
-    const after = readback.snapshot;
-    if (!readback.verification.passed) {
-      throw new Error("保存后回读不一致：Detail 或 Specification 未正确更新。");
-    }
+      overview: prepared.detail.value,
+      specifications: prepared.specification.value,
+      productDescription: prepared.productDescription,
+      currentSpecificationFieldName: prepared.before.detail.specificationsFieldName,
+      nextSpecificationFieldName: prepared.specificationFieldName
+    });
     return {
       mode: "product-direct-revision-submit",
       site: prepared.site,
       productName: prepared.request.productName,
       goodsId: after.goodsId,
       save,
-      backendCheck: { status: "passed", detail: "passed", specification: "passed" }
+      backendCheck: {
+        status: "passed",
+        detail: "passed",
+        specification: "passed",
+        specificationName: "passed",
+        description: "passed"
+      }
     };
   }
 
@@ -925,7 +1069,8 @@ function createProductRevisionSyncFeature(deps) {
           logs,
           session
         );
-        const changed = result.detailChanged || result.specificationChanged;
+        const changed = result.detailChanged || result.specificationChanged
+          || result.specificationFieldNameChanged || result.descriptionChanged;
         results.push({ status: changed ? "ready" : "no-change", site, productName, result });
       } catch (error) {
         if (/page|context|browser.*closed/i.test(error?.message || "")) sessions.delete(site.siteCode);
@@ -1049,11 +1194,16 @@ function createProductRevisionSyncFeature(deps) {
 
   async function preview(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
+    const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
-    const request = validateRevisionRequest(body, sites, { ignoreSourceSite: publishing });
+    const request = validateRevisionRequest(body, sites, {
+      ignoreSourceSite: publishing || specificationLanguageOnly
+    });
     const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
     const parsedDatasheet = parseLanguageDatasheet(languageDatasheetFile.path);
-    const source = publishing ? null : await readSource(request, body, logs);
+    const source = publishing || specificationLanguageOnly
+      ? null
+      : await readSource(request, body, logs);
     const results = [];
     logLine(logs, `开始批量预览 ${request.targets.length} 个目标站点。`);
 
@@ -1101,6 +1251,12 @@ function createProductRevisionSyncFeature(deps) {
           };
         } else {
           current = await readProductSnapshot(session.page, request.productName, logs);
+          if (specificationLanguageOnly) {
+            targetSource = {
+              snapshot: current,
+              image: extractSpecificationImage(current.detail.specifications)
+            };
+          }
         }
         const desired = buildTargetRevision(
           parsedWorkbook,
@@ -1110,17 +1266,32 @@ function createProductRevisionSyncFeature(deps) {
           {
             fallbackDescription: publishing
               ? targetSource.snapshot.productDescription
-              : current.productDescription
+              : current.productDescription,
+            currentDescription: current?.productDescription
           }
         );
+        const currentSpecificationFieldName = publishing
+          ? targetSource.snapshot.detail.specificationsFieldName
+          : current.detail.specificationsFieldName;
+        const desiredSpecificationFieldName = desired.language.title;
+        const specificationFieldNameChanged = normalize(currentSpecificationFieldName)
+          !== normalize(desiredSpecificationFieldName);
         if (publishing) {
           detailChanged = false;
-          specificationChanged = targetSource.snapshot.detail.specifications !== desired.specifications;
+          specificationChanged = targetSource.snapshot.detail.specifications !== desired.specifications
+            || specificationFieldNameChanged;
           descriptionChanged = !desired.productDescription.inherited;
         } else {
-          detailChanged = current.detail.overview !== source.snapshot.detail.overview;
-          specificationChanged = current.detail.specifications !== desired.specifications;
-          descriptionChanged = current.productDescription !== desired.productDescription.description;
+          detailChanged = specificationLanguageOnly
+            ? false
+            : current.detail.overview !== source.snapshot.detail.overview;
+          specificationChanged = current.detail.specifications !== desired.specifications
+            || specificationFieldNameChanged;
+          descriptionChanged = current.productDescription !== effectiveProductDescriptionForScope(
+            specificationLanguageOnly,
+            current.productDescription,
+            desired.productDescription
+          );
         }
         languagePackage = await prepareLanguagePackage(
           session,
@@ -1141,6 +1312,9 @@ function createProductRevisionSyncFeature(deps) {
             localeHeader: desired.language.header,
             detailChanged,
             specificationChanged,
+            specificationFieldNameChanged,
+            currentSpecificationFieldName,
+            desiredSpecificationFieldName,
             descriptionChanged,
             languagePackage: {
               ...languagePackageSummary,
@@ -1169,6 +1343,9 @@ function createProductRevisionSyncFeature(deps) {
           localeHeader: desired.language.header,
           detailChanged,
           specificationChanged,
+          specificationFieldNameChanged,
+          currentSpecificationFieldName,
+          desiredSpecificationFieldName,
           descriptionChanged,
           currentProductDescription: current?.productDescription || "",
           desiredProductDescription: desired.productDescription.description,
@@ -1198,7 +1375,7 @@ function createProductRevisionSyncFeature(deps) {
     return {
       mode: publishing ? "product-publishing-preview" : "product-revision-sync-preview",
       productName: request.productName,
-      source: publishing ? null : {
+      source: publishing || specificationLanguageOnly ? null : {
         site: request.sourceSite,
         goodsId: source.snapshot.goodsId,
         editUrl: source.snapshot.editUrl,
@@ -1336,8 +1513,11 @@ function createProductRevisionSyncFeature(deps) {
   async function submit(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
     const skipLanguagePackage = options.skipLanguagePackage === true;
+    const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
-    const request = validateRevisionRequest(body, sites, { ignoreSourceSite: publishing });
+    const request = validateRevisionRequest(body, sites, {
+      ignoreSourceSite: publishing || specificationLanguageOnly
+    });
     const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
     const parsedDatasheet = parseLanguageDatasheet(languageDatasheetFile.path);
     const expectedWorkbookFingerprint = normalize(body?.expectedWorkbookFingerprint);
@@ -1356,8 +1536,10 @@ function createProductRevisionSyncFeature(deps) {
       parseExpectedLanguagePackageFingerprints(
         body?.expectedLanguagePackageFingerprints
       );
-    const source = publishing ? null : await readSource(request, body, logs);
-    if (!publishing) {
+    const source = publishing || specificationLanguageOnly
+      ? null
+      : await readSource(request, body, logs);
+    if (!publishing && !specificationLanguageOnly) {
       const expectedSourceFingerprint = normalize(body?.expectedSourceFingerprint);
       if (!expectedSourceFingerprint || expectedSourceFingerprint !== source.fingerprint) {
         throw new Error("国际站产品 Detail 在预览后发生变化，请重新预览。");
@@ -1433,17 +1615,36 @@ function createProductRevisionSyncFeature(deps) {
           };
         }
         if (!before) before = await readProductSnapshot(session.page, request.productName, logs);
+        if (specificationLanguageOnly) {
+          targetSource = {
+            snapshot: before,
+            image: extractSpecificationImage(before.detail.specifications)
+          };
+        }
         const desired = buildTargetRevision(
           parsedWorkbook,
           parsedDatasheet,
           target,
           targetSource,
-          { fallbackDescription: before.productDescription }
+          {
+            fallbackDescription: before.productDescription,
+            currentDescription: before.productDescription
+          }
         );
-        const detailChanged = before.detail.overview !== targetSource.snapshot.detail.overview;
-        const specificationChanged = before.detail.specifications !== desired.specifications;
-        const descriptionChanged = before.productDescription
-          !== desired.productDescription.description;
+        const detailChanged = specificationLanguageOnly
+          ? false
+          : before.detail.overview !== targetSource.snapshot.detail.overview;
+        const desiredSpecificationFieldName = desired.language.title;
+        const specificationFieldNameChanged = normalize(before.detail.specificationsFieldName)
+          !== normalize(desiredSpecificationFieldName);
+        const specificationChanged = before.detail.specifications !== desired.specifications
+          || specificationFieldNameChanged;
+        const expectedProductDescription = effectiveProductDescriptionForScope(
+          specificationLanguageOnly,
+          before.productDescription,
+          desired.productDescription
+        );
+        const descriptionChanged = before.productDescription !== expectedProductDescription;
         if (!skipLanguagePackage) {
           languagePackage = await prepareLanguagePackage(
             session,
@@ -1476,7 +1677,7 @@ function createProductRevisionSyncFeature(deps) {
             site: target.site,
             goodsId: before.goodsId,
             localeHeader: desired.language.header,
-            languagePackageHeader: languagePackage.translationHeader,
+            languagePackageHeader: languagePackage?.translationHeader || target.languagePackageHeader,
             components
           });
           continue;
@@ -1506,29 +1707,26 @@ function createProductRevisionSyncFeature(deps) {
         let save = null;
         let after = before;
         if (detailChanged || specificationChanged || descriptionChanged) {
+          const overview = specificationLanguageOnly
+              ? before.detail.overview
+              : targetSource.snapshot.detail.overview;
           await readProductSnapshot(session.page, request.productName, logs);
-          const payload = await buildSavePayload(
-            session.page,
-            targetSource.snapshot.detail.overview,
-            desired.specifications,
-            desired.productDescription.description,
-            before.detail.specificationsFieldName
-          );
-          save = await postProductUpdate(session.page, payload);
-          const readback = await verifySavedProduct(
-            session.page,
-            request.productName,
+          const saved = await saveProductContentAndVerify({
+            page: session.page,
+            productName: request.productName,
             logs,
-            (snapshot) => {
-              const detail = snapshot.detail.overview === targetSource.snapshot.detail.overview;
-              const specification = snapshot.detail.specifications === desired.specifications;
-              const description = snapshot.productDescription === desired.productDescription.description;
-              return { passed: detail && specification && description, detail, specification, description };
-            }
-          );
-          after = readback.snapshot;
+            overview,
+            specifications: desired.specifications,
+            productDescription: expectedProductDescription,
+            currentSpecificationFieldName: before.detail.specificationsFieldName,
+            nextSpecificationFieldName: desiredSpecificationFieldName
+          });
+          save = saved.save;
+          after = saved.after;
+          const readback = saved.readback;
           const detailVerified = readback.verification.detail;
-          const specificationVerified = readback.verification.specification;
+          const specificationVerified = readback.verification.specification
+            && readback.verification.specificationName;
           const descriptionVerified = readback.verification.description;
           components.detail = detailChanged
             ? (detailVerified ? "passed" : "failed")
@@ -1539,13 +1737,6 @@ function createProductRevisionSyncFeature(deps) {
           components.description = descriptionChanged
             ? (descriptionVerified ? "passed" : "failed")
             : "no-change";
-          if (!detailVerified || !specificationVerified || !descriptionVerified) {
-            throw new Error(
-              `保存后回读不一致：Detail ${detailVerified ? "通过" : "失败"}，`
-              + `Specification ${specificationVerified ? "通过" : "失败"}，`
-              + `Product Description ${descriptionVerified ? "通过" : "失败"}。`
-            );
-          }
         } else {
           components.detail = "no-change";
           components.specification = "no-change";
@@ -1604,6 +1795,9 @@ function createProductRevisionSyncFeature(deps) {
           languagePackageHeader: languagePackage?.translationHeader || target.languagePackageHeader,
           detailChanged,
           specificationChanged,
+          specificationFieldNameChanged,
+          currentSpecificationFieldName: before.detail.specificationsFieldName,
+          desiredSpecificationFieldName,
           descriptionChanged,
           productDescriptionHeader: desired.productDescription.translationHeader,
           languagePackageChanged,
@@ -1691,6 +1885,8 @@ module.exports = {
   validateRevisionRequest,
   readDetailFromPcView,
   revisionPreviewStatus,
+  isSpecificationLanguageOnly,
+  effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,
   internationalListSource,
   resolveProductDescription,

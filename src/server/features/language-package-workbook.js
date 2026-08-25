@@ -289,6 +289,21 @@ function assertSafePlan(plan) {
   throw new Error(`语言包预检未通过：${parts.join("，")}。请查看预览明细。`);
 }
 
+function selectAppendSection(packageInfo, plan) {
+  if (!packageInfo.sections.length) {
+    throw new Error("语言包中没有可追加新字段的工作表。");
+  }
+  const counts = new Map();
+  plan.updates.forEach((update) => {
+    counts.set(update.sheetName, (counts.get(update.sheetName) || 0) + 1);
+  });
+  return packageInfo.sections.reduce((best, section) => {
+    const score = counts.get(section.sheetName) || 0;
+    const bestScore = counts.get(best.sheetName) || 0;
+    return score > bestScore ? section : best;
+  });
+}
+
 function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
   assertSafePlan(plan);
   plan.updates.forEach((update) => {
@@ -301,8 +316,9 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
     sheet[address] = { ...existing, t: "s", v: update.translation, w: update.translation };
   });
   const appended = [];
+  const appendSection = selectAppendSection(packageInfo, plan);
   plan.newFields.forEach((field) => {
-    packageInfo.sections.forEach((section) => {
+    [appendSection].forEach((section) => {
       const sheet = packageInfo.workbook.Sheets[section.sheetName];
       const range = XLSX.utils.decode_range(sheet["!ref"]);
       const row = range.e.r + 1;
@@ -397,7 +413,7 @@ function writeUpdatedLanguagePackageNative(
       columnNumber: update.targetColumn + 1,
       value: update.translation
     })),
-    appends: packageInfo.sections.flatMap((section) =>
+    appends: [selectAppendSection(packageInfo, plan)].flatMap((section) =>
       plan.newFields.map((field, index) => ({
         sheetName: section.sheetName,
         rowNumber: section.lastDataRow + 2 + index,

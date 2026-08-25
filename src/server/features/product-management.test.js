@@ -7,7 +7,9 @@ const {
   createProductManagement,
   isLegacyShopPath,
   isLegacyShopUrl,
-  orderedIntGoodsCategories
+  normalizeProductNameForMatch,
+  orderedIntGoodsCategories,
+  productNameSearchVariants
 } = require("./product-management");
 
 test("product publishing always reads from the international source selector", () => {
@@ -45,6 +47,17 @@ test("product editor navigation treats new regional shop hosts as non-legacy", (
   assert.equal(isLegacyShopUrl("https://new-vn-shop.ezvizlife.com/goods/index"), false);
   assert.equal(isLegacyShopPath("https://shop.ezvizlife.com/goods/index", "/goods/index"), true);
   assert.equal(isLegacyShopPath("https://new-shop.ezvizlife.com/goods/index", "/goods/index"), false);
+});
+
+test("product name matching treats superscript plus as plus", () => {
+  assert.equal(
+    normalizeProductNameForMatch("H7c Dual 2K\u207a"),
+    normalizeProductNameForMatch("H7c Dual 2K+")
+  );
+  assert.deepEqual(productNameSearchVariants("H7c Dual 2K+"), [
+    "H7c Dual 2K+",
+    "H7c Dual 2K\u207a"
+  ]);
 });
 
 test("product editor opens legacy goods index even when current new shop path matches", async () => {

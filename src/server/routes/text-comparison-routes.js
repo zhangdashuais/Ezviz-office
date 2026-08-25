@@ -2,7 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const {
   readLanguageReplacementMap,
-  replaceLanguageFieldsInHtml
+  replaceLanguageFieldsInHtml,
+  applyLanguageFieldSuggestionsToHtml
 } = require("../features/text-comparison-language-package");
 
 function uploadedFile(req, name) {
@@ -85,7 +86,8 @@ function registerTextComparisonRoutes(app, deps) {
           fs.promises.readFile(pdfFile.path),
           fs.promises.readFile(htmlFile.path)
         ]);
-        let htmlText = htmlBuffer.toString("utf8").replace(/^\uFEFF/, "");
+        const originalHtmlText = htmlBuffer.toString("utf8").replace(/^\uFEFF/, "");
+        let htmlText = originalHtmlText;
         let languageReplacement = null;
         if (languagePackageFile) {
           const mapInfo = readLanguageReplacementMap(languagePackageFile.path, {
@@ -120,6 +122,10 @@ function registerTextComparisonRoutes(app, deps) {
           pdfPages,
           htmlSegments
         });
+        const modified = applyLanguageFieldSuggestionsToHtml(originalHtmlText, result.items);
+        result.modifiedHtml = modified.replacementCount ? modified.html : "";
+        result.modifiedHtmlReplacementCount = modified.replacementCount;
+        result.modifiedHtmlFieldCount = modified.fieldCount;
         res.json({ ok: true, result });
       } catch (error) {
         const message = error?.message || String(error);

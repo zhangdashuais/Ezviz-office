@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 const XLSX = require("xlsx");
 const {
   readLanguageReplacementMap,
-  replaceLanguageFieldsInHtml
+  replaceLanguageFieldsInHtml,
+  applyLanguageFieldSuggestionsToHtml
 } = require("./text-comparison-language-package");
 
 function workbookBuffer(rows) {
@@ -28,6 +29,24 @@ test("reads total language package fields and replaces html language tokens with
   assert.match(result.html, /Always stays connected/);
   assert.equal(result.replacementCount, 2);
   assert.deepEqual(result.missingKeys, []);
+});
+
+test("applies suggested language fields to a downloadable html copy", () => {
+  const result = applyLanguageFieldSuggestionsToHtml(
+    `<p>{{t('goods.H8c_13')}}</p><p>{{t('goods.keep')}}</p>`,
+    [{
+      languageFieldSuggestions: [{
+        key: "goods.H8c_13",
+        suggestedText: "Smartly follows on human activities",
+        similarity: 0.9
+      }]
+    }]
+  );
+
+  assert.equal(result.replacementCount, 1);
+  assert.equal(result.fieldCount, 1);
+  assert.match(result.html, /Smartly follows on human activities/);
+  assert.match(result.html, /\{\{t\('goods\.keep'\)\}\}/);
 });
 
 test("can use a requested language column when replacing html language tokens", () => {

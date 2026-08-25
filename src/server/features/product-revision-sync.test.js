@@ -8,6 +8,8 @@ const {
   buildPcSpecificationHtml,
   readDetailFromPcView,
   revisionPreviewStatus,
+  isSpecificationLanguageOnly,
+  effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,
   internationalListSource,
   validateRevisionRequest,
@@ -21,6 +23,21 @@ const {
   retryProductReadback,
   specificationTitleForSite
 } = require("./product-revision-sync");
+
+test("Specification and language-only scope preserves unrelated product content", () => {
+  assert.equal(isSpecificationLanguageOnly({ updateScope: "specification-language" }), true);
+  assert.equal(isSpecificationLanguageOnly({}), false);
+});
+
+test("Specification and language-only scope updates Product Description when Datasheet provides it", () => {
+  assert.equal(effectiveProductDescriptionForScope(true, "Old description", {
+    description: "Nieuwe beschrijving"
+  }), "Nieuwe beschrijving");
+  assert.equal(effectiveProductDescriptionForScope(true, "Old description", {
+    description: "Old description",
+    inherited: true
+  }), "Old description");
+});
 
 test("common product revision expands multiple countries and products into independent targets", () => {
   const result = buildCommonRevisionTargets({
@@ -103,6 +120,30 @@ test("Detail and Specification direct revisions validate independently", () => {
   assert.equal(specification.detailHtml, "");
 });
 
+test("direct product revision allows Product Description only", () => {
+  const request = validateDirectRevision({
+    revisionType: "detail",
+    siteCode: "nl",
+    productName: "CP8",
+    productDescription: "Slimme beveiliging"
+  });
+  assert.equal(request.productDescriptionProvided, true);
+  assert.equal(request.productDescription, "Slimme beveiliging");
+  assert.deepEqual(request.operations, []);
+});
+
+test("direct product revision allows Specification custom field name only", () => {
+  const request = validateDirectRevision({
+    revisionType: "specification",
+    siteCode: "fr",
+    productName: "H8c Bundle (4PK)",
+    specificationFieldName: "Spécifications"
+  });
+  assert.equal(request.specificationFieldNameProvided, true);
+  assert.equal(request.specificationFieldName, "Spécifications");
+  assert.deepEqual(request.operations, []);
+});
+
 test("different products can share one exact Detail operation", () => {
   const request = validateDirectRevision({
     revisionType: "detail",
@@ -162,12 +203,49 @@ test("reads a localized Specification custom field name", () => {
   assert.equal(field.name, "Especificaciones");
 });
 
+test("reads localized singular Specification custom field names", () => {
+  const spanish = findSpecificationDetailField([
+    { name: "Resumen", value: "Resumen" },
+    { name: "Especificación", value: "Máx. 25 fps; texto local" }
+  ]);
+  assert.equal(spanish.name, "Especificación");
+  const spanishTypo = findSpecificationDetailField([
+    { name: "Resumen", value: "Resumen" },
+    { name: "Especificaiones", value: "Máx. 25 fps; texto local" }
+  ]);
+  assert.equal(spanishTypo.name, "Especificaiones");
+  const portuguese = findSpecificationDetailField([
+    { name: "Resumo", value: "Resumo" },
+    { name: "Especificação", value: "Máx.: 25 fps; texto local" }
+  ]);
+  assert.equal(portuguese.name, "Especificação");
+  const thai = findSpecificationDetailField([
+    { name: "ภาพรวม", value: "ภาพรวม" },
+    { name: "รายละเอียด", value: "สูงสุด 25 fps; ข้อความท้องถิ่น" }
+  ]);
+  assert.equal(thai.name, "รายละเอียด");
+});
+
 test("falls back to the only custom field containing a Max fps fragment", () => {
   const field = findSpecificationDetailField([
     { name: "未知字段", value: "普通内容" },
     { name: "本地规格标题", value: "Max: 15fps；保留本地文字" }
   ]);
   assert.equal(field.name, "本地规格标题");
+});
+
+test("Specification frame-rate deletion handles localized max labels", () => {
+  const result = applySpecificationOperations(
+    "<td>Máx. 25 fps; texto local</td>"
+      + "<td>最大：30 fps；保留本地文字</td>"
+      + "<td>Макс. 15 fps; локальный текст</td>",
+    [{ type: "delete-frame-rate" }]
+  );
+  assert.equal(result.results[0].matchCount, 3);
+  assert.equal(
+    result.value,
+    "<td>texto local</td><td>保留本地文字</td><td>локальный текст</td>"
+  );
 });
 
 test("product snapshot stability changes when asynchronously loaded Detail changes", () => {
@@ -303,7 +381,10 @@ test("maps the Specification title to the selected target site", () => {
   assert.equal(specificationTitleForSite("la"), "Especificaciones");
   assert.equal(specificationTitleForSite("br"), "Especificações");
   assert.equal(specificationTitleForSite("jp"), "仕様");
-  assert.equal(specificationTitleForSite("de"), "Technische Daten");
+  assert.equal(specificationTitleForSite("de"), "Spezifikationen");
+  assert.equal(specificationTitleForSite("fr"), "Spécifications");
+  assert.equal(specificationTitleForSite("nl"), "Specificaties");
+  assert.equal(specificationTitleForSite("it"), "Specifiche");
   assert.equal(specificationTitleForSite("sa"), "المواصفات");
   assert.equal(specificationTitleForSite("unknown", "Workbook title"), "Workbook title");
 });
@@ -401,6 +482,27 @@ test("product revision may preserve the current target description when Datashee
   }, { fallbackDescription: "Existing JP product description" });
   assert.equal(result.description, "Existing JP product description");
   assert.equal(result.inherited, true);
+});
+
+test("product revision can infer Product Description from the current backend text", () => {
+  const parsedDatasheet = {
+    headers: ["Dutch"],
+    rows: [{
+      key: "CP8_4",
+      source: "Smart protection made simple",
+      rowNumber: 4,
+      translations: { Dutch: "Slimme bescherming, eenvoudig gemaakt" }
+    }]
+  };
+  const result = resolveProductDescription(parsedDatasheet, {
+    siteCode: "nl",
+    languagePackageHeader: "Dutch"
+  }, {
+    currentDescription: "Smart protection made simple",
+    fallbackDescription: "Smart protection made simple"
+  });
+  assert.equal(result.description, "Slimme bescherming, eenvoudig gemaakt");
+  assert.equal(result.inferredFromCurrentDescription, true);
 });
 
 test("product publishing ignores the legacy source-site selection", () => {

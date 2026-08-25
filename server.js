@@ -27,8 +27,6 @@ const { registerCampaignRoutes } = require("./src/server/routes/campaign-routes"
 const { registerAssetUploadRoutes, uploadToFs, uploadUrlToFs } = require("./src/server/routes/asset-upload-routes");
 const { createTdkManagement } = require("./src/server/features/tdk-management");
 const { registerTdkRoutes } = require("./src/server/routes/tdk-routes");
-const { createProductReplacementFeature } = require("./src/server/features/product-replacement");
-const { registerProductReplacementRoutes } = require("./src/server/routes/product-replacement-routes");
 const { createDetailAddressReplacementFeature } = require("./src/server/features/detail-address-replacement");
 const { registerDetailAddressReplacementRoutes } = require("./src/server/routes/detail-address-replacement-routes");
 const { createProductRevisionSyncFeature } = require("./src/server/features/product-revision-sync");
@@ -808,21 +806,6 @@ const tdkManagement = createTdkManagement({
   credentialDomainForSite
 });
 
-const productReplacementFeature = createProductReplacementFeature({
-  logLine,
-  readCampaignConfig,
-  requireSingleCampaignSite,
-  getShopContext: browserAuth.getShopContext,
-  getOpenPage: browserAuth.getOpenPage,
-  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
-  credentialDomainForSite,
-  openProductEditorByName: productManagement.openByName,
-  uploadImageFromPath: (filePath) => uploadToFs(
-    "https://fs.ezvizlife.com/upload.php",
-    { path: filePath, originalname: path.basename(filePath) }
-  )
-});
-
 const detailAddressReplacementFeature = createDetailAddressReplacementFeature({
   logLine,
   readCampaignConfig,
@@ -884,7 +867,6 @@ const ga4Feature = createGa4Connection({
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
 registerLanguagePackageRoutes(app, { upload, languagePackageFeature, logLine });
 registerTdkRoutes(app, { upload, tdkManagement, logLine });
-registerProductReplacementRoutes(app, { feature: productReplacementFeature, logLine });
 registerDetailAddressReplacementRoutes(app, {
   feature: detailAddressReplacementFeature,
   logLine

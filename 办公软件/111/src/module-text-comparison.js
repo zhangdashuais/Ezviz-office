@@ -13,6 +13,9 @@
     summary: $("textCompareSummary"),
     recommendations: $("textCompareRecommendations"),
     recommendationList: $("textCompareRecommendationList"),
+    modifiedHtmlPanel: $("textCompareModifiedHtmlPanel"),
+    modifiedHtmlMeta: $("textCompareModifiedHtmlMeta"),
+    modifiedHtmlOutput: $("textCompareModifiedHtmlOutput"),
     filters: $("textCompareFilters"),
     typeFilter: $("textCompareTypeFilter"),
     search: $("textCompareSearchInput"),
@@ -189,6 +192,7 @@
     if (elements.downloadFieldEdits) elements.downloadFieldEdits.disabled = true;
     elements.summary.hidden = true;
     elements.recommendations.hidden = true;
+    elements.modifiedHtmlPanel.hidden = true;
     elements.filters.hidden = true;
     elements.tableBody.replaceChildren();
     elements.empty.hidden = true;
@@ -222,6 +226,11 @@
       if (elements.downloadFieldEdits) {
         elements.downloadFieldEdits.disabled = collectLanguageFieldEdits(lastResult).length === 0;
       }
+      if (lastResult.modifiedHtml) {
+        elements.modifiedHtmlOutput.value = lastResult.modifiedHtml;
+        elements.modifiedHtmlMeta.textContent = `已按 PDF 建议替换 ${lastResult.modifiedHtmlReplacementCount || 0} 处字段，可直接全选复制。`;
+        elements.modifiedHtmlPanel.hidden = false;
+      }
       const differenceCount = lastResult.summary.missing;
       const languageReplacement = lastResult.languageReplacement;
       const languageMessage = languageReplacement
@@ -249,6 +258,8 @@
     if (elements.languageColumn) elements.languageColumn.value = "";
     elements.summary.hidden = true;
     elements.recommendations.hidden = true;
+    elements.modifiedHtmlPanel.hidden = true;
+    elements.modifiedHtmlOutput.value = "";
     elements.filters.hidden = true;
     elements.tableBody.replaceChildren();
     elements.empty.hidden = true;
@@ -259,8 +270,9 @@
 
   function downloadResult() {
     if (!lastResult) return;
+    const { modifiedHtml, ...report } = lastResult;
     const blob = new Blob(
-      [JSON.stringify(lastResult, null, 2)],
+      [JSON.stringify(report, null, 2)],
       { type: "application/json;charset=utf-8" }
     );
     const link = document.createElement("a");

@@ -20,7 +20,7 @@
     </div>
 
     <div class="nav-group">
-      <div class="nav-label">产品资料处理</div>
+      <div class="nav-label">产品资料</div>
       <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-pdf-upload">PDF 上传转地址</div>
         <div class="nav-item" data-target="tab-text-comparison">PDF / HTML 文字对比</div>
@@ -31,37 +31,23 @@
     </div>
 
     <div class="nav-group">
-      <div class="nav-label">产品上架与维护</div>
+      <div class="nav-label">后台运营</div>
       <div class="nav-items-wrapper">
-        <div class="nav-item" data-target="tab-specification-translation">Specification 翻译上架</div>
+        <div class="nav-item" data-target="tab-product-revision-sync" data-operation="publish-batch">产品资料操作</div>
+        <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换</div>
         <div class="nav-item" data-target="tab-language-package">语言包上传</div>
-        <div class="nav-item" data-target="tab-wtb-tools">WTB 产品购买链接</div>
+        <div class="nav-item" data-target="tab-wtb-tools">WTB 购买链接</div>
         <div class="nav-item" data-target="tab-tdk-config">TDK 配置</div>
-        <div class="nav-item" data-target="tab-product-replace">后台产品替换</div>
-        <div class="nav-item" data-target="tab-product-revision-sync" data-operation="publish-batch">产品上架 / 下架</div>
-        <div class="nav-item" data-target="tab-product-revision-sync" data-operation="revision">产品修订</div>
-        <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换/删除</div>
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">资料平台</div>
-      <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-ecadmin-platform">资料上传平台</div>
       </div>
     </div>
 
     <div class="nav-group">
-      <div class="nav-label">营销运营</div>
+      <div class="nav-label">营销与巡查</div>
       <div class="nav-items-wrapper">
+        <div class="nav-item" data-target="tab-specification-translation">Specification 翻译上架</div>
         <div class="nav-item" data-target="tab-campaign-tools">Banner / Popup / 巡查</div>
         <div class="nav-item" data-target="tab-ga4">GA4 数据连接</div>
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">巡查与质量</div>
-      <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-ezviz-site-audit">EZVIZ 官网定时巡查</div>
       </div>
     </div>
@@ -205,6 +191,12 @@
         <div id="textCompareRecommendations" class="card text-compare-recommendations" hidden>
           <h3>核验结论与建议</h3>
           <div id="textCompareRecommendationList"></div>
+        </div>
+
+        <div id="textCompareModifiedHtmlPanel" class="card" hidden>
+          <h3>修改后 HTML</h3>
+          <p id="textCompareModifiedHtmlMeta" class="desc"></p>
+          <textarea id="textCompareModifiedHtmlOutput" rows="24" readonly spellcheck="false"></textarea>
         </div>
 
         <div id="textCompareFilters" class="card text-compare-results" hidden>
@@ -371,55 +363,22 @@
         <iframe id="textPreviewFrame" title="页面预览"></iframe>
       </div>
 
-      <div id="tab-product-replace" class="tab-content">
-        <div class="card">
-          <h3>后台产品替换 · Detail 读取</h3>
-          <p class="desc">复用 WTB 的站点账号登录和产品定位流程，支持一次读取多个商品 Details 标签下的 Overview 与 Specifications。不会点击 Complete，也不会发送产品保存请求。</p>
-          <div class="form-grid">
-            <label for="productReplaceSiteSelect">国家站点</label>
-            <select id="productReplaceSiteSelect">
-              <option value="">正在加载站点...</option>
-            </select>
-            <label for="productReplaceNameInput">产品名称（可多个）</label>
-            <textarea id="productReplaceNameInput" rows="5" placeholder="每行一个产品，也支持逗号或分号分隔，例如：&#10;CP8&#10;H8c&#10;EB3"></textarea>
-            <label for="productReplaceUsernameInput">商城账号</label>
-            <input id="productReplaceUsernameInput" type="text" placeholder="留空则按站点从网站账号密码表读取">
-            <label for="productReplacePasswordInput">商城密码</label>
-            <input id="productReplacePasswordInput" type="password" placeholder="留空则按站点从网站账号密码表读取">
-          </div>
-          <div class="row">
-            <button id="productReplaceReadDetailBtn" type="button">批量读取 Overview / Specifications</button>
-          </div>
-        </div>
-        <div id="productReplaceStatus" class="status">正在加载国家站点...</div>
-        <div class="card">
-          <h3>Overview HTML</h3>
-          <textarea id="productReplaceOverviewOutput" placeholder="读取到的 Overview HTML 会显示在这里..."></textarea>
-        </div>
-        <div class="card">
-          <h3>Specifications HTML</h3>
-          <textarea id="productReplaceSpecificationsOutput" placeholder="读取到的 Specifications HTML 会显示在这里..."></textarea>
-        </div>
-        <div class="card">
-          <h3>读取信息与日志</h3>
-          <textarea id="productReplaceLogsOutput" placeholder="登录身份、产品编号、编辑页和执行日志会显示在这里..."></textarea>
-        </div>
-      </div>
-
       <div id="tab-product-revision-sync" class="tab-content">
         <div id="revisionModeTabs" class="row" role="tablist" aria-label="产品修订模式" hidden>
           <button id="revisionSameProductTab" type="button" role="tab" aria-selected="true">同一产品跨国家修订</button>
           <button id="revisionCommonPartTab" type="button" role="tab" aria-selected="false">多个产品相同部分修订</button>
         </div>
         <div id="revisionSameProductPanel" role="tabpanel">
-        <div class="card">
-          <h3 id="revisionSyncHeading">产品上架 / 下架</h3>
-          <p id="revisionSyncDescription" class="desc">批量上架从本地文件夹识别多个产品，逐站执行国际站复制、Product Description 翻译、Overview/Specification 和语言包更新；下架模式只关闭 Searchable 并将 Type of listing 设为 No Set Uptime。所有写操作都必须先预览。</p>
+        <div id="revisionSyncMainCard" class="card">
+          <h3 id="revisionSyncHeading">后台产品资料操作</h3>
+          <p id="revisionSyncDescription" class="desc">选择操作类型后，页面只显示该流程需要的字段。所有写操作都必须先预览。</p>
           <div class="form-grid">
             <label id="revisionSyncOperationLabel" for="revisionSyncOperation">操作流程</label>
             <select id="revisionSyncOperation">
               <option value="publish-batch" selected>产品上架（文件夹批量）</option>
-              <option value="revision" hidden>产品修订（仅修改已有产品）</option>
+              <option value="revision">修订已上架产品（源站同步）</option>
+              <option value="specification-language">只改语言包 / Specification 文案</option>
+              <option value="common">多产品相同内容修订</option>
               <option value="delist">产品下架（关闭搜索与上架时间）</option>
             </select>
             <label id="revisionSyncSourceSiteLabel" for="revisionSyncSourceSite">源站点</label>
@@ -447,7 +406,7 @@
             <span id="revisionSyncSelectedCount" class="revision-selected-count">已选择 0 个站点</span>
           </div>
         </div>
-        <div class="card">
+        <div id="revisionSyncTargetsCard" class="card">
           <h3 id="revisionSyncTargetsHeading">目标站点与两份 Excel 的语言列</h3>
           <p id="revisionSyncTargetsHelp" class="desc">每一行都是独立映射：目标站点 → Specification 语言列 → 本站使用的 Datasheet 译文列。系统会自动匹配，执行前可逐站核对；一次预览、一次确认后连续处理全部已选站点。</p>
           <div id="revisionSyncTargets" class="revision-targets">
@@ -459,7 +418,7 @@
           </div>
         </div>
         <div id="revisionSyncStatus" class="status">正在加载站点...</div>
-        <div class="card">
+        <div id="revisionSyncResultCard" class="card">
           <h3>预览与执行结果</h3>
           <textarea id="revisionSyncOutput" placeholder="源站点图片信息、Detail / Specification / 语言包变更项和回读结果会显示在这里..."></textarea>
         </div>
@@ -1084,7 +1043,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="src/module-text-comparison.js?v=20260821-3"></script>
+  <script src="src/module-text-comparison.js?v=20260824-3"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
   <script src="src/language-column-filter-rules.js?v=20260814-1"></script>
@@ -1093,8 +1052,7 @@
   <script src="src/module-text.js?v=20260807-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js?v=20260814-1"></script>
-  <script src="src/module-product-replacement.js"></script>
-  <script src="src/module-product-revision-sync.js?v=20260814-2"></script>
+  <script src="src/module-product-revision-sync.js?v=20260824-1"></script>
   <script src="src/module-product-direct-revision.js?v=20260814-3"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>

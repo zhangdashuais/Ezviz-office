@@ -36,6 +36,22 @@ function orderedIntGoodsCategories(options = []) {
   return [...preferred, ...usable.filter((option) => !preferredValues.has(option.value))];
 }
 
+function normalizeProductNameForMatch(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/\u207a/g, "+")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function productNameSearchVariants(value) {
+  const raw = String(value || "").trim();
+  const plus = raw.replace(/\u207a/g, "+").replace(/＋/g, "+");
+  const superscript = plus.replace(/\+/g, "\u207a");
+  return [...new Set([raw, plus, superscript].filter(Boolean))];
+}
+
 function createProductManagement({ logLine, normalizeBool }) {
   const productEditCache = new Map();
   const PRODUCT_EDIT_CACHE_TTL_MS = 15 * 60 * 1000;
@@ -60,7 +76,7 @@ function createProductManagement({ logLine, normalizeBool }) {
     if (!targetName) throw new Error("请填写产品名称。");
     pruneProductEditCache();
     const initialScope = await productCacheScope(page);
-    const cacheKey = initialScope + "\n" + targetName.toLowerCase();
+    const cacheKey = initialScope + "\n" + normalizeProductNameForMatch(targetName);
     const cached = initialScope ? productEditCache.get(cacheKey) : null;
     if (cached) {
       // Always reload the cached edit URL so callers that perform save -> readback
@@ -84,14 +100,20 @@ function createProductManagement({ logLine, normalizeBool }) {
 
     async function findAndClickEdit() {
       return page.evaluate(({ name, exactOnly }) => {
-        const normalized = name.toLowerCase();
+        const normalizeProductName = (value) => String(value || "")
+          .normalize("NFKC")
+          .replace(/\u207a/g, "+")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLowerCase();
+        const normalized = normalizeProductName(name);
         const visible = (el) => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
         const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope")].filter(visible);
         const exact = rows.find((row) => [...row.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name']")]
-          .some((cell) => (cell.innerText || cell.textContent || "").trim().toLowerCase() === normalized));
+          .some((cell) => normalizeProductName(cell.innerText || cell.textContent || "") === normalized));
         const fuzzy = exactOnly
           ? null
-          : rows.find((row) => (row.innerText || "").trim().toLowerCase().includes(normalized));
+          : rows.find((row) => normalizeProductName(row.innerText || "").includes(normalized));
         const row = exact || fuzzy;
         if (!row) return { ok: false };
         const controls = [...row.querySelectorAll("a, button")].filter(visible);
@@ -120,12 +142,15 @@ function createProductManagement({ logLine, normalizeBool }) {
         'input[type="search"]:visible, input[type="text"]:visible, input:not([type]):visible'
       ).first();
       if (await searchInput.count()) {
-        await searchInput.fill(targetName);
-        const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
-        if (await searchButton.count()) await searchButton.click();
-        else await searchInput.press("Enter");
-        await page.waitForTimeout(3500);
-        found = await findAndClickEdit();
+        for (const searchName of productNameSearchVariants(targetName)) {
+          await searchInput.fill(searchName);
+          const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
+          if (await searchButton.count()) await searchButton.click();
+          else await searchInput.press("Enter");
+          await page.waitForTimeout(3500);
+          found = await findAndClickEdit();
+          if (found.ok) break;
+        }
       }
     }
     if (!found.ok) {
@@ -144,7 +169,7 @@ function createProductManagement({ logLine, normalizeBool }) {
     };
     const resolvedScope = await productCacheScope(page);
     if (resolvedScope) {
-      productEditCache.set(resolvedScope + "\n" + targetName.toLowerCase(), result);
+      productEditCache.set(resolvedScope + "\n" + normalizeProductNameForMatch(targetName), result);
     }
     return result;
   }
@@ -160,7 +185,13 @@ function createProductManagement({ logLine, normalizeBool }) {
 
     async function findExactProduct() {
       return page.evaluate((name) => {
-        const normalized = name.toLowerCase();
+        const normalizeProductName = (value) => String(value || "")
+          .normalize("NFKC")
+          .replace(/\u207a/g, "+")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLowerCase();
+        const normalized = normalizeProductName(name);
         const visible = (el) => Boolean(
           el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)
         );
@@ -168,7 +199,7 @@ function createProductManagement({ logLine, normalizeBool }) {
         const row = rows.find((candidate) =>
           [...candidate.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name']")]
             .some((cell) => (cell.innerText || cell.textContent || "")
-              .trim().toLowerCase() === normalized)
+              && normalizeProductName(cell.innerText || cell.textContent || "") === normalized)
         );
         return row ? { exists: true, rowText: (row.innerText || "").trim().slice(0, 500) } : { exists: false };
       }, targetName);
@@ -180,12 +211,15 @@ function createProductManagement({ logLine, normalizeBool }) {
         'input[type="search"]:visible, input[type="text"]:visible, input:not([type]):visible'
       ).first();
       if (await searchInput.count()) {
-        await searchInput.fill(targetName);
-        const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
-        if (await searchButton.count()) await searchButton.click();
-        else await searchInput.press("Enter");
-        await page.waitForTimeout(3500);
-        result = await findExactProduct();
+        for (const searchName of productNameSearchVariants(targetName)) {
+          await searchInput.fill(searchName);
+          const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
+          if (await searchButton.count()) await searchButton.click();
+          else await searchInput.press("Enter");
+          await page.waitForTimeout(3500);
+          result = await findExactProduct();
+          if (result.exists) break;
+        }
       }
     }
     logLine(logs, `${targetName} 在当前站点${result.exists ? "已存在" : "不存在"}。`);
@@ -622,5 +656,7 @@ module.exports = {
   isLegacyShopPath,
   isLegacyShopUrl,
   orderedIntGoodsCategories,
+  normalizeProductNameForMatch,
+  productNameSearchVariants,
   createProductManagement
 };
