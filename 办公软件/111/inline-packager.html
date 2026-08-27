@@ -426,7 +426,7 @@
         <div id="revisionCommonPartPanel" role="tabpanel" hidden>
           <div class="card">
             <h3>多个产品相同部分修订</h3>
-            <p class="desc">在所选多个国家站点内，对多个不同产品的 Detail 或 Specification 执行同一条精确删除/替换。按国家 × 产品逐项预览、保存和回读，单项失败不会中断其他任务。</p>
+            <p class="desc">在所选多个国家站点内，对多个不同产品的 Detail 或 Specification 执行同一条精确删除/替换；也可以只把后台 Custom Page Name 的 Specification 名称修成对应站点固定文案。按国家 × 产品逐项预览、保存和回读，单项失败不会中断其他任务。</p>
             <div class="form-grid">
               <label for="commonRevisionSite" style="grid-column:1 / -1;">国家站点（可多选）</label>
               <div style="grid-column:1 / -1;">
@@ -439,7 +439,7 @@
               <label for="commonRevisionProducts">产品名称（可多个）</label>
               <textarea id="commonRevisionProducts" rows="5" placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
               <label for="commonRevisionField">修改部分</label>
-              <select id="commonRevisionField"><option value="detail">Detail</option><option value="specification">Specification</option></select>
+              <select id="commonRevisionField"><option value="detail">Detail</option><option value="specification">Specification</option><option value="specification-name">Specification 输入框名称</option></select>
               <label for="commonRevisionOperation">操作</label>
               <select id="commonRevisionOperation"><option value="replace">替换</option><option value="delete">删除</option></select>
               <label for="commonRevisionTarget">目标内容</label>
@@ -1049,11 +1049,11 @@
   <script src="src/language-column-filter-rules.js?v=20260814-1"></script>
   <script src="src/module-language-column-filter.js?v=20260814-1"></script>
   <script src="src/i18n-conversion-rules.js?v=20260807-2"></script>
-  <script src="src/module-text.js?v=20260807-1"></script>
+  <script src="src/module-text.js?v=20260826-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js?v=20260814-1"></script>
-  <script src="src/module-product-revision-sync.js?v=20260824-1"></script>
-  <script src="src/module-product-direct-revision.js?v=20260814-3"></script>
+  <script src="src/module-product-revision-sync.js?v=20260826-1"></script>
+  <script src="src/module-product-direct-revision.js?v=20260825-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>
   <script src="src/module-campaign-tools.js?v=20260724-4"></script>

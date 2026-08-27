@@ -49,6 +49,8 @@
 
     const htmlText = await readFileAsText(file);
     const existingKeys = extractExistingI18nKeys(htmlText);
+    const hasDoctype = /<!doctype\b/i.test(htmlText);
+    const isFullHtmlDocument = hasDoctype || /<html\b/i.test(htmlText);
     const doc = new DOMParser().parseFromString(htmlText, 'text/html');
     
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
@@ -73,7 +75,9 @@
     const existingResult = renderExistingTable(existingKeys);
     updateTableVisibility();
     
-    currentProcessedHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+    currentProcessedHtml = isFullHtmlDocument
+      ? `${hasDoctype ? '<!DOCTYPE html>\n' : ''}${doc.documentElement.outerHTML}`
+      : doc.body.innerHTML;
     currentProcessedHtml = currentProcessedHtml.replace(/\{\{t\(['"]([^'"]+)['"]\)\}\}/g, '{{t(&#39;$1&#39;)}}');
     
     textOutput.value = currentProcessedHtml;

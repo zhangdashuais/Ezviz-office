@@ -70,8 +70,21 @@ const SITE_SPECIFICATION_TITLES = {
   ar: "المواصفات", sa: "المواصفات"
 };
 
+const SITE_SPECIFICATION_FIELD_TITLES = {
+  ...SITE_SPECIFICATION_TITLES,
+  de: "Technische Daten",
+  th: "รายละเอียด",
+  cz: "Technické údaje"
+};
+
 function specificationTitleForSite(siteCode, fallback = "Specifications") {
   return SITE_SPECIFICATION_TITLES[normalize(siteCode).toLowerCase()]
+    || normalize(fallback)
+    || "Specifications";
+}
+
+function specificationFieldTitleForSite(siteCode, fallback = "Specifications") {
+  return SITE_SPECIFICATION_FIELD_TITLES[normalize(siteCode).toLowerCase()]
     || normalize(fallback)
     || "Specifications";
 }
@@ -108,6 +121,32 @@ function normalize(value) {
     .trim();
 }
 
+function fillAdsAdditionalProductTitle(model, productName) {
+  const clean = (item) => String(item == null ? "" : item)
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const value = clean(productName);
+  if (!value || !model || typeof model !== "object") return false;
+  const seen = new Set();
+  let changed = false;
+  function visit(target) {
+    if (!target || typeof target !== "object" || seen.has(target)) return;
+    seen.add(target);
+    Object.keys(target).forEach((key) => {
+      if (key.toLowerCase().replace(/[\s_-]+/g, "") === "producttitle"
+        && !clean(target[key])) {
+        target[key] = value;
+        changed = true;
+      } else {
+        visit(target[key]);
+      }
+    });
+  }
+  visit(model);
+  return changed;
+}
+
 function normalizeDetailFieldName(value) {
   return normalize(value).toLowerCase().replace(/[\s_-]+/g, "");
 }
@@ -115,7 +154,8 @@ function normalizeDetailFieldName(value) {
 function specificationDetailFieldNames() {
   return [
     ...SPECIFICATION_DETAIL_FIELD_NAMES.map(normalizeDetailFieldName),
-    ...Object.values(SITE_SPECIFICATION_TITLES).map(normalizeDetailFieldName)
+    ...Object.values(SITE_SPECIFICATION_TITLES).map(normalizeDetailFieldName),
+    ...Object.values(SITE_SPECIFICATION_FIELD_TITLES).map(normalizeDetailFieldName)
   ];
 }
 
@@ -297,7 +337,7 @@ function buildPcSpecificationHtml(language, image, titleOverride) {
           if (colspan > 1) {
             return `<th class="title" colspan="${colspan}" rowspan="${rowspan}">${value}</th>`;
           }
-          return `<th colspan="${colspan}" rowspan="${rowspan}" width="200">${value}</th>`;
+          return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="200">${value}</td>`;
         }
         if (index === 0 && key === 1 && items.length > 2) {
           return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="160">${value}</td>`;
@@ -425,12 +465,13 @@ async function retryProductReadback(read, verify, options = {}) {
 
 function revisionPreviewStatus({
   publishing,
+  copyRequired = publishing,
   detailChanged,
   specificationChanged,
   descriptionChanged,
   languagePackageChanged
 }) {
-  return publishing || detailChanged || specificationChanged
+  return copyRequired || detailChanged || specificationChanged
     || descriptionChanged || languagePackageChanged
     ? "ready"
     : "no-change";
@@ -644,6 +685,20 @@ function buildCommonRevisionTargets(body, availableSites) {
   };
 }
 
+function isAutoSpecificationFieldName(body) {
+  return body?.autoSpecificationFieldName === true || body?.autoSpecificationFieldName === "true";
+}
+
+function applyAutoSpecificationFieldName(body, siteCode) {
+  if (!isAutoSpecificationFieldName(body)) return body;
+  return {
+    ...(body || {}),
+    revisionType: "specification",
+    specificationOperations: [],
+    specificationFieldName: specificationFieldTitleForSite(siteCode)
+  };
+}
+
 function createProductRevisionSyncFeature(deps) {
   const {
     logLine,
@@ -766,6 +821,7 @@ function createProductRevisionSyncFeature(deps) {
     overview,
     specifications,
     productDescription,
+    productTitle,
     specificationFieldName = "",
     nextSpecificationFieldName = ""
   ) {
@@ -773,12 +829,27 @@ function createProductRevisionSyncFeature(deps) {
       overview,
       specifications,
       productDescription,
+      productTitle,
       specificationFieldNames,
       specificationFieldName,
-      nextSpecificationFieldName
+      nextSpecificationFieldName,
+      fillAdsAdditionalProductTitleSource
     }) => {
       const normalizeField = (value) => String(value || "")
         .trim().toLowerCase().replace(/[\s_-]+/g, "");
+      const fillAdsAdditionalProductTitle = new Function(`return (${fillAdsAdditionalProductTitleSource})`)();
+      const setPath = (root, path, value) => {
+        const parts = String(path || "").replace(/^vm\./, "").split(".").filter(Boolean);
+        let current = root;
+        for (let index = 0; index < parts.length - 1; index += 1) {
+          current = current?.[parts[index]];
+          if (!current || typeof current !== "object") return false;
+        }
+        const key = parts.at(-1);
+        if (!key || String(current[key] || "").trim()) return false;
+        current[key] = value;
+        return true;
+      };
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
       const customFields = scope.vm.pcView?.customs || [];
       let field = customFields.find(
@@ -796,17 +867,34 @@ function createProductRevisionSyncFeature(deps) {
       if (nextSpecificationFieldName) field.name = nextSpecificationFieldName;
       field.value = specifications;
       scope.vm.basic.summary = productDescription;
+      fillAdsAdditionalProductTitle(scope.vm, productTitle);
+      [...document.querySelectorAll("input[ng-model], textarea[ng-model]")].forEach((input) => {
+        const text = (input.closest(".form-group, .control-group, tr, .row, div")?.innerText || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (/Ads Additional Information/i.test(text)
+          && /Product Title\s*:?/i.test(text)
+          && !String(input.value || "").trim()) {
+          input.value = productTitle;
+          setPath(scope.vm, input.getAttribute("ng-model"), productTitle);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
       (scope.$root || scope).$applyAsync?.();
       const data = scope.md.toModel(scope.vm);
+      fillAdsAdditionalProductTitle(data, productTitle);
       data.goods_id = scope.goodsId;
       return data;
     }, {
       overview,
       specifications,
       productDescription,
+      productTitle,
       specificationFieldNames: specificationDetailFieldNames(),
       specificationFieldName,
-      nextSpecificationFieldName
+      nextSpecificationFieldName,
+      fillAdsAdditionalProductTitleSource: fillAdsAdditionalProductTitle.toString()
     });
   }
 
@@ -862,6 +950,7 @@ function createProductRevisionSyncFeature(deps) {
   function buildTargetRevision(parsedWorkbook, parsedDatasheet, target, source, options = {}) {
     const language = resolveWorkbookLanguage(parsedWorkbook, target);
     const specificationTitle = specificationTitleForSite(target.siteCode, language.title);
+    const specificationFieldTitle = specificationFieldTitleForSite(target.siteCode, specificationTitle);
     const specifications = buildPcSpecificationHtml(language, source.image, specificationTitle);
     const fallbackOptions = Object.prototype.hasOwnProperty.call(options, "fallbackDescription")
       ? { fallbackDescription: options.fallbackDescription }
@@ -872,7 +961,7 @@ function createProductRevisionSyncFeature(deps) {
       fallbackOptions.currentDescription = options.currentDescription;
     }
     const productDescription = resolveProductDescription(parsedDatasheet, target, fallbackOptions);
-    return { language: { ...language, title: specificationTitle }, specifications, productDescription };
+    return { language: { ...language, title: specificationFieldTitle, htmlTitle: specificationTitle }, specifications, productDescription };
   }
 
   function summarizeLanguagePackagePlan(plan) {
@@ -920,6 +1009,7 @@ function createProductRevisionSyncFeature(deps) {
       overview,
       specifications,
       productDescription,
+      productName,
       currentSpecificationFieldName,
       nextSpecificationFieldName
     );
@@ -1065,7 +1155,7 @@ function createProductRevisionSyncFeature(deps) {
           sessions.set(site.siteCode, session);
         }
         const result = await previewDirectRevision(
-          { ...(body || {}), siteCode: site.siteCode, productName },
+          applyAutoSpecificationFieldName({ ...(body || {}), siteCode: site.siteCode, productName }, site.siteCode),
           logs,
           session
         );
@@ -1120,7 +1210,7 @@ function createProductRevisionSyncFeature(deps) {
           sessions.set(siteCode, session);
         }
         const result = await submitDirectRevision(
-          { ...(body || {}), siteCode, productName, fingerprint },
+          applyAutoSpecificationFieldName({ ...(body || {}), siteCode, productName, fingerprint }, siteCode),
           logs,
           session
         );
@@ -1214,6 +1304,7 @@ function createProductRevisionSyncFeature(deps) {
         let targetSource = source;
         let current = null;
         let copySource = null;
+        let copyRequired = publishing;
         let detailChanged = true;
         let specificationChanged = true;
         let descriptionChanged = true;
@@ -1224,31 +1315,38 @@ function createProductRevisionSyncFeature(deps) {
             logs
           );
           if (existing.exists) {
-            throw new Error("目标站点已经存在该产品；请使用产品修订同步，避免重复复制。");
+            copyRequired = false;
+            current = await readProductSnapshot(session.page, request.productName, logs);
+            targetSource = {
+              snapshot: current,
+              image: extractSpecificationImage(current.detail.specifications)
+            };
+            logLine(logs, `${target.site.name} 已存在 ${request.productName}，跳过国际站复制，只预览 Specification / Product Description / 语言包更新。`);
+          } else {
+            await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+              waitUntil: "domcontentloaded",
+              timeout: 60000
+            });
+            await session.page.waitForTimeout(1200);
+            copySource = await findInternationalProduct(
+              session.page,
+              request.productName,
+              logs
+            );
+            targetSource = internationalListSource(request.productName, copySource);
+            logLine(
+              logs,
+              `已锁定国际产品复制源：${request.productName} / goods_id=${copySource.goodsId}；`
+              + "完整 Detail 将在提交复制后从目标站产品回读。"
+            );
+            copySource = {
+              ...copySource,
+              sourceFingerprint: targetSource.fingerprint,
+              overviewLength: targetSource.snapshot.detail.overview.length,
+              specificationLength: targetSource.snapshot.detail.specifications.length,
+              image: targetSource.image
+            };
           }
-          await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
-            waitUntil: "domcontentloaded",
-            timeout: 60000
-          });
-          await session.page.waitForTimeout(1200);
-          copySource = await findInternationalProduct(
-            session.page,
-            request.productName,
-            logs
-          );
-          targetSource = internationalListSource(request.productName, copySource);
-          logLine(
-            logs,
-            `已锁定国际产品复制源：${request.productName} / goods_id=${copySource.goodsId}；`
-            + "完整 Detail 将在提交复制后从目标站产品回读。"
-          );
-          copySource = {
-            ...copySource,
-            sourceFingerprint: targetSource.fingerprint,
-            overviewLength: targetSource.snapshot.detail.overview.length,
-            specificationLength: targetSource.snapshot.detail.specifications.length,
-            image: targetSource.image
-          };
         } else {
           current = await readProductSnapshot(session.page, request.productName, logs);
           if (specificationLanguageOnly) {
@@ -1270,13 +1368,13 @@ function createProductRevisionSyncFeature(deps) {
             currentDescription: current?.productDescription
           }
         );
-        const currentSpecificationFieldName = publishing
+        const currentSpecificationFieldName = copyRequired
           ? targetSource.snapshot.detail.specificationsFieldName
           : current.detail.specificationsFieldName;
         const desiredSpecificationFieldName = desired.language.title;
         const specificationFieldNameChanged = normalize(currentSpecificationFieldName)
           !== normalize(desiredSpecificationFieldName);
-        if (publishing) {
+        if (copyRequired) {
           detailChanged = false;
           specificationChanged = targetSource.snapshot.detail.specifications !== desired.specifications
             || specificationFieldNameChanged;
@@ -1293,6 +1391,7 @@ function createProductRevisionSyncFeature(deps) {
             desired.productDescription
           );
         }
+        if (publishing && !copyRequired) detailChanged = false;
         languagePackage = await prepareLanguagePackage(
           session,
           target,
@@ -1307,7 +1406,7 @@ function createProductRevisionSyncFeature(deps) {
             authenticatedIdentity: session.authenticatedIdentity,
             goodsId: current?.goodsId || "",
             editUrl: current?.editUrl || "",
-            copyRequired: publishing,
+            copyRequired,
             copySource,
             localeHeader: desired.language.header,
             detailChanged,
@@ -1329,6 +1428,7 @@ function createProductRevisionSyncFeature(deps) {
         results.push({
           status: revisionPreviewStatus({
             publishing,
+            copyRequired,
             detailChanged,
             specificationChanged,
             descriptionChanged,
@@ -1338,7 +1438,7 @@ function createProductRevisionSyncFeature(deps) {
           authenticatedIdentity: session.authenticatedIdentity,
           goodsId: current?.goodsId || "",
           editUrl: current?.editUrl || "",
-          copyRequired: publishing,
+          copyRequired,
           copySource,
           localeHeader: desired.language.header,
           detailChanged,
@@ -1567,6 +1667,7 @@ function createProductRevisionSyncFeature(deps) {
         let targetSource = source;
         let copy = null;
         let before = null;
+        let copyRequired = publishing;
         if (publishing) {
           const existing = await productExistsInCurrentSite(
             session.page,
@@ -1574,45 +1675,53 @@ function createProductRevisionSyncFeature(deps) {
             logs
           );
           if (existing.exists) {
-            throw new Error("目标站点已经存在该产品；已阻止重复复制，请改用产品修订同步。");
-          }
-          await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
-            waitUntil: "domcontentloaded",
-            timeout: 60000
-          });
-          await session.page.waitForTimeout(1200);
-          const copySource = await findInternationalProduct(
-            session.page,
-            request.productName,
-            logs
-          );
-          targetSource = internationalListSource(request.productName, copySource);
-          const expectedCopySourceFingerprint = normalize(
-            expectedCopySourceFingerprints[target.site.siteCode]
-          );
-          if (!expectedCopySourceFingerprint
-            || expectedCopySourceFingerprint !== targetSource.fingerprint) {
-            throw new Error(
-              `${target.site.name} 国际产品复制源在预览后发生变化，请重新预览。`
+            copyRequired = false;
+            components.copy = "not-required-existing";
+            before = await readProductSnapshot(session.page, request.productName, logs);
+            targetSource = {
+              snapshot: before,
+              image: extractSpecificationImage(before.detail.specifications)
+            };
+            logLine(logs, `${target.site.name} 已存在 ${request.productName}，跳过国际站复制，直接更新 Specification / Product Description / 语言包。`);
+          } else {
+            await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+              waitUntil: "domcontentloaded",
+              timeout: 60000
+            });
+            await session.page.waitForTimeout(1200);
+            const copySource = await findInternationalProduct(
+              session.page,
+              request.productName,
+              logs
             );
+            targetSource = internationalListSource(request.productName, copySource);
+            const expectedCopySourceFingerprint = normalize(
+              expectedCopySourceFingerprints[target.site.siteCode]
+            );
+            if (!expectedCopySourceFingerprint
+              || expectedCopySourceFingerprint !== targetSource.fingerprint) {
+              throw new Error(
+                `${target.site.name} 国际产品复制源在预览后发生变化，请重新预览。`
+              );
+            }
+            await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+              waitUntil: "domcontentloaded",
+              timeout: 60000
+            });
+            await session.page.waitForTimeout(1200);
+            copy = await copyInternationalProduct(session.page, request.productName, logs);
+            components.copy = "passed";
+            before = await readProductSnapshot(session.page, request.productName, logs);
+            const copiedImage = extractSpecificationImage(before.detail.specifications);
+            if (!copiedImage.src) {
+              logLine(logs, "复制后的目标产品 Specification 没有可用图片地址，目标规格将保持无图片状态。");
+            }
+            targetSource = {
+              snapshot: before,
+              image: copiedImage,
+              fingerprint: targetSource.fingerprint
+            };
           }
-          await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
-            waitUntil: "domcontentloaded",
-            timeout: 60000
-          });
-          await session.page.waitForTimeout(1200);
-          copy = await copyInternationalProduct(session.page, request.productName, logs);
-          components.copy = "passed";
-          before = await readProductSnapshot(session.page, request.productName, logs);
-          const copiedImage = extractSpecificationImage(before.detail.specifications);
-          if (!copiedImage.src) {
-            logLine(logs, "复制后的目标产品 Specification 没有可用图片地址，目标规格将保持无图片状态。");
-          }
-          targetSource = {
-            snapshot: before,
-            image: copiedImage,
-            fingerprint: targetSource.fingerprint
-          };
         }
         if (!before) before = await readProductSnapshot(session.page, request.productName, logs);
         if (specificationLanguageOnly) {
@@ -1631,7 +1740,7 @@ function createProductRevisionSyncFeature(deps) {
             currentDescription: before.productDescription
           }
         );
-        const detailChanged = specificationLanguageOnly
+        const detailChanged = specificationLanguageOnly || (publishing && !copyRequired)
           ? false
           : before.detail.overview !== targetSource.snapshot.detail.overview;
         const desiredSpecificationFieldName = desired.language.title;
@@ -1666,7 +1775,7 @@ function createProductRevisionSyncFeature(deps) {
         }
         const languagePackageChanged = !skipLanguagePackage
           && languagePackage.plan.changedCellCount > 0;
-        if (!publishing && !detailChanged && !specificationChanged
+        if (!copyRequired && !detailChanged && !specificationChanged
           && !descriptionChanged && !languagePackageChanged) {
           components.detail = "no-change";
           components.specification = "no-change";
@@ -1871,12 +1980,15 @@ function createProductRevisionSyncFeature(deps) {
 module.exports = {
   SITE_LANGUAGE_NEEDLES,
   SITE_SPECIFICATION_TITLES,
+  SITE_SPECIFICATION_FIELD_TITLES,
   specificationTitleForSite,
+  specificationFieldTitleForSite,
   SPECIFICATION_DETAIL_FIELD_NAMES,
   normalizeDetailFieldName,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
   retryProductReadback,
+  fillAdsAdditionalProductTitle,
   extractSpecificationImage,
   parseSpecificationWorkbook,
   resolveWorkbookLanguage,
@@ -1894,5 +2006,6 @@ module.exports = {
   applyContentOperations,
   applySpecificationOperations,
   buildCommonRevisionTargets,
+  applyAutoSpecificationFieldName,
   createProductRevisionSyncFeature
 };

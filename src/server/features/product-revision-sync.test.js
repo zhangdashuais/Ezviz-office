@@ -17,11 +17,14 @@ const {
   applyContentOperations,
   applySpecificationOperations,
   buildCommonRevisionTargets,
+  applyAutoSpecificationFieldName,
   resolveProductDescription,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
   retryProductReadback,
-  specificationTitleForSite
+  specificationTitleForSite,
+  specificationFieldTitleForSite,
+  fillAdsAdditionalProductTitle
 } = require("./product-revision-sync");
 
 test("Specification and language-only scope preserves unrelated product content", () => {
@@ -39,6 +42,20 @@ test("Specification and language-only scope updates Product Description when Dat
   }), "Old description");
 });
 
+test("fills empty Ads Additional Information product title from product name", () => {
+  const model = {
+    title: "",
+    adsAdditionalInformation: {
+      productTitle: "",
+      nested: { product_title: "Existing Ad Title" }
+    }
+  };
+  assert.equal(fillAdsAdditionalProductTitle(model, "  H8c Pro 4K  "), true);
+  assert.equal(model.title, "");
+  assert.equal(model.adsAdditionalInformation.productTitle, "H8c Pro 4K");
+  assert.equal(model.adsAdditionalInformation.nested.product_title, "Existing Ad Title");
+});
+
 test("common product revision expands multiple countries and products into independent targets", () => {
   const result = buildCommonRevisionTargets({
     sites: ["de", "fr", "de"],
@@ -51,6 +68,19 @@ test("common product revision expands multiple countries and products into indep
   assert.deepEqual(result.targets.map(({ site, productName }) => `${site.siteCode}:${productName}`), [
     "de:CP8", "de:H9c", "fr:CP8", "fr:H9c"
   ]);
+});
+
+test("common product revision can target only the Specification custom field name", () => {
+  assert.deepEqual(applyAutoSpecificationFieldName({
+    revisionType: "detail",
+    autoSpecificationFieldName: "true",
+    specificationOperations: [{ type: "replace", targetText: "old", replacementText: "new" }]
+  }, "de"), {
+    revisionType: "specification",
+    autoSpecificationFieldName: "true",
+    specificationOperations: [],
+    specificationFieldName: "Technische Daten"
+  });
 });
 
 test("retries stale product readback without resubmitting the save", async () => {
@@ -275,6 +305,22 @@ test("product publishing remains executable when copied content needs no later e
     languagePackageChanged: false
   }), "ready");
   assert.equal(revisionPreviewStatus({
+    publishing: true,
+    copyRequired: false,
+    detailChanged: false,
+    specificationChanged: false,
+    descriptionChanged: false,
+    languagePackageChanged: false
+  }), "no-change");
+  assert.equal(revisionPreviewStatus({
+    publishing: true,
+    copyRequired: false,
+    detailChanged: false,
+    specificationChanged: true,
+    descriptionChanged: false,
+    languagePackageChanged: false
+  }), "ready");
+  assert.equal(revisionPreviewStatus({
     publishing: false,
     detailChanged: false,
     specificationChanged: false,
@@ -375,6 +421,8 @@ test("parses paired language columns and generates Specification HTML", () => {
   assert.match(html, /src="https:\/\/cdn\.example\/spec\.jpg"/);
   assert.match(html, /alt="Caméra &quot;Pro&quot;"/);
   assert.match(html, /word-break: normal/);
+  assert.match(html, /<td class="tdline3" colspan="1" rowspan="1" width="200">Modèle<\/td>/);
+  assert.doesNotMatch(html, /<th colspan="1" rowspan="1" width="200">Modèle<\/th>/);
 });
 
 test("maps the Specification title to the selected target site", () => {
@@ -387,6 +435,14 @@ test("maps the Specification title to the selected target site", () => {
   assert.equal(specificationTitleForSite("it"), "Specifiche");
   assert.equal(specificationTitleForSite("sa"), "المواصفات");
   assert.equal(specificationTitleForSite("unknown", "Workbook title"), "Workbook title");
+});
+
+test("maps the Specification custom field name to the selected target site", () => {
+  assert.equal(specificationFieldTitleForSite("de"), "Technische Daten");
+  assert.equal(specificationFieldTitleForSite("th"), "รายละเอียด");
+  assert.equal(specificationFieldTitleForSite("cz"), "Technické údaje");
+  assert.equal(specificationFieldTitleForSite("it"), "Specifiche");
+  assert.equal(specificationFieldTitleForSite("unknown", "Workbook title"), "Workbook title");
 });
 
 test("uses a target-site title override in Detail Specification HTML", () => {

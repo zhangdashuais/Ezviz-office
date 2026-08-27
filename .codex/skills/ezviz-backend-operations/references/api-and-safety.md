@@ -84,8 +84,8 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | --- | --- | --- |
 | POST | `/api/product-revision/preview` | 单产品 Detail 整体替换与 Specification 删除/替换预览 |
 | POST | `/api/product-revision/submit` | 携带预览指纹保存单产品修订并回读验证 |
-| POST | `/api/product-revision/common-preview` | 多站点 × 多产品的相同 Detail/Specification 片段删除或替换预览 |
-| POST | `/api/product-revision/common-submit` | 按逐站点、逐产品预览指纹执行相同片段修订并分别回读 |
+| POST | `/api/product-revision/common-preview` | 多站点 × 多产品的相同 Detail/Specification 片段删除或替换预览；也支持只按站点固定文案预览 Specification 的 Custom Page Name |
+| POST | `/api/product-revision/common-submit` | 按逐站点、逐产品预览指纹执行相同片段修订或 Specification 输入框名称修订并分别回读 |
 | POST | `/api/detail-address-replacement/preview` | 读取多个产品 PC Details，返回旧地址命中路径和次数 |
 | POST | `/api/detail-address-replacement/submit` | 精确替换命中地址，保存后逐产品回读 |
 | GET | `/api/detail-address-replacement/template` | 下载“临时功能”七列表格模板 |
@@ -93,10 +93,11 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/specification/submit` | 写产品后台 |
 | POST | `/api/product-publishing/preview` | 在目标站读取国际产品复制源并预览上架，不提交 |
 | POST | `/api/product-publishing/submit` | 在单个目标站复制产品、更新资料并回读 |
-| POST | `/api/product-publishing/batch-preview` | 多产品、逐目标站预览上架，不提交 |
-| POST | `/api/product-publishing/batch-submit` | 多产品、逐目标站执行上架并回读 |
+| POST | `/api/product-publishing/batch-preview` | 多产品、逐目标站预览上架；目标站已有同名产品时跳过复制，改为只预览资料/语言包更新，不提交 |
+| POST | `/api/product-publishing/batch-submit` | 多产品、逐目标站执行；未存在则复制上架，已存在则只更新资料/语言包并回读 |
 
-产品上架与修订写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列，后台自定义字段名 `vm.pcView.customs[n].name`（Custom Page Name 输入框）和 HTML 顶部 Specification 标题都按站点代码自动使用固定本地化译文；未知站点回退到工作簿标题。荷兰固定 `Specificaties`，德国固定 `Spezifikationen`，法国固定 `Spécifications`，西班牙固定 `Especificaciones`，意大利固定 `Specifiche`。
+产品上架与修订写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列。后台自定义字段名 `vm.pcView.customs[n].name`（Custom Page Name 输入框）使用官网 tab 固定文案，HTML 顶部 Specification 标题使用规格内容标题；未知站点回退到工作簿标题。Custom Page Name 固定映射包括：荷兰/比利时 `Specificaties`，德国 `Technische Daten`，法国 `Spécifications`，西班牙/拉美/阿根廷 `Especificaciones`，意大利 `Specifiche`，捷克 `Technické údaje`，泰国 `รายละเอียด`。
+保存产品资料前会自动把空的 Ads Additional Information → Product Title 补为当前产品名称；已有值不覆盖。
 | POST | `/api/language-package/upload` | 上传语言包 |
 | POST | `/api/language-package/datasheet-inspect` | 识别单产品 Datasheet 的语种列和字段，不访问商城后台 |
 | POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖/追加预览，不上传 |
@@ -106,7 +107,7 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |
 | POST | `/api/assets/upload-image` | 上传图片 |
 
-产品修订分为两种：同一产品跨国家修订继续使用 Specifications 与 Datasheet 同步；多个不同产品的相同部分修订可同时选择多个站点，对 Detail 或 Specification 执行同一条精确删除/替换。后者按国家 × 产品逐项预览、保存和回读，单项失败不影响其他任务，一次最多 50 个产品。产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
+产品修订分为两种：同一产品跨国家修订继续使用 Specifications 与 Datasheet 同步；多个不同产品的相同部分修订可同时选择多个站点，对 Detail 或 Specification 执行同一条精确删除/替换，或只把 Specification 的 Custom Page Name 输入框修成站点固定文案。后者按国家 × 产品逐项预览、保存和回读，单项失败不影响其他任务，一次最多 50 个产品。产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
 
 Detail 内容操作递归处理 `vm.pcView` 的字符串值，适用于 Overview、自定义 Specifications 等 PC Details 内容。`operation: "replace"` 精确替换用户填写的文本，可为完整 URL、相对路径或地址片段，不要求 HTTP/HTTPS 协议；`operation: "delete"` 精确删除 `targetText` 指定的完整代码块（替换为空字符串）。直接修订接口也允许只提交 `productDescription` 更新 Basic Information 的 Product Description，或只提交 `specificationFieldName` 更新 Custom Page Name 输入框，同时保留 Overview 与 Specification 内容。先调用 `preview`；输入未变化且存在命中、字段名或 Product Description 发生变化时才能调用 `submit`。无命中且无字段名/描述变化不保存，提交后必须回读并确认目标内容剩余为 0、字段名和描述值一致。它不修改 Mobile Details 或其他产品标签。
 

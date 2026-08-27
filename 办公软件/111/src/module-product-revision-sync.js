@@ -628,12 +628,15 @@
       lines.push(`- ${item.productName} | ${item.status}`);
       if (item.error) lines.push(`  · ${item.error}`);
       if (item.result) {
-        lines.push(`  · 目标站点 ${item.result.targetCount}，待上架 ${item.result.readyCount}，失败 ${item.result.failedCount}`);
+        lines.push(`  · 目标站点 ${item.result.targetCount}，待执行 ${item.result.readyCount}，失败 ${item.result.failedCount}`);
         item.result.results.forEach((siteResult) => {
           lines.push(
             `    - ${siteResult.site.name} (${siteResult.site.siteCode}) | ${siteResult.status}`
             + (siteResult.error ? ` | ${siteResult.error}` : "")
           );
+          if (siteResult.copyRequired === false) {
+            lines.push("      已存在同名产品：跳过国际站复制，只更新 Specification / Product Description / 语言包。");
+          }
           if (siteResult.desiredProductDescription) {
             lines.push(`      Product Description：${siteResult.desiredProductDescription}`);
           }
@@ -765,7 +768,7 @@
           : "确认并执行同步";
     renderTargets();
     setStatus(({
-      "publish-batch": "批量上架模式：选择资料文件夹，预览确认后逐产品、逐站点执行。",
+      "publish-batch": "批量上架模式：选择资料文件夹，预览确认后逐产品、逐站点执行；目标站已有同名产品时跳过复制，只更新 Specification / Product Description / 语言包。",
       revision: "修订同步模式：选择源站、目标站和两份 Excel，只修改目标站点已经存在的产品。",
       "specification-language": "文案更新模式：不读取源站，只更新目标站已有产品的 Specification / Product Description / 语言包。",
       common: "多产品相同内容修订：请使用下方表单填写站点、产品和替换/删除内容。",
@@ -894,7 +897,7 @@
       return;
     }
     const confirmed = window.confirm(isBatchPublishing()
-      ? `将批量上架 ${validatedPreview.productCount} 个产品，逐国家站点同步 Product Description、Detail、Specification 和语言包。确认继续？`
+      ? `将批量处理 ${validatedPreview.productCount} 个产品：未上架的先复制，已存在同名产品的跳过复制并只更新 Specification / Product Description / 语言包。确认继续？`
       : isDelisting()
         ? `将执行 ${validatedPreview.readyCount} 项下架：取消 Searchable，并把 Type of listing 改为 No Set Uptime。确认继续？`
         : isSpecificationLanguageOnly()

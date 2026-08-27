@@ -75,7 +75,9 @@
     products: byId("commonRevisionProducts"),
     field: byId("commonRevisionField"),
     operation: byId("commonRevisionOperation"),
+    operationLabel: document.querySelector('label[for="commonRevisionOperation"]'),
     target: byId("commonRevisionTarget"),
+    targetLabel: document.querySelector('label[for="commonRevisionTarget"]'),
     replacement: byId("commonRevisionReplacement"),
     replacementLabel: byId("commonRevisionReplacementLabel"),
     preview: byId("commonRevisionPreview"),
@@ -87,8 +89,13 @@
   let commonPreview = null;
   let commonSignature = "";
 
+  function isCommonSpecificationNameOnly() {
+    return common.field.value === "specification-name";
+  }
+
   function commonBody() {
-    const operation = {
+    const nameOnly = isCommonSpecificationNameOnly();
+    const operation = nameOnly ? null : {
       type: common.operation.value,
       targetText: common.target.value,
       replacementText: common.operation.value === "replace" ? common.replacement.value : ""
@@ -98,7 +105,8 @@
         .map((input) => input.value)
         .filter(Boolean),
       productNames: common.products.value,
-      revisionType: common.field.value,
+      revisionType: nameOnly ? "specification" : common.field.value,
+      autoSpecificationFieldName: nameOnly,
       detailOperations: common.field.value === "detail" ? [operation] : [],
       specificationOperations: common.field.value === "specification" ? [operation] : []
     };
@@ -123,9 +131,27 @@
       lines.push(`- ${siteName} | ${item.productName} | ${item.status}${item.error ? ` | ${item.error}` : ""}`);
       if (!submitting && item.result) {
         lines.push(`  · Detail 命中 ${detailMatches}；Specification 命中 ${specificationMatches}`);
+        if (isCommonSpecificationNameOnly() && item.result.desiredSpecificationFieldName) {
+          lines.push(`  · Specification 输入框：${item.result.currentSpecificationFieldName || "（空）"} → ${item.result.desiredSpecificationFieldName}；${item.result.specificationFieldNameChanged ? "将更新" : "已正确"}`);
+        }
       }
     });
     common.output.value = lines.join("\n");
+  }
+
+  function updateCommonUi() {
+    const nameOnly = isCommonSpecificationNameOnly();
+    [common.operation, common.operationLabel, common.target, common.targetLabel].forEach((element) => {
+      element.hidden = nameOnly;
+    });
+    const showReplacement = !nameOnly && common.operation.value === "replace";
+    common.replacement.hidden = !showReplacement;
+    common.replacementLabel.hidden = !showReplacement;
+    if (nameOnly) {
+      common.target.value = "";
+      common.replacement.value = "";
+      common.status.textContent = "请选择站点并填写产品名称；此模式只修改 Specification 的 Custom Page Name 输入框。";
+    }
   }
 
   async function runCommon(action) {
@@ -177,11 +203,13 @@
 
   [common.site, common.products, common.field, common.operation, common.target, common.replacement]
     .forEach((element) => element.addEventListener("input", invalidateCommon));
+  common.field.addEventListener("change", () => {
+    updateCommonUi();
+    invalidateCommon();
+  });
   common.operation.addEventListener("change", () => {
-    const replace = common.operation.value === "replace";
-    common.replacement.hidden = !replace;
-    common.replacementLabel.hidden = !replace;
-    if (!replace) common.replacement.value = "";
+    updateCommonUi();
+    if (common.operation.value !== "replace") common.replacement.value = "";
     invalidateCommon();
   });
   common.preview.addEventListener("click", () => runCommon("preview"));
@@ -221,4 +249,5 @@
       common.site.appendChild(label);
     });
   });
+  updateCommonUi();
 })();
