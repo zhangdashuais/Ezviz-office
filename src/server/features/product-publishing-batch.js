@@ -138,15 +138,22 @@ function createProductPublishingBatchFeature(deps) {
       });
     });
     logLine(logs, "先合并本批次全部产品译文，并按站点一次上传语言包。");
-    await revisionFeature.submitPublishingLanguagePackageBatch(
-      { ...(body || {}), productName: products[0].productName },
-      products.map((product) => ({
-        productName: product.productName,
-        file: product.files.datasheet
-      })),
-      expectedLanguagePackageFingerprints,
-      logs
-    );
+    let languagePackageBatch = { results: [], warnings: [] };
+    try {
+      languagePackageBatch = await revisionFeature.submitPublishingLanguagePackageBatch(
+        { ...(body || {}), productName: products[0].productName },
+        products.map((product) => ({
+          productName: product.productName,
+          file: product.files.datasheet
+        })),
+        expectedLanguagePackageFingerprints,
+        logs
+      ) || { results: [], warnings: [] };
+    } catch (error) {
+      const message = `语言包处理失败，产品上架继续执行：${error?.message || String(error)}`;
+      languagePackageBatch = { results: [], warnings: [{ type: "language-package", message }] };
+      logLine(logs, message);
+    }
     const results = [];
     for (const product of products) {
       const previewResult = expected[product.productName];
@@ -188,6 +195,7 @@ function createProductPublishingBatchFeature(deps) {
       completedCount: results.filter((item) => item.status === "completed").length,
       partialCount: results.filter((item) => item.status === "partial").length,
       failedCount: results.filter((item) => item.status === "failed").length,
+      warnings: languagePackageBatch.warnings || [],
       results
     };
   }

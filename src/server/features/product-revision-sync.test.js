@@ -475,6 +475,22 @@ test("product publishing may preserve the target site's international copy sourc
   assert.equal(result.translationHeader, "国际产品复制源");
 });
 
+test("tolerant publishing preserves source description when the target language column is unusable", () => {
+  const result = resolveProductDescription({
+    headers: ["French"],
+    rows: []
+  }, {
+    siteCode: "de",
+    languagePackageHeader: "German"
+  }, {
+    fallbackDescription: "International source description",
+    tolerant: true
+  });
+  assert.equal(result.description, "International source description");
+  assert.equal(result.inherited, true);
+  assert.match(result.warning, /译文列不存在/);
+});
+
 test("product revision may preserve the current target description when Datasheet omits it", () => {
   const result = resolveProductDescription({ headers: ["Japanese"], rows: [] }, {
     siteCode: "jp",

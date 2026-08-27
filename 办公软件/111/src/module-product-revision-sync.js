@@ -571,7 +571,13 @@
               .map((entry) => entry.key).join("、")
           );
         }
+        (item.languagePackage.warnings || []).slice(0, 5).forEach((warning) => {
+          lines.push(`    警告：${warning.message}`);
+        });
       }
+      (item.warnings || []).slice(0, 5).forEach((warning) => {
+        lines.push(`  · 警告：${warning.message}`);
+      });
     });
     showLines(lines, data);
   }
@@ -601,6 +607,9 @@
           `- 成功并回读通过 | ${item.site.name} (${item.site.siteCode}) `
           + `| ${item.localeHeader} | Goods ID ${item.goodsId}`
         );
+        (item.warnings || []).slice(0, 5).forEach((warning) => {
+          lines.push(`  · 警告：${warning.message}`);
+        });
         lines.push(
           `  · 复制：${item.components?.copy || "未知"}；`
           + `Detail：${item.components?.detail || "未知"}；`
@@ -637,6 +646,9 @@
           if (siteResult.desiredProductDescription) {
             lines.push(`      Product Description：${siteResult.desiredProductDescription}`);
           }
+          (siteResult.warnings || []).slice(0, 3).forEach((warning) => {
+            lines.push(`      警告：${warning.message}`);
+          });
         });
       }
     });
@@ -648,6 +660,9 @@
     const lines = [
       "批量产品上架执行结果",
       `产品：${result.productCount}，完成：${result.completedCount}，部分失败：${result.partialCount}，失败：${result.failedCount}`,
+      ...(result.warnings?.length
+        ? [`警告：${result.warnings.slice(0, 5).map((item) => item.message).join("；")}`]
+        : []),
       ""
     ];
     result.results.forEach((item) => {
@@ -908,8 +923,16 @@
     try {
       const data = await postForm(productEndpoint("submit"), request.form);
       renderProductResult(data, true);
-      setStatus(`执行完成：失败 ${data.result.failedCount}。`,
-        data.result.failedCount ? "warn" : "ok");
+      const warningCount = isBatchPublishing()
+        ? (data.result.warnings || []).length
+        : (data.result.results || []).reduce(
+          (count, item) => count + (item.warnings || []).length,
+          0
+        );
+      setStatus(
+        `执行完成：失败 ${data.result.failedCount}，警告 ${warningCount}。`,
+        data.result.failedCount || warningCount ? "warn" : "ok"
+      );
       invalidatePreview();
     } catch (error) {
       showRequestError("执行", error);

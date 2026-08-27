@@ -32,50 +32,30 @@ function parseLanguageDatasheet(input) {
   const sheet = workbook.Sheets[sheetName];
   if (!sheet?.["!ref"]) throw new Error("语言包 Datasheet 的第一个工作表为空。");
   const range = XLSX.utils.decode_range(sheet["!ref"]);
-  if (range.e.c < 2) {
-    throw new Error("语言包 Datasheet 至少需要三列：字段名、原文和一种译文。");
-  }
-
   const headers = [];
   for (let column = range.s.c + 2; column <= range.e.c; column += 1) {
     const header = normalize(cellValue(sheet, range.s.r, column));
     if (header) headers.push({ header, column });
   }
-  if (!headers.length) throw new Error("语言包 Datasheet 中没有识别到译文列。");
-
   const rows = [];
-  const byKey = new Map();
   for (let row = range.s.r + 1; row <= range.e.r; row += 1) {
     const key = normalize(cellValue(sheet, row, range.s.c));
     const source = normalize(cellValue(sheet, row, range.s.c + 1));
-    if (!key && !source) continue;
-    if (!key) throw new Error(`语言包 Datasheet 第 ${row + 1} 行缺少字段名。`);
-    if (!source) {
-      const hasTranslation = headers.some(({ column }) =>
-        normalize(cellValue(sheet, row, column))
-      );
-      if (!hasTranslation) continue;
-      throw new Error(`语言包 Datasheet 第 ${row + 1} 行缺少原文。`);
-    }
-    if (byKey.has(key)) {
-      throw new Error(
-        `语言包 Datasheet 字段名重复：${key}（第 ${byKey.get(key)}、${row + 1} 行）。`
-      );
-    }
-    byKey.set(key, row + 1);
     const translations = {};
     headers.forEach(({ header, column }) => {
       const value = cellValue(sheet, row, column);
       translations[header] = value == null ? "" : String(value);
     });
+    const hasTranslation = Object.values(translations).some((value) => normalize(value));
+    if (!key && !source && !hasTranslation) continue;
+    if (key && !source && !hasTranslation) continue;
     rows.push({ key, source, rowNumber: row + 1, translations });
   }
-  if (!rows.length) throw new Error("语言包 Datasheet 中没有可处理的数据行。");
-
   return {
     sheetName,
     fingerprint: hashBuffer(buffer),
     headers: headers.map((item) => item.header),
+    headerColumns: Object.fromEntries(headers.map((item) => [item.header, item.column])),
     rows
   };
 }
@@ -174,7 +154,9 @@ function normalizeSourceForComparison(value) {
 }
 
 function normalizeTranslationForComparison(value) {
-  return String(value == null ? "" : value).replace(/\r\n?/g, "\n");
+  return String(value == null ? "" : value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "");
 }
 
 function readLanguagePackage(input, langCode) {
@@ -221,16 +203,61 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
   const missing = [];
   const newFields = [];
   const sourceMismatches = [];
+  const inputWarnings = [];
   const skippedBlank = [];
   const unchanged = [];
+  const selectedByKey = new Map();
   parsedDatasheet.rows.forEach((entry) => {
     const translation = String(entry.translations[translationHeader] ?? "");
     if (!normalize(translation)) {
       skippedBlank.push({ key: entry.key, datasheetRow: entry.rowNumber });
       return;
     }
+    const datasheetColumn = parsedDatasheet.headerColumns?.[translationHeader];
+    const location = `${parsedDatasheet.sheetName}!${XLSX.utils.encode_cell({
+      r: entry.rowNumber - 1,
+      c: Number.isInteger(datasheetColumn) ? datasheetColumn : 0
+    })}`;
+    if (!entry.key) {
+      inputWarnings.push({
+        type: "missing-key",
+        datasheetRow: entry.rowNumber,
+        location,
+        message: `${location} 缺少字段名，已跳过`
+      });
+      return;
+    }
+    if (selectedByKey.has(entry.key)) {
+      inputWarnings.push({
+        type: "duplicate-key",
+        key: entry.key,
+        datasheetRow: entry.rowNumber,
+        location,
+        message: `${location} 字段 ${entry.key} 重复，采用最后一行`
+      });
+    }
+    selectedByKey.set(entry.key, entry);
+  });
+
+  selectedByKey.forEach((entry) => {
+    const translation = String(entry.translations[translationHeader] ?? "");
     const candidates = candidatesByKey.get(entry.key) || [];
     if (!candidates.length) {
+      if (!entry.source) {
+        const datasheetColumn = parsedDatasheet.headerColumns?.[translationHeader];
+        const location = `${parsedDatasheet.sheetName}!${XLSX.utils.encode_cell({
+          r: entry.rowNumber - 1,
+          c: Number.isInteger(datasheetColumn) ? datasheetColumn : 0
+        })}`;
+        inputWarnings.push({
+          type: "missing-source",
+          key: entry.key,
+          datasheetRow: entry.rowNumber,
+          location,
+          message: `${location} 字段 ${entry.key} 缺少原文且语言包中不存在，已跳过`
+        });
+        return;
+      }
       const item = {
         key: entry.key,
         source: entry.source,
@@ -246,9 +273,15 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
         === normalizeSourceForComparison(entry.source)
     );
     if (!sourceMatches.length) {
+      const datasheetColumn = parsedDatasheet.headerColumns?.[translationHeader];
+      const location = `${parsedDatasheet.sheetName}!${XLSX.utils.encode_cell({
+        r: entry.rowNumber - 1,
+        c: Number.isInteger(datasheetColumn) ? datasheetColumn : 0
+      })}`;
       sourceMismatches.push({
         key: entry.key,
         datasheetRow: entry.rowNumber,
+        location,
         expectedSource: entry.source,
         packageSources: [...new Set(candidates.map((candidate) => candidate.source))]
       });
@@ -274,6 +307,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
     missing,
     newFields,
     sourceMismatches,
+    inputWarnings,
     skippedBlank,
     updates
   };

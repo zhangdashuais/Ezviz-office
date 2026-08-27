@@ -38,6 +38,13 @@ test("translation comparison ignores Excel line-ending conversion", () => {
   );
 });
 
+test("translation comparison ignores invisible direction markers", () => {
+  assert.equal(
+    normalizeTranslationForComparison("دقة 2K\u200e"),
+    normalizeTranslationForComparison("دقة 2K")
+  );
+});
+
 function workbookBuffer(rows, bookType = "xlsx") {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "Sheet1");
@@ -80,19 +87,43 @@ test("parses language Datasheet and resolves a target language", () => {
   );
 });
 
-test("skips a note-only Datasheet row but still rejects translated rows without source text", () => {
+test("only validates the selected language column and reports usable row issues", () => {
   const parsed = parseLanguageDatasheet(workbookBuffer([
-    ["Field", "Source", "Spanish"],
-    ["Review note for the following strings", "", ""],
-    ["product_title", "Smart camera", "Cámara inteligente"]
+    ["Field", "Source", "Spanish", "French"],
+    ["Review note for the following strings", "", "", ""],
+    ["product_title", "Smart camera", "Cámara inteligente", "Caméra intelligente"],
+    ["french_only_problem", "", "", "Texte français"]
   ]));
-  assert.equal(parsed.rows.length, 1);
+  assert.equal(parsed.rows.length, 2);
   assert.equal(parsed.rows[0].key, "product_title");
+  const languagePackage = readLanguagePackage(packageBuffer(), "es-ES");
+  const plan = planLanguagePackageUpdates(languagePackage, parsed, "Spanish");
+  assert.equal(plan.inputWarnings.length, 0);
+  assert.equal(plan.changedCellCount, 1);
+});
 
-  assert.throws(() => parseLanguageDatasheet(workbookBuffer([
-    ["Field", "Source", "Spanish"],
-    ["product_title", "", "Cámara inteligente"]
-  ])), /缺少原文/);
+test("selected-language row errors become located warnings instead of blocking updates", () => {
+  const parsed = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish", "French"],
+    ["product_title", "Smart camera", "Primero", "Caméra"],
+    ["product_title", "Smart camera", "Último", ""],
+    ["", "Missing key", "Sin clave", ""],
+    ["french_problem", "", "", "Texte français"]
+  ]));
+  const plan = planLanguagePackageUpdates(readLanguagePackage(packageBuffer(), "es-ES"), parsed, "Spanish");
+  assert.equal(plan.changedCellCount, 1);
+  assert.equal(plan.updates[0].translation, "Último");
+  assert.deepEqual(plan.inputWarnings.map((item) => item.type), ["duplicate-key", "missing-key"]);
+  assert.deepEqual(plan.inputWarnings.map((item) => item.location), ["Sheet1!C3", "Sheet1!C4"]);
+});
+
+test("a readable Datasheet without translation columns remains parseable", () => {
+  const parsed = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source"],
+    ["product_title", "Smart camera"]
+  ]));
+  assert.deepEqual(parsed.headers, []);
+  assert.equal(parsed.rows.length, 1);
 });
 
 test("plans exact field and source matches, including identical duplicates", () => {
