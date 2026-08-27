@@ -132,3 +132,36 @@ test("batch submit uploads one merged language package before publishing product
     ["product", "HP8"]
   ]);
 });
+
+test("batch submit continues product publishing when language package processing fails", async () => {
+  const calls = [];
+  const feature = createProductPublishingBatchFeature({
+    logLine() {},
+    revisionFeature: {
+      async submitPublishingLanguagePackageBatch() {
+        throw new Error("one cell could not be updated");
+      },
+      async submitPublishingWithoutLanguagePackage(body) {
+        calls.push(body.productName);
+        return { failedCount: 0 };
+      }
+    }
+  });
+  const files = [
+    { originalname: "0000__CP8_Datasheet.xlsx", path: "a" },
+    { originalname: "0001__CP8_Specifications.xlsx", path: "b" }
+  ];
+  const batchManifest = JSON.stringify([
+    { uploadName: files[0].originalname, relativePath: "CP8/CP8 Datasheet.xlsx" },
+    { uploadName: files[1].originalname, relativePath: "CP8/CP8 Specifications.xlsx" }
+  ]);
+  const result = await feature.submit({
+    batchManifest,
+    expectedBatchPreviews: JSON.stringify({
+      CP8: { workbook: {}, languageDatasheet: {}, results: [] }
+    })
+  }, files, []);
+  assert.deepEqual(calls, ["CP8"]);
+  assert.equal(result.completedCount, 1);
+  assert.match(result.warnings[0].message, /继续执行/);
+});
