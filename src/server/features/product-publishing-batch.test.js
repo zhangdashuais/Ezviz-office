@@ -87,6 +87,21 @@ test("batch preview stays disabled when every target failed", async () => {
   assert.equal(result.results[0].status, "failed");
 });
 
+test("groups plus and superscript-plus filenames as one product", () => {
+  const files = [
+    { originalname: "data.xlsx", path: "a" },
+    { originalname: "spec.xlsx", path: "b" }
+  ];
+  const products = groupProductFiles(files, [
+    { uploadName: "data.xlsx", relativePath: "Products/CP1 Pro 2K+/CP1 Pro 2K+ Datasheet.xlsx" },
+    { uploadName: "spec.xlsx", relativePath: "Products/CP1 Pro 2K\u207a/CP1 Pro 2K\u207a Spec.xlsx" }
+  ]);
+  assert.equal(products.length, 1);
+  assert.equal(products[0].productName, "CP1 Pro 2K+");
+  assert.ok(products[0].files.datasheet);
+  assert.ok(products[0].files.specification);
+});
+
 test("batch submit uploads one merged language package before publishing products", async () => {
   const calls = [];
   const feature = createProductPublishingBatchFeature({

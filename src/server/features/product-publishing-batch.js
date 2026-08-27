@@ -1,4 +1,5 @@
 const path = require("path");
+const { normalizeProductNameForMatch } = require("./product-name-utils");
 
 const MAX_BATCH_PRODUCTS = 20;
 
@@ -54,7 +55,7 @@ function groupProductFiles(files, manifestValue) {
     if (!file) throw new Error(`文件夹清单中的文件没有上传成功：${relativePath}`);
     const productName = productNameFromPath(relativePath);
     if (!productName) throw new Error(`无法从文件名识别产品名称：${relativePath}`);
-    const key = productName.toLowerCase();
+    const key = normalizeProductNameForMatch(productName);
     const group = groups.get(key) || { productName, files: {}, relativePaths: {} };
     if (group.files[kind]) {
       throw new Error(`${productName} 存在多份 ${kind === "datasheet" ? "Datasheet" : "Specifications"} 文件。`);

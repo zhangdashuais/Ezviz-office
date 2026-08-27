@@ -323,6 +323,15 @@
       .replace(/[\s_-]+$/g, "").trim();
   }
 
+  function productNameMatchKey(value) {
+    return String(value || "")
+      .normalize("NFKC")
+      .replace(/[\u207a＋]/g, "+")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
   async function parseBatchFolder() {
     if (!window.XLSX) throw new Error("Excel 解析库尚未加载，请刷新页面后重试。");
     const groups = new Map();
@@ -331,7 +340,7 @@
       if (!kind) return;
       const productName = batchProductName(file);
       if (!productName) return;
-      const key = productName.toLowerCase();
+      const key = productNameMatchKey(productName);
       const group = groups.get(key) || { productName, files: {} };
       if (group.files[kind]) throw new Error(`${productName} 存在多份 ${kind} 文件。`);
       group.files[kind] = file;

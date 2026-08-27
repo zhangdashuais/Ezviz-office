@@ -1,3 +1,8 @@
+const {
+  normalizeProductNameForMatch,
+  productNameSearchVariants
+} = require("./product-name-utils");
+
 const INT_GOODS_COPY_URL = "https://shop.ezvizlife.com/goods/save-cite";
 const INT_GOODS_CATEGORY_PRIORITY = ["WiFi Cameras", "For Home"];
 const INT_GOODS_SOURCE_SITE_VALUE = "0";
@@ -34,22 +39,6 @@ function orderedIntGoodsCategories(options = []) {
     .filter(Boolean);
   const preferredValues = new Set(preferred.map((option) => option.value));
   return [...preferred, ...usable.filter((option) => !preferredValues.has(option.value))];
-}
-
-function normalizeProductNameForMatch(value) {
-  return String(value || "")
-    .normalize("NFKC")
-    .replace(/\u207a/g, "+")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function productNameSearchVariants(value) {
-  const raw = String(value || "").trim();
-  const plus = raw.replace(/\u207a/g, "+").replace(/＋/g, "+");
-  const superscript = plus.replace(/\+/g, "\u207a");
-  return [...new Set([raw, plus, superscript].filter(Boolean))];
 }
 
 function createProductManagement({ logLine, normalizeBool }) {
@@ -331,11 +320,21 @@ function createProductManagement({ logLine, normalizeBool }) {
   async function copyIntGoodsProduct(page, productName, logs) {
     const normalized = String(productName || "").trim();
     if (!normalized) throw new Error("Product name is required.");
-    const item = page.locator("li.pro-list-li").filter({ has: page.locator("p.pro-list-title", { hasText: normalized }) });
-    const exactItem = item.filter({ hasText: new RegExp("^\\s*" + normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?:\\s|$)", "i") }).first();
-    if (!(await exactItem.count())) throw new Error("Product not found in selected category: " + normalized);
+    const items = page.locator("li.pro-list-li");
+    let exactItem = null;
+    for (let index = 0; index < await items.count(); index += 1) {
+      const candidate = items.nth(index);
+      const title = await candidate.locator("p.pro-list-title").first().innerText().catch(() => "");
+      if (normalizeProductNameForMatch(title) === normalizeProductNameForMatch(normalized)) {
+        exactItem = candidate;
+        break;
+      }
+    }
+    if (!exactItem) throw new Error("Product not found in selected category: " + normalized);
     const title = (await exactItem.locator("p.pro-list-title").first().innerText()).trim();
-    if (title.toLowerCase() !== normalized.toLowerCase()) throw new Error("Product verification failed: " + title);
+    if (normalizeProductNameForMatch(title) !== normalizeProductNameForMatch(normalized)) {
+      throw new Error("Product verification failed: " + title);
+    }
     const copyButton = exactItem.getByText(/^Copy$/i).first();
     if (!(await copyButton.count())) throw new Error("Copy button not found for " + title);
     await copyButton.click();
@@ -417,14 +416,13 @@ function createProductManagement({ logLine, normalizeBool }) {
           nearMatches.push(`${category.text}: ${cleaned}`);
         }
       });
-      const matches = page.locator(".pro-list-ul li.pro-list-li").filter({
-        has: page.locator("p.pro-list-title", { hasText: normalized })
-      });
+      const matches = page.locator(".pro-list-ul li.pro-list-li");
       const count = await matches.count();
       for (let index = 0; index < count; index += 1) {
         const item = matches.nth(index);
         const title = (await item.locator("p.pro-list-title").first().innerText()).trim();
-        if (title.toLowerCase() !== normalized.toLowerCase()) continue;
+        if (normalizeProductNameForMatch(title)
+          !== normalizeProductNameForMatch(normalized)) continue;
         const product = await item.evaluate((element) => {
           const scope = window.angular && window.angular.element(element).scope();
           const good = scope?.good || null;
