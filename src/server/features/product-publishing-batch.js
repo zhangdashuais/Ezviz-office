@@ -42,16 +42,24 @@ function productNameFromPath(relativePath) {
     .replace(/[\s_-]+$/g, ""));
 }
 
+function uploadSequence(value) {
+  return String(value || "").match(/^(\d{4})__/)?.[1] || "";
+}
+
 function groupProductFiles(files, manifestValue) {
   const manifest = parseManifest(manifestValue);
   const uploadedByName = new Map((files || []).map((file) => [file.originalname, file]));
+  const uploadedBySequence = new Map((files || [])
+    .map((file) => [uploadSequence(file.originalname), file])
+    .filter(([sequence]) => sequence));
   const groups = new Map();
   manifest.forEach((entry) => {
-    const uploadName = normalize(entry?.uploadName);
-    const relativePath = normalize(entry?.relativePath);
+    const uploadName = String(entry?.uploadName || "").trim();
+    const relativePath = String(entry?.relativePath || "").trim();
     const kind = fileKind(relativePath);
     if (!kind) return;
-    const file = uploadedByName.get(uploadName);
+    const file = uploadedByName.get(uploadName)
+      || uploadedBySequence.get(uploadSequence(uploadName));
     if (!file) throw new Error(`文件夹清单中的文件没有上传成功：${relativePath}`);
     const productName = productNameFromPath(relativePath);
     if (!productName) throw new Error(`无法从文件名识别产品名称：${relativePath}`);
@@ -208,6 +216,7 @@ module.exports = {
   MAX_BATCH_PRODUCTS,
   fileKind,
   productNameFromPath,
+  uploadSequence,
   groupProductFiles,
   createProductPublishingBatchFeature
 };

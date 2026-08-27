@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   fileKind,
   productNameFromPath,
+  uploadSequence,
   groupProductFiles,
   createProductPublishingBatchFeature
 } = require("./product-publishing-batch");
@@ -100,6 +101,28 @@ test("groups plus and superscript-plus filenames as one product", () => {
   assert.equal(products[0].productName, "CP1 Pro 2K+");
   assert.ok(products[0].files.datasheet);
   assert.ok(products[0].files.specification);
+});
+
+test("matches uploaded Unicode filenames by their stable upload sequence", () => {
+  const files = [
+    { originalname: "0000__CP1 Pro 2Kâº datasheet.xlsx", path: "a" },
+    { originalname: "0001__CP1 Pro 2Kâº spec.xlsx", path: "b" }
+  ];
+  const products = groupProductFiles(files, [
+    {
+      uploadName: "0000__CP1 Pro 2K\u207a datasheet.xlsx",
+      relativePath: "test/CP1 Pro 2K\u207a datasheet.xlsx"
+    },
+    {
+      uploadName: "0001__CP1 Pro 2K\u207a spec.xlsx",
+      relativePath: "test/CP1 Pro 2K\u207a spec.xlsx"
+    }
+  ]);
+  assert.equal(uploadSequence(files[0].originalname), "0000");
+  assert.equal(products.length, 1);
+  assert.equal(products[0].productName, "CP1 Pro 2K\u207a");
+  assert.equal(products[0].files.datasheet.path, "a");
+  assert.equal(products[0].files.specification.path, "b");
 });
 
 test("batch submit uploads one merged language package before publishing products", async () => {
