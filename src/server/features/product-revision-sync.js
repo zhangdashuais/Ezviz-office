@@ -77,6 +77,10 @@ const SITE_SPECIFICATION_FIELD_TITLES = {
   cz: "Technické údaje"
 };
 
+const WIFI6_HALOW_PATTERN = /Wi-Fi\s*6\s*:\s*IEEE(?:\s|&nbsp;)+802\s*\.\s*11b\s*\/\s*g\s*\/\s*a\s*\/\s*n\s*\/\s*ac\s*\/\s*ax(?:\s|&nbsp;)+Wi-Fi(?:\s|&nbsp;)+HaLow\s*:\s*IEEE(?:\s|&nbsp;)+802\s*\.\s*11ah/gi;
+const WIFI6_HALOW_REPLACEMENT = "Wi-Fi : IEEE 802.11b/g/a/n/ac Wi-Fi HaLow: IEEE 802.11ah";
+const WIFI6_AX_PATTERN = /802\s*\.\s*11ax\b/gi;
+
 function specificationTitleForSite(siteCode, fallback = "Specifications") {
   return SITE_SPECIFICATION_TITLES[normalize(siteCode).toLowerCase()]
     || normalize(fallback)
@@ -101,6 +105,10 @@ const SPECIFICATION_DETAIL_FIELD_NAMES = [
   "especifica",
   "spezifikation",
   "spécification",
+  "caractéristiques",
+  "caracteristiques",
+  "özellikler",
+  "ozellikler",
   "specyfikacje",
   "specificații",
   "specificatii",
@@ -649,14 +657,15 @@ function validateDirectRevision(body) {
   operations = operations.map((item, index) => {
     const type = item?.type === "delete-frame-rate"
       ? "delete-frame-rate"
+      : item?.type === "sanitize-wifi6" ? "sanitize-wifi6"
       : item?.type === "delete" ? "delete" : item?.type === "replace" ? "replace" : "";
     const targetText = String(item?.targetText ?? "");
     const replacementText = type === "replace" ? String(item?.replacementText ?? "") : "";
     if (!type) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 操作类型无效。`);
-    if (type === "delete-frame-rate" && revisionType !== "specification") {
-      throw new Error("帧率删除操作只允许用于 Specification。");
+    if ((type === "delete-frame-rate" || type === "sanitize-wifi6") && revisionType !== "specification") {
+      throw new Error("该操作只允许用于 Specification。");
     }
-    if (type !== "delete-frame-rate" && !targetText) {
+    if (type !== "delete-frame-rate" && type !== "sanitize-wifi6" && !targetText) {
       throw new Error(`第 ${index + 1} 条 ${fieldLabel} 操作缺少目标内容。`);
     }
     if (type === "replace" && !replacementText) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 替换操作缺少替换内容。`);
@@ -684,6 +693,13 @@ function applyContentOperations(source, operations, fieldLabel = "Specification"
       if (!matchCount) throw new Error(`${fieldLabel} 中未找到目标内容，已停止操作。`);
       value = value.replace(MAX_FRAME_RATE_DELETE_PATTERN, "");
       return { ...operation, matchCount };
+    }
+    if (operation.type === "sanitize-wifi6") {
+      const phraseMatchCount = value.match(WIFI6_HALOW_PATTERN)?.length || 0;
+      value = value.replace(WIFI6_HALOW_PATTERN, WIFI6_HALOW_REPLACEMENT);
+      const axMatchCount = value.match(WIFI6_AX_PATTERN)?.length || 0;
+      value = value.replace(WIFI6_AX_PATTERN, "");
+      return { ...operation, matchCount: phraseMatchCount + axMatchCount, phraseMatchCount, axMatchCount };
     }
     const matchCount = value.split(operation.targetText).length - 1;
     if (!matchCount) throw new Error(`${fieldLabel} 中未找到目标内容，已停止操作。`);

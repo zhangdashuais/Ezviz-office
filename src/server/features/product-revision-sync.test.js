@@ -136,6 +136,34 @@ test("Specification frame-rate deletion preserves the site's remaining text", ()
   }), /只允许用于 Specification/);
 });
 
+test("Wi-Fi 6 Specification cleanup replaces the HaLow phrase and removes all spaced 802.11ax variants", () => {
+  const request = validateDirectRevision({
+    revisionType: "specification",
+    siteCode: "de",
+    productName: "CP8",
+    specificationOperations: [{ type: "sanitize-wifi6" }]
+  });
+  const result = applySpecificationOperations(
+    "<td>Wi-Fi 6: IEEE 802. 11b/g/a/n/ac/ax Wi-Fi HaLow: IEEE 802.11ah</td>"
+      + "<td>Other: IEEE 802 . 11ax; 802.11ax</td>",
+    request.operations
+  );
+  assert.equal(
+    result.value,
+    "<td>Wi-Fi : IEEE 802.11b/g/a/n/ac Wi-Fi HaLow: IEEE 802.11ah</td><td>Other: IEEE ; </td>"
+  );
+  assert.equal(result.results[0].phraseMatchCount, 1);
+  assert.equal(result.results[0].axMatchCount, 2);
+  assert.equal(result.results[0].matchCount, 3);
+  assert.doesNotMatch(result.value, /802\s*\.\s*11ax/i);
+});
+
+test("Wi-Fi 6 Specification cleanup reports no change instead of failing when a product has no Wi-Fi 6 text", () => {
+  const result = applySpecificationOperations("<td>Wi-Fi: IEEE 802.11b/g/n/ac</td>", [{ type: "sanitize-wifi6" }]);
+  assert.equal(result.value, "<td>Wi-Fi: IEEE 802.11b/g/n/ac</td>");
+  assert.equal(result.results[0].matchCount, 0);
+});
+
 test("Detail and Specification direct revisions validate independently", () => {
   const detail = validateDirectRevision({
     revisionType: "detail", siteCode: "de", productName: "CP8", detailHtml: "<main>new</main>"
@@ -231,6 +259,19 @@ test("reads a localized Specification custom field name", () => {
     { name: "Especificaciones", value: "Max: 25fps; texto local" }
   ]);
   assert.equal(field.name, "Especificaciones");
+});
+
+test("reads French and Turkish Specification custom field variants", () => {
+  const french = findSpecificationDetailField([
+    { name: "Résumé", value: "Overview" },
+    { name: "Caractéristiques", value: "Wi-Fi: IEEE 802.11ac" }
+  ]);
+  assert.equal(french.name, "Caractéristiques");
+  const turkish = findSpecificationDetailField([
+    { name: "Genel Bakış", value: "Overview" },
+    { name: "Özellikler", value: "Wi-Fi: IEEE 802.11ac" }
+  ]);
+  assert.equal(turkish.name, "Özellikler");
 });
 
 test("reads localized singular Specification custom field names", () => {

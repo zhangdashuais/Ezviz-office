@@ -53,7 +53,8 @@
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    // Let the browser consume the Blob URL before releasing its backing data.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function downloadCss(css, fileName) {

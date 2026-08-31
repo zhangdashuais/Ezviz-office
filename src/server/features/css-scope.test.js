@@ -69,6 +69,18 @@ test("prunes unused class selectors while keeping used selector list items", () 
   assert.equal(result.removedRuleCount, 1);
 });
 
+test("pruning a Webflow-style stylesheet keeps root declarations and used rules", () => {
+  const result = pruneUnusedCssClasses(
+    ":root { --brand: #167be6; } .page .hero { color: var(--brand); } .missing { color: red; }",
+    '<section class="page"><div class="hero"></div></section>'
+  );
+
+  assert.match(result.css, /:root\{ --brand: #167be6; \}/);
+  assert.match(result.css, /\.page \.hero\{ color: var\(--brand\); \}/);
+  assert.doesNotMatch(result.css, /missing/);
+  assert.ok(result.css.trim().length > 0);
+});
+
 test("prunes unused class selectors inside grouping at-rules", () => {
   const result = pruneUnusedCssClasses(
     "@media (max-width: 767px) { .used { width: 100%; } .missing { width: 50%; } }",

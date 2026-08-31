@@ -124,18 +124,25 @@
       `国家：${result.siteCount}，产品：${result.productCount}，任务：${result.operationCount}，${submitting ? `完成：${result.completedCount}` : `可执行：${result.readyCount}，无需修改：${result.noChangeCount}`}，失败：${result.failedCount}`,
       ""
     ];
+    const bySite = new Map();
     result.results.forEach((item) => {
-      const detailMatches = item.result?.detailOperations?.reduce((sum, operation) => sum + operation.matchCount, 0) || 0;
-      const specificationMatches = item.result?.specificationOperations?.reduce((sum, operation) => sum + operation.matchCount, 0) || 0;
       const siteName = item.site?.name || item.site?.siteCode || "未知站点";
-      lines.push(`- ${siteName} | ${item.productName} | ${item.status}${item.error ? ` | ${item.error}` : ""}`);
-      if (!submitting && item.result) {
-        lines.push(`  · Detail 命中 ${detailMatches}；Specification 命中 ${specificationMatches}`);
-        if (isCommonSpecificationNameOnly() && item.result.desiredSpecificationFieldName) {
-          lines.push(`  · Specification 输入框：${item.result.currentSpecificationFieldName || "（空）"} → ${item.result.desiredSpecificationFieldName}；${item.result.specificationFieldNameChanged ? "将更新" : "已正确"}`);
-        }
-      }
+      const summary = bySite.get(siteName) || { ready: 0, noChange: 0, completed: 0, failed: 0 };
+      summary[item.status] = (summary[item.status] || 0) + 1;
+      bySite.set(siteName, summary);
     });
+    bySite.forEach((summary, siteName) => {
+      const done = submitting ? `完成 ${summary.completed || 0}` : `可执行 ${summary.ready || 0}，无需修改 ${summary["no-change"] || 0}`;
+      lines.push(`- ${siteName}：${done}，失败 ${summary.failed || 0}`);
+    });
+    const failures = result.results.filter((item) => item.status === "failed");
+    if (failures.length) {
+      lines.push("", "失败项：");
+      failures.forEach((item) => {
+        const siteName = item.site?.name || item.site?.siteCode || "未知站点";
+        lines.push(`- ${siteName} | ${item.productName} | ${item.error || "未知错误"}`);
+      });
+    }
     common.output.value = lines.join("\n");
   }
 
@@ -144,9 +151,17 @@
     [common.operation, common.operationLabel, common.target, common.targetLabel].forEach((element) => {
       element.hidden = nameOnly;
     });
+    const wifi6Cleanup = !nameOnly && common.operation.value === "sanitize-wifi6";
     const showReplacement = !nameOnly && common.operation.value === "replace";
     common.replacement.hidden = !showReplacement;
     common.replacementLabel.hidden = !showReplacement;
+    common.target.hidden = nameOnly || wifi6Cleanup;
+    common.targetLabel.hidden = nameOnly || wifi6Cleanup;
+    if (wifi6Cleanup) {
+      common.target.value = "";
+      common.replacement.value = "";
+      common.status.textContent = "将把指定 Wi-Fi 6 / HaLow 文字改为 Wi-Fi，并清除所有空格写法的 802.11ax。";
+    }
     if (nameOnly) {
       common.target.value = "";
       common.replacement.value = "";
