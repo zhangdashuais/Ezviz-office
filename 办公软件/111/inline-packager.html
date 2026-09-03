@@ -15,6 +15,7 @@
       <div class="nav-items-wrapper">
         <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
         <div class="nav-item" data-target="tab-css-scope">Webflow CSS 作用域</div>
+        <div class="nav-item" data-target="tab-ai-badge">图片 AI 标志</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
       </div>
     </div>
@@ -140,6 +141,35 @@
         <div id="cssScopeStatus" class="status">请选择一个 Webflow CSS 文件。</div>
       </div>
 
+      <div id="tab-ai-badge" class="tab-content">
+        <div class="card">
+          <h3>图片 AI 标志</h3>
+          <p class="desc">选择图片后，系统会在右下角叠加固定标识并导出 PNG，不会上传图片或覆盖原文件。</p>
+          <div class="form-grid">
+            <label for="aiBadgeImageInput">图片文件</label>
+            <input id="aiBadgeImageInput" type="file" accept="image/*" multiple>
+            <label for="aiBadgeTextInput">标志文案</label>
+            <input id="aiBadgeTextInput" type="text" value="AI GENERATED">
+          </div>
+          <div id="aiBadgeDropZone" style="margin-top: 16px; padding: 28px; border: 2px dashed var(--border); border-radius: 10px; text-align: center; color: var(--text-muted); background: #f8fafc;">
+            拖拽图片到这里，或点击上方选择图片
+          </div>
+          <div class="row" style="margin-top: 16px; margin-bottom: 0;">
+            <button id="aiBadgeRunBtn" type="button" disabled>生成 AI 标志图片</button>
+            <button id="aiBadgeClearBtn" type="button" disabled>清空列表</button>
+          </div>
+        </div>
+        <div id="aiBadgeStatus" class="status">请选择一张图片。</div>
+        <div class="card">
+          <h3>待处理图片列表</h3>
+          <div id="aiBadgeList" class="revision-targets">暂无图片。</div>
+        </div>
+        <div class="card">
+          <h3>预览</h3>
+          <canvas id="aiBadgeCanvas" style="max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc;"></canvas>
+        </div>
+      </div>
+
       <div id="tab-pdf-upload" class="tab-content">
         <div class="card">
           <h3>PDF 上传转地址</h3>
@@ -165,12 +195,14 @@
       <div id="tab-text-comparison" class="tab-content">
         <div class="card">
           <h3>PDF / HTML 文字对比</h3>
-          <p class="desc">上传电子版 PDF 与 HTML 后，先汇总 HTML 全部可见文字，再逐条检查 PDF 正文片段是否包含。若 HTML 已转换成语言包字段，可上传总语言包 Excel，系统会先把字段还原成文字再对比。</p>
+          <p class="desc">上传 PDF 与 HTML 后，逐条提取 PDF 正文并与 HTML 对比；未包含的 PDF 片段会同时裁成图片显示，便于核对原版式。若 HTML 已转换成语言包字段，可上传总语言包 Excel，系统会先把字段还原成文字再对比。</p>
           <div class="form-grid">
             <label for="textComparePdfInput">PDF 文件</label>
             <input id="textComparePdfInput" type="file" accept=".pdf,application/pdf">
             <label for="textCompareHtmlInput">HTML 文件</label>
             <input id="textCompareHtmlInput" type="file" accept=".html,.htm,text/html">
+            <label for="textCompareOcrLanguage">OCR 语言</label>
+            <input id="textCompareOcrLanguage" type="text" value="eng" placeholder="例如 eng、jpn、chi_sim">
             <label for="textCompareLanguageInput">总语言包 Excel（可选）</label>
             <input id="textCompareLanguageInput" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
             <label for="textCompareLanguageColumn">替换列（可选）</label>
@@ -395,6 +427,7 @@
             <div id="revisionSyncFolderGroup">
               <input id="revisionSyncFolder" type="file" webkitdirectory directory multiple>
               <div class="desc">每个产品需要一份 <code>Datasheet.xls/xlsx</code> 和一份 <code>Specifications.xls/xlsx</code>。支持“每个产品一个子文件夹”，或在同一文件夹使用“产品名 Datasheet.xlsx / 产品名 Specifications.xlsx”。Datasheet 必须包含 <code>Product Description</code> 行及各站点译文。</div>
+              <label class="check-row"><input id="revisionSyncEuropeDrive" type="checkbox"> 从欧洲云盘获取：按文件名识别产品，并将每份同时包含 Datasheet 和 Specification 工作表的 Excel 自动拆分后上架</label>
             </div>
             <label id="revisionSyncDelistLabel" for="revisionSyncDelistProducts" hidden>下架产品名称</label>
             <textarea id="revisionSyncDelistProducts" rows="5" hidden placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
@@ -1039,11 +1072,12 @@
   <script src="src/module-css-scope.js?v=20260821-1"></script>
   <script src="src/module-task-progress.js?v=20260814-2"></script>
   <script src="src/module-inline.js"></script>
+  <script src="src/module-ai-badge.js?v=20260903-2"></script>
   <script src="src/module-pdf-upload.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="src/module-text-comparison.js?v=20260824-3"></script>
+  <script src="src/module-text-comparison.js?v=20260902-1"></script>
   <script src="src/module-spec-upload.js"></script>
   <script src="src/module-spec-excel-build.js"></script>
   <script src="src/language-column-filter-rules.js?v=20260814-1"></script>
@@ -1052,7 +1086,7 @@
   <script src="src/module-text.js?v=20260826-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js?v=20260814-1"></script>
-  <script src="src/module-product-revision-sync.js?v=20260826-1"></script>
+  <script src="src/module-product-revision-sync.js?v=20260901-1"></script>
   <script src="src/module-product-direct-revision.js?v=20260825-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>

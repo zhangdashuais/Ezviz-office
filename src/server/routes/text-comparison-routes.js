@@ -5,6 +5,8 @@ const {
   replaceLanguageFieldsInHtml,
   applyLanguageFieldSuggestionsToHtml
 } = require("../features/text-comparison-language-package");
+const { cropPdfSegments } = require("../features/text-comparison-crops");
+const { extractPdfPagesByOcr } = require("../features/text-comparison-ocr");
 
 function uploadedFile(req, name) {
   return req.files?.[name]?.[0] || null;
@@ -82,8 +84,8 @@ function registerTextComparisonRoutes(app, deps) {
         const languagePackageFile = uploadedFile(req, "languagePackageFile");
         validateFiles(pdfFile, htmlFile);
         validateLanguagePackageFile(languagePackageFile);
-        const [pdfBuffer, htmlBuffer] = await Promise.all([
-          fs.promises.readFile(pdfFile.path),
+        const [, htmlBuffer] = await Promise.all([
+          fs.promises.access(pdfFile.path),
           fs.promises.readFile(htmlFile.path)
         ]);
         const originalHtmlText = htmlBuffer.toString("utf8").replace(/^\uFEFF/, "");
@@ -109,7 +111,7 @@ function registerTextComparisonRoutes(app, deps) {
           };
         }
         const [pdfPages, htmlSegments] = await Promise.all([
-          fileFeature.extractPdfPages(pdfBuffer),
+          extractPdfPagesByOcr(pdfFile.path, String(req.body?.ocrLanguage || "eng").trim() || "eng"),
           Promise.resolve(fileFeature.extractHtmlSegments(htmlText))
         ]);
         const result = feature.compareTextContent({
@@ -123,6 +125,15 @@ function registerTextComparisonRoutes(app, deps) {
           htmlSegments
         });
         const modified = applyLanguageFieldSuggestionsToHtml(originalHtmlText, result.items);
+        let evidenceCount = 0;
+        result.items.forEach((item) => {
+          if (item.type !== "match" && item.pdfImage && evidenceCount < 30) {
+            item.pdfCropImage = item.pdfImage;
+            evidenceCount += 1;
+          }
+          delete item.pdfImage;
+        });
+        result.summary.pdfTextSource = "OCR 图片识别";
         result.modifiedHtml = modified.replacementCount ? modified.html : "";
         result.modifiedHtmlReplacementCount = modified.replacementCount;
         result.modifiedHtmlFieldCount = modified.fieldCount;

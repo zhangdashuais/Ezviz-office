@@ -16,6 +16,7 @@
   const statusElement = document.getElementById("revisionSyncStatus");
   const outputElement = document.getElementById("revisionSyncOutput");
   const folderInput = document.getElementById("revisionSyncFolder");
+  const europeDriveCheckbox = document.getElementById("revisionSyncEuropeDrive");
   const folderLabel = document.getElementById("revisionSyncFolderLabel");
   const folderGroup = document.getElementById("revisionSyncFolderGroup");
   const productNameLabel = document.getElementById("revisionSyncProductNameLabel");
@@ -40,7 +41,7 @@
   if (!operationSelect || !sourceSiteSelect || !productNameInput || !excelInput || !languageDatasheetInput
     || !targetsElement
     || !selectMatchedButton || !clearTargetsButton || !selectedCountElement || !previewButton
-    || !submitButton || !statusElement || !outputElement || !folderInput || !folderGroup
+    || !submitButton || !statusElement || !outputElement || !folderInput || !europeDriveCheckbox || !folderGroup
     || !folderLabel || !productNameLabel || !excelLabel || !languageDatasheetLabel
     || !delistLabel || !delistProductsInput || !sourceSiteLabel || !languageHelp
     || !targetsHeading || !targetsHelp || !revisionModeTabs || !sameProductTab || !commonPartTab
@@ -332,10 +333,52 @@
       .toLowerCase();
   }
 
+  function europeDriveProductName(file) {
+    return file.name.replace(/\.[^.]+$/, "")
+      .replace(/(?:网站翻译表|website\s*translation(?:\s*table)?|translation\s*table)/ig, " ")
+      .replace(/[\s_-]+$/g, "").trim();
+  }
+
+  async function splitEuropeDriveWorkbook(file, productName) {
+    if (!window.ExcelJS) throw new Error("Excel 拆分库尚未加载，请刷新页面后重试。");
+    const workbook = new window.ExcelJS.Workbook();
+    await workbook.xlsx.load(await file.arrayBuffer());
+    const sheets = [
+      ["datasheet", /datasheet/i, "Datasheet"],
+      ["specification", /^(spec|specification)/i, "Specifications"]
+    ];
+    const split = {};
+    for (const [kind, pattern, suffix] of sheets) {
+      const sourceSheet = workbook.worksheets.find((sheet) => pattern.test(sheet.name));
+      if (!sourceSheet) throw new Error(`${file.name} 没有检测到 ${suffix} 工作表。`);
+      const output = new window.ExcelJS.Workbook();
+      await output.xlsx.load(await file.arrayBuffer());
+      output.worksheets
+        .filter((sheet) => sheet.name !== sourceSheet.name)
+        .forEach((sheet) => output.removeWorksheet(sheet.id));
+      split[kind] = new File(
+        [await output.xlsx.writeBuffer()],
+        `${productName} ${suffix}.xlsx`,
+        { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+      );
+    }
+    return split;
+  }
+
   async function parseBatchFolder() {
     if (!window.XLSX) throw new Error("Excel 解析库尚未加载，请刷新页面后重试。");
     const groups = new Map();
-    [...folderInput.files].forEach((file) => {
+    const files = [...folderInput.files];
+    if (europeDriveCheckbox.checked) {
+      for (const file of files) {
+        if (!/\.xlsx$/i.test(file.name)) continue;
+        const productName = europeDriveProductName(file);
+        if (!productName) throw new Error(`无法从文件名识别产品名称：${file.name}`);
+        const key = productNameMatchKey(productName);
+        if (groups.has(key)) throw new Error(`${productName} 存在多份欧洲云盘翻译表。`);
+        groups.set(key, { productName, files: await splitEuropeDriveWorkbook(file, productName) });
+      }
+    } else files.forEach((file) => {
       const kind = batchFileKind(file);
       if (!kind) return;
       const productName = batchProductName(file);
@@ -399,6 +442,7 @@
       languageDatasheet: languageDatasheet
         ? [languageDatasheet.name, languageDatasheet.size, languageDatasheet.lastModified]
         : null,
+      fromEuropeDrive: europeDriveCheckbox.checked,
       folder: batchProducts.map((product) => [
         product.productName,
         product.files.specification.name,
@@ -809,6 +853,22 @@
     try {
       await parseBatchFolder();
       setStatus(`已识别 ${batchProducts.length} 个产品及共同语言列，请选择目标站点。`, "ok");
+    } catch (error) {
+      batchProducts = [];
+      specificationHeaders = [];
+      languagePackageHeaders = [];
+      renderTargets();
+      setStatus("产品文件夹解析失败：" + (error.message || error), "warn");
+    }
+  });
+  europeDriveCheckbox.addEventListener("change", async () => {
+    invalidatePreview();
+    if (!folderInput.files?.length) return;
+    try {
+      await parseBatchFolder();
+      setStatus(europeDriveCheckbox.checked
+        ? `已按文件名拆分并识别 ${batchProducts.length} 个欧洲云盘翻译表。`
+        : `已识别 ${batchProducts.length} 个产品及共同语言列，请选择目标站点。`, "ok");
     } catch (error) {
       batchProducts = [];
       specificationHeaders = [];

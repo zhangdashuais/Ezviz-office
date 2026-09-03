@@ -85,10 +85,13 @@ function preparePdfSegments(pdfPages, options = {}) {
     const lines = Array.isArray(page?.lines)
       ? page.lines
       : String(page?.text || "").split(/\r?\n/);
-    lines.forEach((line) => {
-      splitLongText(line).forEach((text) => {
+    const lineDetails = Array.isArray(page?.lineDetails) && page.lineDetails.length
+      ? page.lineDetails
+      : lines.map((text) => ({ text, bbox: null }));
+    lineDetails.forEach((line) => {
+      splitLongText(line.text).forEach((text) => {
         if (text.length >= 2 && /[\p{L}\p{N}]/u.test(text)) {
-          segments.push({ text, page: pageNumber });
+          segments.push({ text, page: pageNumber, bbox: line.bbox || null, image: line.image || "" });
         }
       });
     });
@@ -397,6 +400,8 @@ function compareTextContent(input = {}) {
       return {
         type: "match",
         page: pdfSegment.page,
+        pdfCrop: pdfSegment.bbox || null,
+        pdfImage: pdfSegment.image || "",
         pdfText: pdfSegment.text,
         htmlText: htmlSegment.text,
         htmlTag: htmlSegment.tag,
@@ -416,6 +421,8 @@ function compareTextContent(input = {}) {
     return {
       type: "missing",
       page: pdfSegment.page,
+      pdfCrop: pdfSegment.bbox || null,
+      pdfImage: pdfSegment.image || "",
       pdfText: pdfSegment.text,
       htmlText: "",
       htmlSection: "",

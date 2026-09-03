@@ -20,6 +20,7 @@
     "multer": "^2.2.0",
     "pdfjs-dist": "^6.2.108",
     "playwright": "^1.61.1",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5"
   }
 }

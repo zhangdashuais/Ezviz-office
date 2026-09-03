@@ -11,6 +11,10 @@ function loadPdfJs() {
 }
 
 function groupPdfItemsIntoLines(items) {
+  return groupPdfItemsIntoLineDetails(items).map((line) => line.text);
+}
+
+function groupPdfItemsIntoLineDetails(items, pageHeight = 0) {
   const rows = [];
   const sorted = (items || [])
     .filter((item) => normalizeDisplayText(item.str))
@@ -40,20 +44,35 @@ function groupPdfItemsIntoLines(items) {
     .forEach((row) => {
       const rowItems = row.items.sort((left, right) => left.x - right.x);
       let current = "";
+      let currentItems = [];
       let previousEnd = null;
+      const pushCurrent = () => {
+        if (!current) return;
+        const left = Math.min(...currentItems.map((item) => item.x));
+        const right = Math.max(...currentItems.map((item) => item.x + item.width));
+        const baseline = Math.max(...currentItems.map((item) => item.y));
+        lines.push({
+          text: normalizeDisplayText(current),
+          bbox: pageHeight
+            ? [Math.max(0, left - 4), Math.max(0, pageHeight - baseline - 20), right - left + 8, 28]
+            : null
+        });
+      };
       rowItems.forEach((item) => {
         const gap = previousEnd === null ? 0 : item.x - previousEnd;
         if (current && gap > 38) {
-          lines.push(normalizeDisplayText(current));
+          pushCurrent();
           current = item.text;
+          currentItems = [item];
         } else {
           current += (current ? " " : "") + item.text;
+          currentItems.push(item);
         }
         previousEnd = item.x + item.width;
       });
-      if (current) lines.push(normalizeDisplayText(current));
+      pushCurrent();
     });
-  return lines.filter(Boolean);
+  return lines.filter((line) => line.text);
 }
 
 async function extractPdfPages(buffer) {
@@ -82,9 +101,12 @@ async function extractPdfPages(buffer) {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1 });
+      const lineDetails = groupPdfItemsIntoLineDetails(content.items, viewport.height);
       pages.push({
         page: pageNumber,
-        lines: groupPdfItemsIntoLines(content.items)
+        lines: lineDetails.map((line) => line.text),
+        lineDetails
       });
       page.cleanup();
     }
@@ -220,6 +242,7 @@ function extractHtmlSegments(html) {
 
 module.exports = {
   groupPdfItemsIntoLines,
+  groupPdfItemsIntoLineDetails,
   extractPdfPages,
   extractHtmlSegments
 };

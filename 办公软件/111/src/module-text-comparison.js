@@ -3,6 +3,7 @@
   const elements = {
     pdf: $("textComparePdfInput"),
     html: $("textCompareHtmlInput"),
+    ocrLanguage: $("textCompareOcrLanguage"),
     languagePackage: $("textCompareLanguageInput"),
     languageColumn: $("textCompareLanguageColumn"),
     compare: $("textCompareRunBtn"),
@@ -61,6 +62,7 @@
     const languageReplacement = lastResult?.languageReplacement || null;
     const cards = [
       summaryCard("PDF 页数", summary.pdfPages),
+      summaryCard("PDF 文字来源", summary.pdfTextSource || "PDF 文字层"),
       summaryCard("已排除 Specification", `${summary.excludedSpecificationPages || 0} 页 / ${summary.excludedSpecificationSegments || 0} 条`),
       summaryCard("HTML 已包含", summary.match, "is-match"),
       summaryCard("HTML 未包含", summary.missing, "is-missing"),
@@ -141,6 +143,14 @@
 
       const pdfCell = document.createElement("td");
       pdfCell.textContent = item.pdfText || "-";
+      if (item.pdfCropImage) {
+        const preview = document.createElement("img");
+        preview.src = item.pdfCropImage;
+        preview.alt = `PDF 第 ${item.page} 页原文片段`;
+        preview.style.cssText = "display:block;max-width:220px;max-height:96px;margin-top:8px;border:1px solid #ddd;cursor:zoom-in";
+        preview.addEventListener("click", () => window.open(item.pdfCropImage, "_blank", "noopener"));
+        pdfCell.appendChild(preview);
+      }
 
       const htmlCell = document.createElement("td");
       htmlCell.textContent = item.htmlText || "-";
@@ -201,6 +211,7 @@
       const formData = new FormData();
       formData.append("pdfFile", pdfFile, pdfFile.name);
       formData.append("htmlFile", htmlFile, htmlFile.name);
+      formData.append("ocrLanguage", elements.ocrLanguage?.value.trim() || "eng");
       const languagePackageFile = elements.languagePackage?.files?.[0];
       if (languagePackageFile) {
         formData.append("languagePackageFile", languagePackageFile, languagePackageFile.name);
@@ -238,8 +249,11 @@
           + (languageReplacement.missingFieldCount ? `，缺失 ${languageReplacement.missingFieldCount} 个字段` : "")
           + "；"
         : "";
+      const cropMessage = lastResult.pdfCropWarning
+        ? `PDF 图片证据未生成：${lastResult.pdfCropWarning}；`
+        : "";
       setStatus(
-        `${languageMessage}${lastResult.summary.verdictText} 共发现 ${differenceCount} 条未包含片段，其中 ${lastResult.summary.critical} 条包含数值或单位风险。`,
+        `${cropMessage}${languageMessage}${lastResult.summary.verdictText} 共发现 ${differenceCount} 条未包含片段，其中 ${lastResult.summary.critical} 条包含数值或单位风险。`,
         lastResult.summary.verdict === "pass" ? "ok" : "warn"
       );
     } catch (error) {
@@ -256,6 +270,7 @@
     elements.html.value = "";
     if (elements.languagePackage) elements.languagePackage.value = "";
     if (elements.languageColumn) elements.languageColumn.value = "";
+    if (elements.ocrLanguage) elements.ocrLanguage.value = "eng";
     elements.summary.hidden = true;
     elements.recommendations.hidden = true;
     elements.modifiedHtmlPanel.hidden = true;
