@@ -5,7 +5,6 @@ const {
   replaceLanguageFieldsInHtml,
   applyLanguageFieldSuggestionsToHtml
 } = require("../features/text-comparison-language-package");
-const { cropPdfSegments } = require("../features/text-comparison-crops");
 const { extractPdfPagesByOcr } = require("../features/text-comparison-ocr");
 
 function uploadedFile(req, name) {
@@ -37,6 +36,15 @@ function validateLanguagePackageFile(file) {
   }
   if (file.size > 30 * 1024 * 1024) {
     throw new Error("语言包 Excel 文件不能超过 30 MB。");
+  }
+}
+
+async function extractPdfPagesPreferText(fileFeature, pdfBuffer, pdfPath, ocrLanguage, ocr = extractPdfPagesByOcr) {
+  try {
+    return { pages: await fileFeature.extractPdfPages(pdfBuffer), source: "PDF 文字层" };
+  } catch (error) {
+    if (!/没有可提取文字/.test(error?.message || "")) throw error;
+    return { pages: await ocr(pdfPath, ocrLanguage), source: "OCR 图片识别（PDF 无文字层）" };
   }
 }
 
@@ -84,8 +92,8 @@ function registerTextComparisonRoutes(app, deps) {
         const languagePackageFile = uploadedFile(req, "languagePackageFile");
         validateFiles(pdfFile, htmlFile);
         validateLanguagePackageFile(languagePackageFile);
-        const [, htmlBuffer] = await Promise.all([
-          fs.promises.access(pdfFile.path),
+        const [pdfBuffer, htmlBuffer] = await Promise.all([
+          fs.promises.readFile(pdfFile.path),
           fs.promises.readFile(htmlFile.path)
         ]);
         const originalHtmlText = htmlBuffer.toString("utf8").replace(/^\uFEFF/, "");
@@ -110,8 +118,13 @@ function registerTextComparisonRoutes(app, deps) {
             missingKeys: replaced.missingKeys.slice(0, 100)
           };
         }
-        const [pdfPages, htmlSegments] = await Promise.all([
-          extractPdfPagesByOcr(pdfFile.path, String(req.body?.ocrLanguage || "eng").trim() || "eng"),
+        const [pdfExtraction, htmlSegments] = await Promise.all([
+          extractPdfPagesPreferText(
+            fileFeature,
+            pdfBuffer,
+            pdfFile.path,
+            String(req.body?.ocrLanguage || "eng").trim() || "eng"
+          ),
           Promise.resolve(fileFeature.extractHtmlSegments(htmlText))
         ]);
         const result = feature.compareTextContent({
@@ -121,7 +134,7 @@ function registerTextComparisonRoutes(app, deps) {
             languagePackage: languagePackageFile?.originalname || ""
           },
           languageReplacement,
-          pdfPages,
+          pdfPages: pdfExtraction.pages,
           htmlSegments
         });
         const modified = applyLanguageFieldSuggestionsToHtml(originalHtmlText, result.items);
@@ -133,7 +146,7 @@ function registerTextComparisonRoutes(app, deps) {
           }
           delete item.pdfImage;
         });
-        result.summary.pdfTextSource = "OCR 图片识别";
+        result.summary.pdfTextSource = pdfExtraction.source;
         result.modifiedHtml = modified.replacementCount ? modified.html : "";
         result.modifiedHtmlReplacementCount = modified.replacementCount;
         result.modifiedHtmlFieldCount = modified.fieldCount;
@@ -152,5 +165,6 @@ function registerTextComparisonRoutes(app, deps) {
 module.exports = {
   validateFiles,
   validateLanguagePackageFile,
+  extractPdfPagesPreferText,
   registerTextComparisonRoutes
 };

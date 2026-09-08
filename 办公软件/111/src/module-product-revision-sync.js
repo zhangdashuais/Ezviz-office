@@ -333,12 +333,6 @@
       .toLowerCase();
   }
 
-  function europeDriveProductName(file) {
-    return file.name.replace(/\.[^.]+$/, "")
-      .replace(/(?:网站翻译表|website\s*translation(?:\s*table)?|translation\s*table)/ig, " ")
-      .replace(/[\s_-]+$/g, "").trim();
-  }
-
   async function splitEuropeDriveWorkbook(file, productName) {
     if (!window.ExcelJS) throw new Error("Excel 拆分库尚未加载，请刷新页面后重试。");
     const workbook = new window.ExcelJS.Workbook();
@@ -365,30 +359,37 @@
     return split;
   }
 
+  async function isCombinedPublishingWorkbook(file) {
+    if (!/\.xlsx$/i.test(file.name)) return false;
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", bookSheets: true });
+    return window.productPublishingInputRules.hasCombinedPublishingSheets(workbook.SheetNames);
+  }
+
   async function parseBatchFolder() {
     if (!window.XLSX) throw new Error("Excel 解析库尚未加载，请刷新页面后重试。");
     const groups = new Map();
     const files = [...folderInput.files];
-    if (europeDriveCheckbox.checked) {
-      for (const file of files) {
-        if (!/\.xlsx$/i.test(file.name)) continue;
-        const productName = europeDriveProductName(file);
+    for (const file of files) {
+      if (!/\.xlsx?$/i.test(file.name)) continue;
+      if (await isCombinedPublishingWorkbook(file)) {
+        const productName = window.productPublishingInputRules
+          .productNameFromCombinedWorkbook(file.name);
         if (!productName) throw new Error(`无法从文件名识别产品名称：${file.name}`);
         const key = productNameMatchKey(productName);
         if (groups.has(key)) throw new Error(`${productName} 存在多份欧洲云盘翻译表。`);
         groups.set(key, { productName, files: await splitEuropeDriveWorkbook(file, productName) });
+        continue;
       }
-    } else files.forEach((file) => {
       const kind = batchFileKind(file);
-      if (!kind) return;
+      if (!kind) continue;
       const productName = batchProductName(file);
-      if (!productName) return;
+      if (!productName) continue;
       const key = productNameMatchKey(productName);
       const group = groups.get(key) || { productName, files: {} };
       if (group.files[kind]) throw new Error(`${productName} 存在多份 ${kind} 文件。`);
       group.files[kind] = file;
       groups.set(key, group);
-    });
+    }
     batchProducts = [...groups.values()].sort((a, b) => a.productName.localeCompare(b.productName));
     if (!batchProducts.length) throw new Error("文件夹中没有识别到产品 Excel。");
     if (batchProducts.length > 20) throw new Error("一次最多上架 20 个产品，请分批执行。");
@@ -442,7 +443,7 @@
       languageDatasheet: languageDatasheet
         ? [languageDatasheet.name, languageDatasheet.size, languageDatasheet.lastModified]
         : null,
-      fromEuropeDrive: europeDriveCheckbox.checked,
+      combinedWorkbookDetection: true,
       folder: batchProducts.map((product) => [
         product.productName,
         product.files.specification.name,
@@ -592,6 +593,9 @@
         `- ${item.status === "ready" ? "待更新" : "无需更新"} | `
         + `${item.site.name} (${item.site.siteCode}) | ${item.localeHeader}`
       );
+      if (publishing && item.targetProductName && item.targetProductName !== result.productName) {
+        lines.push(`  · 日本站上架名称：${result.productName} → ${item.targetProductName}`);
+      }
       lines.push(
         `  · Detail：${item.detailChanged ? "将替换" : "相同"} `
         + `(${item.currentOverviewLength} → ${item.desiredOverviewLength} 字符)`
@@ -660,11 +664,15 @@
           `- 成功并回读通过 | ${item.site.name} (${item.site.siteCode}) `
           + `| ${item.localeHeader} | Goods ID ${item.goodsId}`
         );
+        if (publishing && item.targetProductName && item.targetProductName !== result.productName) {
+          lines.push(`  · 日本站产品名称：${item.targetProductName}`);
+        }
         (item.warnings || []).slice(0, 5).forEach((warning) => {
           lines.push(`  · 警告：${warning.message}`);
         });
         lines.push(
           `  · 复制：${item.components?.copy || "未知"}；`
+          + `产品名称：${item.components?.productName || "未知"}；`
           + `Detail：${item.components?.detail || "未知"}；`
           + `Specification：${item.components?.specification || "未知"}；`
           + `Product Description：${item.components?.description || "未知"}；`
@@ -696,8 +704,11 @@
             `    - ${siteResult.site.name} (${siteResult.site.siteCode}) | ${siteResult.status}`
             + (siteResult.error ? ` | ${siteResult.error}` : "")
           );
+          if (siteResult.targetProductName && siteResult.targetProductName !== item.productName) {
+            lines.push(`      日本站上架名称：${item.productName} → ${siteResult.targetProductName}`);
+          }
           if (siteResult.copyRequired === false) {
-            lines.push("      已存在同名产品：跳过国际站复制，只更新 Specification / Product Description / 语言包。");
+            lines.push("      已存在目标站产品：跳过国际站复制，只更新产品名称 / Specification / Product Description / 语言包。");
           }
           if (siteResult.desiredProductDescription) {
             lines.push(`      Product Description：${siteResult.desiredProductDescription}`);
@@ -726,6 +737,9 @@
       item.result?.results?.forEach((siteResult) => {
         lines.push(`  - ${siteResult.site.name} (${siteResult.site.siteCode}) | ${siteResult.status}`
           + (siteResult.error ? ` | ${siteResult.error}` : ""));
+        if (siteResult.targetProductName && siteResult.targetProductName !== item.productName) {
+          lines.push(`    日本站产品名称：${siteResult.targetProductName}`);
+        }
       });
     });
     showLines(lines, data);
@@ -853,22 +867,6 @@
     try {
       await parseBatchFolder();
       setStatus(`已识别 ${batchProducts.length} 个产品及共同语言列，请选择目标站点。`, "ok");
-    } catch (error) {
-      batchProducts = [];
-      specificationHeaders = [];
-      languagePackageHeaders = [];
-      renderTargets();
-      setStatus("产品文件夹解析失败：" + (error.message || error), "warn");
-    }
-  });
-  europeDriveCheckbox.addEventListener("change", async () => {
-    invalidatePreview();
-    if (!folderInput.files?.length) return;
-    try {
-      await parseBatchFolder();
-      setStatus(europeDriveCheckbox.checked
-        ? `已按文件名拆分并识别 ${batchProducts.length} 个欧洲云盘翻译表。`
-        : `已识别 ${batchProducts.length} 个产品及共同语言列，请选择目标站点。`, "ok");
     } catch (error) {
       batchProducts = [];
       specificationHeaders = [];

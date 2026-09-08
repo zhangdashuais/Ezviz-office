@@ -14,7 +14,6 @@
       <div class="nav-label">基础工具</div>
       <div class="nav-items-wrapper">
         <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
-        <div class="nav-item" data-target="tab-css-scope">Webflow CSS 作用域</div>
         <div class="nav-item" data-target="tab-ai-badge">图片 AI 标志</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
       </div>
@@ -71,10 +70,10 @@
       <div id="tab-inline" class="tab-content active">
         <div class="card">
           <h3>内联配置</h3>
-          <p class="desc">批量处理 HTML、CSS 和 JS 资源，生成单文件离线包。支持图片上传、CDN 替换或接口同步。</p>
+          <p class="desc">批量处理 HTML、CSS 和 JS 资源，并自动为 Webflow CSS 添加 <code>.page.page-webflow</code> 作用域。完成后同时返回 HTML 与独立 CSS 文件。</p>
 
           <select id="versionSelect" hidden>
-            <option value="src/main-default.js" selected>Standard</option>
+            <option value="src/main-default.js?v=20260908-1" selected>Standard</option>
           </select>
           <select id="imageModeSelect" hidden>
             <option value="upload" selected>Upload Assets</option>
@@ -94,51 +93,22 @@
           <div class="row" style="margin-bottom: 0;">
             <label>HTML</label>
             <select id="htmlSelect" style="width: 200px;"></select>
-            <button id="runBtn" class="transform el-button mt-4 mb-4 el-button--danger el-button--mini" type="button">Transform</button>
+            <button id="runBtn" class="transform el-button mt-4 mb-4 el-button--danger el-button--mini" type="button">开始一键打包</button>
           </div>
         </div>
 
         <div id="status" class="status">等待任务启动...</div>
         <textarea id="output" placeholder="处理后的 HTML 代码预览..."></textarea>
-      </div>
-
-      <div id="tab-css-scope" class="tab-content">
         <div class="card">
-          <h3>Webflow CSS 作用域处理</h3>
-          <p class="desc">选择 Webflow 导出的项目 CSS，系统会添加页面作用域并返回可直接使用的 CSS 文件；也可以按 HTML 中实际出现的 class 清理未使用的 CSS selector。</p>
-
-          <div class="row">
-            <label for="cssScopeFileInput">选择 CSS 文件</label>
-            <input id="cssScopeFileInput" type="file" accept=".css,text/css">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <h3 style="margin-bottom: 4px;">打包后的 Webflow CSS</h3>
+              <p class="desc" style="margin: 0;">已自动添加 <code>.page.page-webflow</code> 作用域，可复制或再次下载。</p>
+            </div>
+            <button id="cssDownloadBtn" type="button" disabled>下载 webflow.scoped.css</button>
           </div>
-
-          <div class="row">
-            <label for="cssScopeSelectorInput">页面作用域</label>
-            <input id="cssScopeSelectorInput" type="text" value=".page.page-webflow" style="flex: 1;">
-          </div>
-
-          <div class="row" style="margin-bottom: 0;">
-            <button id="cssScopeRunBtn" type="button" disabled>生成并下载 CSS</button>
-          </div>
+          <textarea id="cssOutput" readonly placeholder="完成一键打包后，作用域 CSS 会显示在这里..."></textarea>
         </div>
-
-        <div class="card">
-          <h3>删除未使用 CSS 类</h3>
-          <p class="desc">上传 HTML 后，系统会检测其中的 class；如果 CSS 写在 HTML 的 style 标签里，可直接清理并下载新的 HTML。如果 CSS 是单独文件，再选择 CSS 文件并下载清理后的 CSS。</p>
-
-          <div class="form-grid">
-            <label for="cssCleanHtmlInput">HTML 文件</label>
-            <input id="cssCleanHtmlInput" type="file" accept=".html,.htm,text/html">
-            <label for="cssCleanFileInput">CSS 文件（可选）</label>
-            <input id="cssCleanFileInput" type="file" accept=".css,text/css">
-            <label for="cssCleanSafelistInput">保留类名</label>
-            <input id="cssCleanSafelistInput" type="text" value="w-,w--,w-mod-,w-condition-,w-dyn-" placeholder="逗号分隔；支持前缀">
-            <label></label>
-            <button id="cssCleanRunBtn" type="button" disabled>清理并下载</button>
-          </div>
-        </div>
-
-        <div id="cssScopeStatus" class="status">请选择一个 Webflow CSS 文件。</div>
       </div>
 
       <div id="tab-ai-badge" class="tab-content">
@@ -173,7 +143,7 @@
       <div id="tab-pdf-upload" class="tab-content">
         <div class="card">
           <h3>PDF 上传转地址</h3>
-          <p class="desc">按抓包里的 fs.ezvizlife.com 上传请求发送 PDF，返回可复制的文件地址。</p>
+          <p class="desc">支持一次选择多个 PDF，或选择包含 PDF 的整个文件夹；文件夹中的非 PDF 文件会自动忽略。上传后返回可复制的文件地址。</p>
 
           <div class="row">
             <label>上传接口</label>
@@ -181,8 +151,10 @@
           </div>
 
           <div class="row">
-            <label>PDF 文件</label>
+            <label>PDF 文件（可多选）</label>
             <input id="pdfFileInput" type="file" accept=".pdf,application/pdf" multiple>
+            <label>PDF 文件夹</label>
+            <input id="pdfFolderInput" type="file" accept=".pdf,application/pdf" webkitdirectory directory multiple>
             <button id="pdfUploadBtn">开始上传</button>
             <button id="pdfCopyBtn" disabled>复制地址</button>
           </div>
@@ -201,7 +173,7 @@
             <input id="textComparePdfInput" type="file" accept=".pdf,application/pdf">
             <label for="textCompareHtmlInput">HTML 文件</label>
             <input id="textCompareHtmlInput" type="file" accept=".html,.htm,text/html">
-            <label for="textCompareOcrLanguage">OCR 语言</label>
+            <label for="textCompareOcrLanguage">OCR 回退语言</label>
             <input id="textCompareOcrLanguage" type="text" value="eng" placeholder="例如 eng、jpn、chi_sim">
             <label for="textCompareLanguageInput">总语言包 Excel（可选）</label>
             <input id="textCompareLanguageInput" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
@@ -343,6 +315,28 @@
           </div>
         </div>
 
+        <div class="card">
+          <h3>本地 i18n Datasheet 生成</h3>
+          <p class="desc">只需填写产品名称。系统会自动读取产品 HTML、下载目录中后缀最新的 en-US 总语言包，以及产品文件夹内的单产品 Excel；生成文件默认保存到产品文件夹的 upload 目录。</p>
+          <div class="form-grid">
+            <label for="localI18nProductName">产品名称</label>
+            <input id="localI18nProductName" type="text" placeholder="例如 TY1 G1 3K">
+            <label for="localI18nHtmlPath">HTML 路径</label>
+            <input id="localI18nHtmlPath" type="text" readonly>
+            <label for="localI18nProductPackagePath">单产品语言包路径</label>
+            <input id="localI18nProductPackagePath" type="text" readonly>
+            <label for="localI18nGlobalPackagePath">总语言包路径</label>
+            <input id="localI18nGlobalPackagePath" type="text" readonly>
+            <label for="localI18nOutputPath">存储路径</label>
+            <input id="localI18nOutputPath" type="text" readonly>
+          </div>
+          <div class="row">
+            <button id="localI18nGenerateBtn" type="button">生成 i18n Datasheet</button>
+          </div>
+          <div id="localI18nStatus" class="status">请输入产品名称后生成。</div>
+          <textarea id="localI18nOutput" placeholder="已使用的 HTML、语言包、单产品 Excel 与输出路径会显示在这里..."></textarea>
+        </div>
+
         <div id="textStatus" class="status">请上传文件以开始解析。</div>
 
         <div id="tableContainer" style="display:none;" class="card">
@@ -426,8 +420,8 @@
             <label id="revisionSyncFolderLabel" for="revisionSyncFolder">待上架产品文件夹</label>
             <div id="revisionSyncFolderGroup">
               <input id="revisionSyncFolder" type="file" webkitdirectory directory multiple>
-              <div class="desc">每个产品需要一份 <code>Datasheet.xls/xlsx</code> 和一份 <code>Specifications.xls/xlsx</code>。支持“每个产品一个子文件夹”，或在同一文件夹使用“产品名 Datasheet.xlsx / 产品名 Specifications.xlsx”。Datasheet 必须包含 <code>Product Description</code> 行及各站点译文。</div>
-              <label class="check-row"><input id="revisionSyncEuropeDrive" type="checkbox"> 从欧洲云盘获取：按文件名识别产品，并将每份同时包含 Datasheet 和 Specification 工作表的 Excel 自动拆分后上架</label>
+              <div class="desc">默认自动判断 Excel：同时包含 <code>Datasheet</code> 和 <code>Spec / Specification</code> 工作表时，按文件名识别产品并自动拆分；否则按“产品名 Datasheet.xlsx / 产品名 Specifications.xlsx”成对识别。欧洲云盘文件名末尾的 <code>- Website</code> 会自动移除。Datasheet 必须包含 <code>Product Description</code> 行及各站点译文。</div>
+              <label class="check-row"><input id="revisionSyncEuropeDrive" type="checkbox" checked disabled> 从欧洲云盘获取并自动识别双工作表 Excel（默认启用）</label>
             </div>
             <label id="revisionSyncDelistLabel" for="revisionSyncDelistProducts" hidden>下架产品名称</label>
             <textarea id="revisionSyncDelistProducts" rows="5" hidden placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
@@ -1069,11 +1063,10 @@
 
   <script src="src/ui.js"></script>
   <script src="src/css-scope.js?v=20260821-1"></script>
-  <script src="src/module-css-scope.js?v=20260821-1"></script>
   <script src="src/module-task-progress.js?v=20260814-2"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-ai-badge.js?v=20260903-2"></script>
-  <script src="src/module-pdf-upload.js"></script>
+  <script src="src/module-pdf-upload.js?v=20260908-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1085,8 +1078,9 @@
   <script src="src/i18n-conversion-rules.js?v=20260807-2"></script>
   <script src="src/module-text.js?v=20260826-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
-  <script src="src/module-language-package.js?v=20260814-1"></script>
-  <script src="src/module-product-revision-sync.js?v=20260901-1"></script>
+  <script src="src/module-language-package.js?v=20260908-1"></script>
+  <script src="src/product-publishing-input-rules.js?v=20260908-2"></script>
+  <script src="src/module-product-revision-sync.js?v=20260908-2"></script>
   <script src="src/module-product-direct-revision.js?v=20260825-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>

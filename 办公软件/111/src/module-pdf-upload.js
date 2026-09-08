@@ -1,12 +1,13 @@
 (function () {
   const apiInput = document.getElementById("pdfUploadApiInput");
   const fileInput = document.getElementById("pdfFileInput");
+  const folderInput = document.getElementById("pdfFolderInput");
   const uploadBtn = document.getElementById("pdfUploadBtn");
   const copyBtn = document.getElementById("pdfCopyBtn");
   const statusEl = document.getElementById("pdfUploadStatus");
   const outputEl = document.getElementById("pdfUploadOutput");
 
-  if (!apiInput || !fileInput || !uploadBtn || !copyBtn || !statusEl || !outputEl) {
+  if (!apiInput || !fileInput || !folderInput || !uploadBtn || !copyBtn || !statusEl || !outputEl) {
     return;
   }
 
@@ -104,18 +105,22 @@
   }
 
   uploadBtn.addEventListener("click", async () => {
-    const files = Array.from(fileInput.files || []);
+    const candidates = [...(fileInput.files || []), ...(folderInput.files || [])];
+    const files = [...new Map(candidates
+      .filter((file) => /\.pdf$/i.test(file.name) || file.type === "application/pdf")
+      .map((file) => [`${file.webkitRelativePath || file.name}:${file.size}:${file.lastModified}`, file]))
+      .values()];
     const uploadApi = apiInput.value.trim() || "https://fs.ezvizlife.com/upload.php";
 
     if (!files.length) {
-      setStatus("请先选择 PDF 文件。", "warn");
+      setStatus("请先选择一个或多个 PDF，或选择包含 PDF 的文件夹。", "warn");
       return;
     }
 
     uploadBtn.disabled = true;
     copyBtn.disabled = true;
     outputEl.value = "";
-    setStatus("正在上传 PDF...");
+    setStatus(`正在上传 ${files.length} 个 PDF...`);
 
     const links = [];
     const errors = [];

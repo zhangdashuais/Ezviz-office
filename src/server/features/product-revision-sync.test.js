@@ -24,8 +24,20 @@ const {
   retryProductReadback,
   specificationTitleForSite,
   specificationFieldTitleForSite,
-  fillAdsAdditionalProductTitle
+  fillAdsAdditionalProductTitle,
+  normalizeJapanPublishingProductName,
+  publishingProductNameForSite
 } = require("./product-revision-sync");
+
+test("Japan publishing converts resolution labels in product names but keeps 4K", () => {
+  assert.equal(normalizeJapanPublishingProductName("TY1 G1 1080P"), "TY1 G1 2MP");
+  assert.equal(normalizeJapanPublishingProductName("H6c 2K"), "H6c 3MP");
+  assert.equal(normalizeJapanPublishingProductName("H6c 2K+"), "H6c 4MP");
+  assert.equal(normalizeJapanPublishingProductName("H9c 3K"), "H9c 5MP");
+  assert.equal(normalizeJapanPublishingProductName("H8c Pro 4K"), "H8c Pro 4K");
+  assert.equal(publishingProductNameForSite("H9c 3K", "jp"), "H9c 5MP");
+  assert.equal(publishingProductNameForSite("H9c 3K", "de"), "H9c 3K");
+});
 
 test("Specification and language-only scope preserves unrelated product content", () => {
   assert.equal(isSpecificationLanguageOnly({ updateScope: "specification-language" }), true);
@@ -54,6 +66,12 @@ test("fills empty Ads Additional Information product title from product name", (
   assert.equal(model.title, "");
   assert.equal(model.adsAdditionalInformation.productTitle, "H8c Pro 4K");
   assert.equal(model.adsAdditionalInformation.nested.product_title, "Existing Ad Title");
+});
+
+test("overwrites Ads product title when Japan publishing renames the product", () => {
+  const model = { adsAdditionalInformation: { productTitle: "H9c 3K" } };
+  assert.equal(fillAdsAdditionalProductTitle(model, "H9c 5MP", true), true);
+  assert.equal(model.adsAdditionalInformation.productTitle, "H9c 5MP");
 });
 
 test("common product revision expands multiple countries and products into independent targets", () => {

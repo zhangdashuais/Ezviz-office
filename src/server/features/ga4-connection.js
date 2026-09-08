@@ -3,8 +3,9 @@ const path = require("path");
 const crypto = require("crypto");
 
 const SCOPES = [
-  "https://www.googleapis.com/auth/analytics.readonly",
-  "https://www.googleapis.com/auth/webmasters.readonly"
+  "https://www.googleapis.com/auth/analytics",
+  "https://www.googleapis.com/auth/analytics.edit",
+  "https://www.googleapis.com/auth/webmasters"
 ];
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";

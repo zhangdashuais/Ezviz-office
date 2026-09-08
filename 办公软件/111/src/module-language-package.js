@@ -18,7 +18,15 @@
     datasheetPreview: document.getElementById("languageDatasheetPreviewBtn"),
     datasheetSubmit: document.getElementById("languageDatasheetSubmitBtn"),
     datasheetStatus: document.getElementById("languageDatasheetStatus"),
-    datasheetOutput: document.getElementById("languageDatasheetOutput")
+    datasheetOutput: document.getElementById("languageDatasheetOutput"),
+    localI18nProductName: document.getElementById("localI18nProductName"),
+    localI18nGenerate: document.getElementById("localI18nGenerateBtn"),
+    localI18nStatus: document.getElementById("localI18nStatus"),
+    localI18nOutput: document.getElementById("localI18nOutput"),
+    localI18nHtmlPath: document.getElementById("localI18nHtmlPath"),
+    localI18nProductPackagePath: document.getElementById("localI18nProductPackagePath"),
+    localI18nGlobalPackagePath: document.getElementById("localI18nGlobalPackagePath"),
+    localI18nOutputPath: document.getElementById("localI18nOutputPath")
   };
 
   if (!el.sites || !el.upload) return;
@@ -138,6 +146,61 @@
       writeOutput("语言包上传失败：\n" + (error.message || error));
     } finally {
       el.upload.disabled = false;
+    }
+  }
+
+  function setLocalI18nStatus(message, type) {
+    if (!el.localI18nStatus) return;
+    el.localI18nStatus.textContent = message;
+    el.localI18nStatus.className = "status" + (type ? " " + type : "");
+  }
+
+  function showLocalI18nPaths(result = {}) {
+    const productName = el.localI18nProductName?.value.trim() || "产品名称";
+    el.localI18nHtmlPath.value = result.htmlFile
+      || `D:\\代码存放\\产品代码\\ezviz\\（自动匹配 ${productName} 的 HTML）`;
+    el.localI18nProductPackagePath.value = result.productFile
+      || `D:\\产品\\${productName}\\（自动匹配单产品 Excel）`;
+    el.localI18nGlobalPackagePath.value = result.globalFile
+      || "C:\\Users\\zhangtianle7\\Downloads\\en-US (数字后缀最大).xls/xlsx";
+    el.localI18nOutputPath.value = result.outputFile
+      || `D:\\产品\\${productName}\\upload\\${productName} datasheet.xlsx`;
+  }
+
+  async function generateLocalI18nDatasheet() {
+    const productName = el.localI18nProductName?.value.trim();
+    if (!productName) {
+      setLocalI18nStatus("请先填写产品名称。", "warn");
+      return;
+    }
+    el.localI18nGenerate.disabled = true;
+    setLocalI18nStatus("正在读取本地 HTML 和 Excel，并生成 Datasheet...");
+    el.localI18nOutput.value = "生成中...";
+    try {
+      const response = await fetch(serviceBase + "/api/language-package/local-i18n-datasheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productName })
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "生成失败");
+      const result = payload.result || {};
+      showLocalI18nPaths(result);
+      el.localI18nOutput.value = [
+        "生成完成",
+        "输出文件：" + result.outputFile,
+        "HTML：" + result.htmlFile,
+        "总语言包：" + result.globalFile,
+        "单产品 Excel：" + result.productFile,
+        "本产品字段：" + result.productFieldCount,
+        "需复查字段：" + result.foreignFieldCount
+      ].join("\n");
+      setLocalI18nStatus("Datasheet 已生成。", "ok");
+    } catch (error) {
+      setLocalI18nStatus("生成失败：" + (error.message || error), "warn");
+      el.localI18nOutput.value = "生成失败：\n" + (error.message || error);
+    } finally {
+      el.localI18nGenerate.disabled = false;
     }
   }
 
@@ -329,4 +392,9 @@
   el.datasheetSubmit.addEventListener("click", () => runDatasheet("submit"));
 
   loadSites();
+  if (el.localI18nGenerate) el.localI18nGenerate.addEventListener("click", generateLocalI18nDatasheet);
+  if (el.localI18nProductName) {
+    el.localI18nProductName.addEventListener("input", () => showLocalI18nPaths());
+    showLocalI18nPaths();
+  }
 })();

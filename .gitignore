@@ -6,7 +6,13 @@ outputs/
 .pw-ecadmin-auto-profile/
 .pw-ecadmin-profile/
 .pw-ezviz-shop-profile/
+.pw-ezviz-shop-profile-*/
+.pw-google-cloud-profile/
 .playwright-cli/
+
+__pycache__/
+*.pyc
+eng.traineddata
 
 .env
 .env.*

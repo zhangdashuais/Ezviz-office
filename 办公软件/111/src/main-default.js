@@ -3,10 +3,24 @@
       const runBtn = document.getElementById("runBtn");
       const statusEl = document.getElementById("status");
       const outputEl = document.getElementById("output");
+      const cssOutputEl = document.getElementById("cssOutput");
+      const cssDownloadBtn = document.getElementById("cssDownloadBtn");
+      let packagedCss = "";
 
       function setStatus(message, type) {
         statusEl.textContent = message;
         statusEl.className = "status" + (type ? " " + type : "");
+      }
+
+      function downloadResult(content, fileName, type) {
+        const url = URL.createObjectURL(new Blob([content], { type }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
       function normalizePath(path) {
@@ -582,6 +596,9 @@
         }
 
         runBtn.disabled = true;
+        packagedCss = "";
+        if (cssOutputEl) cssOutputEl.value = "";
+        if (cssDownloadBtn) cssDownloadBtn.disabled = true;
         setStatus("正在读取文件并处理，请稍候...");
 
         try {
@@ -707,18 +724,10 @@
             .replace("__EZVIZ_REMOTE_WEBFLOW_JS__", webflowJsUrl);
 
           outputEl.value = result;
-
-          const blob = new Blob([result], { type: "text/html;charset=utf-8" });
-          const url = URL.createObjectURL(blob);
-
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "store.html";
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-
-          URL.revokeObjectURL(url);
+          packagedCss = normalizedCssContent;
+          if (cssOutputEl) cssOutputEl.value = packagedCss;
+          if (cssDownloadBtn) cssDownloadBtn.disabled = false;
+          downloadResult(result, "store.html", "text/html;charset=utf-8");
 
           const summaryMessage = [
             `Normalized ../images/ -> images/: HTML ${normalizedImagePathResult.replaceCount}, CSS ${normalizedCssPathResult.replaceCount}`,
@@ -730,9 +739,9 @@
           const allWarnings = [...warnings, ...imageWarnings];
 
           if (allWarnings.length) {
-            setStatus("Completed, downloaded store.html\n" + summaryMessage + "\n" + allWarnings.join("\n"), "warn");
+            setStatus("Completed, downloaded store.html; webflow.scoped.css is ready below\n" + summaryMessage + "\n" + allWarnings.join("\n"), "warn");
           } else {
-            setStatus("Completed, downloaded store.html\n" + summaryMessage, "ok");
+            setStatus("Completed, downloaded store.html; webflow.scoped.css is ready below\n" + summaryMessage, "ok");
           }
         } catch (err) {
           setStatus("处理失败: " + (err && err.message ? err.message : String(err)), "warn");
@@ -742,4 +751,7 @@
       }
 
       runBtn.addEventListener("click", run);
+      cssDownloadBtn?.addEventListener("click", () => {
+        if (packagedCss) downloadResult(packagedCss, "webflow.scoped.css", "text/css;charset=utf-8");
+      });
     })();

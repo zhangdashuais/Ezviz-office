@@ -1,6 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { validateFiles, validateLanguagePackageFile } = require("./text-comparison-routes");
+const {
+  validateFiles,
+  validateLanguagePackageFile,
+  extractPdfPagesPreferText
+} = require("./text-comparison-routes");
 
 test("multipart text comparison accepts PDF and HTML files", () => {
   assert.doesNotThrow(() => validateFiles(
@@ -31,4 +35,25 @@ test("multipart text comparison accepts an optional language package excel", () 
     originalname: "en-US.csv",
     size: 1024
   }), /语言包 Excel 文件格式/);
+});
+
+test("PDF comparison prefers its text layer and only uses OCR when no text exists", async () => {
+  let ocrCalls = 0;
+  const direct = await extractPdfPagesPreferText({
+    extractPdfPages: async () => [{ page: 1, lines: ["Direct text"] }]
+  }, Buffer.from("pdf"), "file.pdf", "eng", async () => {
+    ocrCalls += 1;
+    return [];
+  });
+  assert.equal(direct.source, "PDF 文字层");
+  assert.equal(ocrCalls, 0);
+
+  const fallback = await extractPdfPagesPreferText({
+    extractPdfPages: async () => { throw new Error("PDF 中没有可提取文字"); }
+  }, Buffer.from("pdf"), "file.pdf", "eng", async () => {
+    ocrCalls += 1;
+    return [{ page: 1, lines: ["OCR text"] }];
+  });
+  assert.equal(fallback.source, "OCR 图片识别（PDF 无文字层）");
+  assert.equal(ocrCalls, 1);
 });

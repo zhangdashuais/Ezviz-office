@@ -4,6 +4,18 @@ const pathModule = require("path");
 function registerLanguagePackageRoutes(app, deps) {
   const { upload, languagePackageFeature, logLine } = deps;
 
+  app.post("/api/language-package/local-i18n-datasheet", (req, res) => {
+    const logs = [];
+    try {
+      const result = languagePackageFeature.generateLocalI18nDatasheet(req.body || {});
+      logLine(logs, `已生成 Datasheet：${result.outputFile}`);
+      res.json({ ok: true, logs, result });
+    } catch (error) {
+      logLine(logs, `本地 i18n Datasheet 生成失败：${error.message || String(error)}`);
+      res.status(500).json({ ok: false, error: error.message || String(error), logs });
+    }
+  });
+
   app.post("/api/language-package/upload", upload.fields([
     { name: "languagePackage", maxCount: 1 }
   ]), async (req, res) => {
