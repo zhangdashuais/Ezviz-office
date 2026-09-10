@@ -2,6 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const childProcess = require("child_process");
 const XLSX = require("xlsx");
+const cheerio = require("cheerio");
+const i18nRules = require("../../../办公软件/111/src/i18n-conversion-rules");
 
 const HTML_ROOT = "D:\\代码存放\\产品代码\\ezviz";
 const PRODUCT_ROOT = "D:\\产品";
@@ -19,6 +21,27 @@ function token(value) {
 
 function copy(value) {
   return value ? JSON.parse(JSON.stringify(value)) : value;
+}
+
+function locateRawHtmlText(rawNode, source) {
+  const escaped = source
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+  for (const candidate of [...new Set([source, escaped])]) {
+    const start = rawNode.indexOf(candidate);
+    if (start >= 0) return { start, length: candidate.length };
+  }
+  return null;
+}
+
+function isProductNameOnlyText(value, productName) {
+  const normalizeName = (input) => text(input).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const source = normalizeName(value);
+  const parts = normalizeName(productName).split(" ").filter(Boolean);
+  return parts.some((_part, index) => source === parts.slice(0, index + 1).join(" "));
 }
 
 function cell(sheet, row, column) {
@@ -70,14 +93,15 @@ function findProductWorkbook(productName) {
   });
   walk(root);
   const wanted = token(productName);
-  const outputName = `${productName} datasheet.xlsx`.toLowerCase();
-  const ranked = files.filter((file) => path.basename(file).toLowerCase() !== outputName).map((file) => {
+  const generatedOutputPrefix = `${productName} datasheet`.toLowerCase();
+  const ranked = files.filter((file) => !path.basename(file).toLowerCase().startsWith(generatedOutputPrefix)).map((file) => {
     const name = path.basename(file, path.extname(file));
     const key = token(name);
     return {
       file,
       score: (/(^|_)datasheet($|_)/i.test(key) ? 100 : 0)
         + (key.includes(wanted) ? 20 : 0)
+        - (file.toLowerCase().includes(`${path.sep}upload${path.sep}`) ? 1000 : 0)
         + fs.statSync(file).mtimeMs / 1e15
     };
   }).sort((a, b) => b.score - a.score);
@@ -135,29 +159,150 @@ function parseProductDatasheet(file) {
   return { headers: headers.map((item) => item.header), rows };
 }
 
-function extractHtmlKeys(html, globalEntries) {
+function mergeGeneratedOutputHistory(productData, destination, productName, outputFile) {
+  const prefix = `${productName} datasheet`.toLowerCase();
+  const files = fs.readdirSync(destination, { withFileTypes: true })
+    .filter((entry) => entry.isFile()
+      && entry.name.toLowerCase().startsWith(prefix)
+      && /\.xlsx?$/i.test(entry.name))
+    .map((entry) => path.join(destination, entry.name))
+    .filter((file) => path.resolve(file).toLowerCase() !== path.resolve(outputFile).toLowerCase())
+    .sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
+  files.forEach((file) => {
+    try {
+      parseProductDatasheet(file).rows.forEach((entry, key) => productData.rows.set(key, entry));
+    } catch {}
+  });
+}
+
+function recoverRowsFromHtmlBackup(htmlFile, html, productName, productData) {
+  const extension = path.extname(htmlFile);
+  const prefix = `${path.basename(htmlFile, extension)}.before-i18n-`;
+  const backupFile = fs.readdirSync(path.dirname(htmlFile), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.startsWith(prefix) && entry.name.endsWith(extension))
+    .map((entry) => path.join(path.dirname(htmlFile), entry.name))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+  if (!backupFile) return;
+  const collect = (sourceHtml) => {
+    const $ = cheerio.load(sourceHtml);
+    const nodes = [];
+    $("body").find("*").addBack().contents().each((_index, node) => {
+      if (node.type === "text" && !["script", "style", "noscript"].includes(node.parent?.name)) nodes.push(node.data);
+    });
+    return nodes;
+  };
+  const currentNodes = collect(html);
+  const backupNodes = collect(fs.readFileSync(backupFile, "utf8"));
+  if (currentNodes.length !== backupNodes.length) return;
+  currentNodes.forEach((current, index) => {
+    const match = String(current || "").match(/\{\{t\(\s*['"]goods\.([^'"]+)['"]\s*\)\}\}/);
+    if (!match || productData.rows.has(match[1].toLowerCase())) return;
+    const raw = text(backupNodes[index]);
+    const source = i18nRules.extractTranslatableText(raw, productName);
+    if (!source || isProductNameOnlyText(source, productName)) return;
+    productData.rows.set(match[1].toLowerCase(), {
+      key: match[1],
+      values: { [productData.headers[0]]: source }
+    });
+  });
+}
+
+function extractHtmlKeys(html, entries) {
   const candidates = new Set();
   const quoted = /["'`]([a-z][a-z0-9_]{2,})["'`]/gi;
   let match;
   while ((match = quoted.exec(html))) candidates.add(match[1].toLowerCase());
   const dotted = /\bgoods\.([a-z][a-z0-9_]{2,})\b/gi;
   while ((match = dotted.exec(html))) candidates.add(match[1].toLowerCase());
-  return [...candidates].map((key) => globalEntries.get(key)).filter(Boolean);
+  return [...candidates].map((key) => entries.get(key)).filter(Boolean);
 }
 
-function buildWorkbook({ productName, productKey, productData, globalEntries, htmlKeys }) {
+function extractNewProductRows(html, productName, productKey, productData, globalEntries) {
+  const sourceEntries = [...productData.rows.values()].map((entry) => ({
+    key: entry.key,
+    source: entry.values[productData.headers[0]] || ""
+  })).concat([...globalEntries.values()]);
+  const sourceIndex = i18nRules.buildSourceKeyIndex(sourceEntries).bySource;
+  const reused = new Map();
+  const newSources = new Map();
+  const occurrences = new Map();
+  const $ = cheerio.load(html, { sourceCodeLocationInfo: true });
+  $("body").find("*").addBack().contents().each((_index, node) => {
+    if (node.type !== "text") return;
+    if (["script", "style", "noscript"].includes(node.parent?.name)) return;
+    const raw = text(node.data);
+    if (!raw || raw.includes("{{t(") || !i18nRules.containsEnglishText(raw)) return;
+    const source = i18nRules.extractTranslatableText(raw, productName);
+    if (!source || isProductNameOnlyText(source, productName)) return;
+    const normalized = i18nRules.normalize(source);
+    const location = node.sourceCodeLocation;
+    if (!location) return;
+    const rawNode = html.slice(location.startOffset, location.endOffset);
+    const rawLocation = locateRawHtmlText(rawNode, source);
+    if (!rawLocation) return;
+    if (!occurrences.has(normalized)) occurrences.set(normalized, []);
+    occurrences.get(normalized).push({
+      start: location.startOffset + rawLocation.start,
+      end: location.startOffset + rawLocation.start + rawLocation.length
+    });
+    const existing = sourceIndex.get(normalized);
+    if (existing) reused.set(existing.key.toLowerCase(), existing);
+    else if (!newSources.has(normalized)) newSources.set(normalized, source);
+  });
+  const reserved = new Set([
+    ...globalEntries.keys(),
+    ...productData.rows.keys()
+  ]);
+  let index = 0;
+  const prefix = productKey.toUpperCase();
+  const newRows = [...newSources.entries()].map(([normalized, source]) => {
+    let key;
+    do { key = `${prefix}_${++index}`; } while (reserved.has(key.toLowerCase()));
+    reserved.add(key.toLowerCase());
+    return { key, source, normalized };
+  });
+  const keyBySource = new Map(newRows.map((entry) => [entry.normalized, entry.key]));
+  reused.forEach((entry) => keyBySource.set(i18nRules.normalize(entry.source), entry.key));
+  const replacements = [...occurrences.entries()].flatMap(([normalized, positions]) => {
+    const key = keyBySource.get(normalized);
+    return key ? positions.map((position) => ({ ...position, key })) : [];
+  });
+  return {
+    newRows: newRows.map(({ normalized: _normalized, ...entry }) => entry),
+    reusedRows: [...reused.values()],
+    replacements
+  };
+}
+
+function replaceHtmlText(html, replacements) {
+  return [...replacements]
+    .sort((a, b) => b.start - a.start)
+    .reduce((result, item) => (
+      result.slice(0, item.start)
+      + `{{t(&#39;goods.${item.key}&#39;)}}`
+      + result.slice(item.end)
+    ), html);
+}
+
+function backupAndWriteHtml(htmlFile, html) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const extension = path.extname(htmlFile);
+  const backupFile = path.join(
+    path.dirname(htmlFile),
+    `${path.basename(htmlFile, extension)}.before-i18n-${stamp}${extension}`
+  );
+  fs.copyFileSync(htmlFile, backupFile, fs.constants.COPYFILE_EXCL);
+  fs.writeFileSync(htmlFile, html, "utf8");
+  return backupFile;
+}
+
+function buildWorkbook({ productName, productKey, productData, globalEntries, htmlKeys, newProductRows }) {
   const template = XLSX.readFile(TEMPLATE_PATH, { cellStyles: true });
   const templateSheet = template.Sheets[template.SheetNames.find((name) => /datasheet/i.test(name)) || template.SheetNames[0]];
   const headers = productData.headers;
-  const directRows = [...globalEntries.values()].filter((entry) => entry.key.toLowerCase().startsWith(productKey));
-  // Product pages sometimes reuse an earlier resolution's fields, e.g. a 3K
-  // page still references TY1_G1_2K_*. Treat that as the same product family.
-  const familyKey = productKey.replace(/_(?:\d+k|\d+mp)$/i, "");
-  const productFieldKey = directRows.length ? productKey : familyKey;
-  const productRows = directRows.length ? directRows : [...globalEntries.values()]
-    .filter((entry) => entry.key.toLowerCase().startsWith(productFieldKey));
+  const productRows = newProductRows;
   const seen = new Set(productRows.map((entry) => entry.key.toLowerCase()));
-  const foreignRows = htmlKeys.filter((entry) => !entry.key.toLowerCase().startsWith(productFieldKey) && !seen.has(entry.key.toLowerCase()));
+  const foreignRows = htmlKeys.filter((entry) => !seen.has(entry.key.toLowerCase()));
   const outputRows = [...productRows, ...foreignRows];
   if (!productRows.length && !foreignRows.length) throw new Error("未在总语言包或 HTML 中识别到可生成的 i18n 字段。");
 
@@ -205,16 +350,49 @@ function generateLocalI18nDatasheet({ productName, outputDir }) {
   const globalFile = latestGlobalPackage();
   const productFile = findProductWorkbook(cleanName);
   const globalEntries = parseGlobalPackage(globalFile);
-  const productData = parseProductDatasheet(productFile);
   const productKey = token(cleanName);
-  const htmlKeys = extractHtmlKeys(fs.readFileSync(htmlFile, "utf8"), globalEntries);
-  const { workbook, ...stats } = buildWorkbook({ productName: cleanName, productKey, productData, globalEntries, htmlKeys });
   const destination = outputDir || (fs.existsSync(path.join(PRODUCT_ROOT, cleanName, "upload"))
     ? path.join(PRODUCT_ROOT, cleanName, "upload")
     : path.join(PRODUCT_ROOT, cleanName));
   fs.mkdirSync(destination, { recursive: true });
-  const outputFile = path.join(destination, `${cleanName} datasheet.xlsx`);
-  XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
+  let outputFile = path.join(destination, `${cleanName} datasheet.xlsx`);
+  const productData = parseProductDatasheet(productFile);
+  mergeGeneratedOutputHistory(productData, destination, cleanName, outputFile);
+  if (fs.existsSync(outputFile)) {
+    const previousOutput = parseProductDatasheet(outputFile);
+    previousOutput.rows.forEach((entry, key) => productData.rows.set(key, entry));
+  }
+  recoverRowsFromHtmlBackup(htmlFile, fs.readFileSync(htmlFile, "utf8"), cleanName, productData);
+  const knownEntries = new Map(globalEntries);
+  productData.rows.forEach((entry, key) => knownEntries.set(key, {
+    key: entry.key,
+    source: entry.values[productData.headers[0]] || ""
+  }));
+  const html = fs.readFileSync(htmlFile, "utf8");
+  const htmlKeys = extractHtmlKeys(html, knownEntries);
+  const extracted = extractNewProductRows(html, cleanName, productKey, productData, globalEntries);
+  const productPrefix = `${productKey.toUpperCase()}_`;
+  const currentProductRows = new Map(extracted.newRows.concat(
+    htmlKeys.concat(extracted.reusedRows).filter((entry) => entry.key.toUpperCase().startsWith(productPrefix))
+  ).map((entry) => [entry.key.toLowerCase(), entry]));
+  const reusedKeys = new Map(htmlKeys.concat(extracted.reusedRows)
+    .filter((entry) => !entry.key.toUpperCase().startsWith(productPrefix))
+    .map((entry) => [entry.key.toLowerCase(), entry]));
+  const { workbook, ...stats } = buildWorkbook({
+    productName: cleanName,
+    productKey,
+    productData,
+    globalEntries,
+    htmlKeys: [...reusedKeys.values()],
+    newProductRows: [...currentProductRows.values()].sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }))
+  });
+  try {
+    XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
+  } catch (error) {
+    if (!['EBUSY', 'EPERM'].includes(error.code)) throw error;
+    outputFile = path.join(destination, `${cleanName} datasheet.updated.xlsx`);
+    XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
+  }
   const styleResult = childProcess.spawnSync(
     process.env.PYTHON || "python",
     [path.join(__dirname, "local-i18n-datasheet-style.py"), TEMPLATE_PATH, outputFile],
@@ -223,7 +401,22 @@ function generateLocalI18nDatasheet({ productName, outputDir }) {
   if (styleResult.error || styleResult.status !== 0) {
     throw new Error(`Datasheet 样式处理失败：${styleResult.stderr || styleResult.error?.message || "Python 未返回成功状态"}`);
   }
-  return { outputFile, htmlFile, globalFile, productFile, ...stats };
+  const updatedHtml = replaceHtmlText(html, extracted.replacements);
+  const backupFile = updatedHtml === html ? "" : backupAndWriteHtml(htmlFile, updatedHtml);
+  return {
+    outputFile,
+    htmlFile,
+    htmlBackupFile: backupFile,
+    htmlReplacementCount: extracted.replacements.length,
+    globalFile,
+    productFile,
+    ...stats
+  };
 }
 
-module.exports = { generateLocalI18nDatasheet };
+module.exports = {
+  generateLocalI18nDatasheet,
+  extractNewProductRows,
+  replaceHtmlText,
+  isProductNameOnlyText
+};

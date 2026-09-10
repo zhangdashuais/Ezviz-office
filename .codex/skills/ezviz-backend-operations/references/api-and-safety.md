@@ -100,8 +100,8 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 保存产品资料前会自动把空的 Ads Additional Information → Product Title 补为当前产品名称；已有值不覆盖。
 | POST | `/api/language-package/upload` | 上传语言包 |
 | POST | `/api/language-package/datasheet-inspect` | 识别单产品 Datasheet 的语种列和字段，不访问商城后台 |
-| POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖/追加预览，不上传 |
-| POST | `/api/language-package/datasheet-submit` | 校验预览指纹后原生修改、上传并重新下载回读；失败时回滚原包 |
+| POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖预览；页面默认跳过站点缺失 Key，不上传 |
+| POST | `/api/language-package/datasheet-submit` | 单任务运行；校验语种与预览指纹后原生修改、上传并重新下载回读；失败时回滚原包 |
 | POST | `/api/language-package/hg2-400-4-preview` | 逐站下载语言包并预览 `HG2_400_4` E 列秒数删除，不上传 |
 | POST | `/api/language-package/hg2-400-4-submit` | 按预览指纹逐站修改、上传并重新下载回读；失败时回滚原包 |
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |

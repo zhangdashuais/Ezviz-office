@@ -7,7 +7,7 @@ param(
 $excel = $null
 $workbook = $null
 try {
-  $instructions = Get-Content -Raw -LiteralPath $InstructionPath | ConvertFrom-Json
+  $instructions = Get-Content -Raw -Encoding UTF8 -LiteralPath $InstructionPath | ConvertFrom-Json
   $excel = New-Object -ComObject Excel.Application
   $excel.Visible = $false
   $excel.DisplayAlerts = $false

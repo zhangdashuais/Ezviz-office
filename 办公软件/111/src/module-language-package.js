@@ -174,7 +174,7 @@
       return;
     }
     el.localI18nGenerate.disabled = true;
-    setLocalI18nStatus("正在读取本地 HTML 和 Excel，并生成 Datasheet...");
+    setLocalI18nStatus("正在生成 Datasheet、备份并替换 HTML 语言包字段...");
     el.localI18nOutput.value = "生成中...";
     try {
       const response = await fetch(serviceBase + "/api/language-package/local-i18n-datasheet", {
@@ -190,12 +190,14 @@
         "生成完成",
         "输出文件：" + result.outputFile,
         "HTML：" + result.htmlFile,
+        "HTML 原文件备份：" + (result.htmlBackupFile || "无需备份（没有待替换文案）"),
+        "HTML 字段替换：" + result.htmlReplacementCount + " 处",
         "总语言包：" + result.globalFile,
         "单产品 Excel：" + result.productFile,
         "本产品字段：" + result.productFieldCount,
         "需复查字段：" + result.foreignFieldCount
       ].join("\n");
-      setLocalI18nStatus("Datasheet 已生成。", "ok");
+      setLocalI18nStatus("Datasheet 已生成，HTML 语言包字段已替换。", "ok");
     } catch (error) {
       setLocalI18nStatus("生成失败：" + (error.message || error), "warn");
       el.localI18nOutput.value = "生成失败：\n" + (error.message || error);
@@ -263,6 +265,7 @@
     const formData = new FormData();
     formData.append("datasheet", file, file.name);
     formData.append("targets", JSON.stringify(targets));
+    formData.append("skipMissingFields", "true");
     formData.append("shopUsername", el.username.value.trim());
     formData.append("shopPassword", el.password.value);
     if (submit) {
@@ -292,6 +295,9 @@
       if (item.plan) {
         lines.push("  覆盖 " + plan.changedCellCount + "，新增 " + plan.appendedFieldCount
           + "，不变 " + plan.unchangedCellCount + "，空译文跳过 " + plan.skippedBlankCount);
+        if (plan.skippedMissingFieldCount) {
+          lines.push("  站点缺失 Key 跳过 " + plan.skippedMissingFieldCount + "（不安全追加）。");
+        }
         if (plan.sourceMismatches?.length) {
           lines.push("  提醒：" + plan.sourceMismatches.length + " 个字段英文原文与站点语言包不同，Key 匹配结果已保留。");
         }

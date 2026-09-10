@@ -3,12 +3,15 @@ const pathModule = require("path");
 
 function registerLanguagePackageRoutes(app, deps) {
   const { upload, languagePackageFeature, logLine } = deps;
+  let activeDatasheetAction = "";
 
   app.post("/api/language-package/local-i18n-datasheet", (req, res) => {
     const logs = [];
     try {
       const result = languagePackageFeature.generateLocalI18nDatasheet(req.body || {});
       logLine(logs, `已生成 Datasheet：${result.outputFile}`);
+      logLine(logs, `已替换 HTML 语言包字段：${result.htmlReplacementCount} 处`);
+      if (result.htmlBackupFile) logLine(logs, `原 HTML 备份：${result.htmlBackupFile}`);
       res.json({ ok: true, logs, result });
     } catch (error) {
       logLine(logs, `本地 i18n Datasheet 生成失败：${error.message || String(error)}`);
@@ -38,6 +41,19 @@ function registerLanguagePackageRoutes(app, deps) {
   ]) {
     app.post(path, datasheetUpload, async (req, res) => {
       const logs = [];
+      const requiresLock = action !== "inspectLanguageDatasheet";
+      if (requiresLock && activeDatasheetAction) {
+        if (req.file?.path) {
+          fs.rmSync(req.file.path, { force: true });
+          try { fs.rmdirSync(pathModule.dirname(req.file.path)); } catch {}
+        }
+        return res.status(409).json({
+          ok: false,
+          error: `已有语言包任务正在执行（${activeDatasheetAction}），请等待完成后再操作。`,
+          logs
+        });
+      }
+      if (requiresLock) activeDatasheetAction = action;
       try {
         const result = action === "inspectLanguageDatasheet"
           ? languagePackageFeature[action](req.file)
@@ -48,6 +64,7 @@ function registerLanguagePackageRoutes(app, deps) {
         logLine(logs, `${done.replace("完成", "失败")}：${error.message || String(error)}`);
         res.status(500).json({ ok: false, error: error.message || String(error), logs });
       } finally {
+        if (requiresLock) activeDatasheetAction = "";
         if (req.file?.path) {
           fs.rmSync(req.file.path, { force: true });
           try { fs.rmdirSync(pathModule.dirname(req.file.path)); } catch {}

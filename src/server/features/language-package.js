@@ -17,7 +17,7 @@ const SITE_LANGUAGE_NEEDLES = {
   hq: ["english"], us: ["english"], uk: ["english"], eu: ["english"],
   ca: ["english"], au: ["english"], in: ["english"], my: ["english"], af: ["english"],
   cis: ["russian"], de: ["german", "deutsch"], fr: ["french", "france"],
-  be: ["french", "france"], it: ["italian", "italiano"], es: ["spanish-", "espanol"],
+  be: ["dutch", "nederlands", "belgie"], it: ["italian", "italiano"], es: ["spanish-", "espanol"],
   pl: ["polish", "polski"], cz: ["czech"], nl: ["dutch", "nederlands"],
   tr: ["turkish"], ro: ["romanian"], th: ["thai"], vn: ["vietnamese"],
   jp: ["japanese"], kr: ["korean"], id: ["indonesian", "indonesia"],
@@ -27,6 +27,29 @@ const SITE_LANGUAGE_NEEDLES = {
 };
 const ENGLISH_SOURCE_HEADER = "English (Source)";
 
+const LANGUAGE_HEADER_CODES = [
+  ["english", "en"], ["russian", "ru"], ["hungarian", "hu"], ["german", "de"],
+  ["italian", "it"], ["czech", "cs"], ["slovak", "sk"], ["french", "fr"],
+  ["francais", "fr"], ["france", "fr"],
+  ["polish", "pl"], ["dutch", "nl"], ["brazilian portuguese", "pt"],
+  ["portuguese", "pt"], ["spanish", "es"], ["romanian", "ro"], ["korean", "ko"],
+  ["thai", "th"], ["vietnamese", "vi"], ["japanese", "ja"], ["arabic", "ar"],
+  ["indonesian", "id"], ["turkish", "tr"], ["finnish", "fi"], ["greek", "el"],
+  ["繁体中文", "zh"], ["简体中文", "zh"], ["chinese", "zh"]
+];
+
+const LANGUAGE_ROW_NEEDLES = {
+  en: ["english", "united states", "united kingdom"],
+  ru: ["russian", "русский"], de: ["deutsch", "german"],
+  fr: ["francais", "france", "belgique"], it: ["italian", "italiano"],
+  es: ["espanol", "spanish"], pl: ["polska", "polish"], cs: ["cesko", "czech"],
+  nl: ["nederlands", "belgie", "dutch"], pt: ["brasil", "portuguese"],
+  tr: ["turkiye", "turkish"], ro: ["romania", "romanian"],
+  ar: ["arabic", "العربية"], th: ["thai", "ประเทศไทย"],
+  id: ["indonesia", "indonesian"], vi: ["viet nam", "vietnamese"],
+  ja: ["japan", "japanese"], ko: ["korea", "korean"], zh: ["chinese", "中文"]
+};
+
 function normalizedLanguageText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -34,12 +57,27 @@ function normalizedLanguageText(value) {
     .toLowerCase();
 }
 
-function languageRowScore(candidate, siteCode) {
+function languageHeaderCode(header) {
+  const normalized = normalizedLanguageText(header);
+  return LANGUAGE_HEADER_CODES.find(([needle]) => normalized.includes(needle))?.[1] || "";
+}
+
+function languageRowScore(candidate, siteCode, languageHeader = "") {
   const code = String(siteCode || "").trim().toLowerCase();
   const langCode = String(candidate?.langCode || "").trim().toLowerCase();
+  const actualLanguageCode = langCode.split("-")[0];
+  const expectedLanguageCode = languageHeaderCode(languageHeader);
   const text = normalizedLanguageText(candidate?.rowText);
   const needles = (SITE_LANGUAGE_NEEDLES[code] || [code]).map(normalizedLanguageText);
   let score = needles.reduce((total, needle) => total + (needle && text.includes(needle) ? 20 : 0), 0);
+
+  if (expectedLanguageCode && actualLanguageCode) {
+    score += actualLanguageCode === expectedLanguageCode ? 300 : -300;
+  }
+  if (expectedLanguageCode) {
+    const expectedNeedles = LANGUAGE_ROW_NEEDLES[expectedLanguageCode] || [];
+    if (expectedNeedles.some((needle) => text.includes(normalizedLanguageText(needle)))) score += 200;
+  }
 
   // The backend can expose two packages in the same account, e.g. fr-CA and
   // fr-FR. The locale region is the strongest signal for the target site.
@@ -48,11 +86,26 @@ function languageRowScore(candidate, siteCode) {
   return score;
 }
 
-function chooseLanguageRowCandidate(candidates, siteCode) {
+function chooseLanguageRowCandidate(candidates, siteCode, languageHeader = "") {
   if (!Array.isArray(candidates) || !candidates.length) return null;
   return candidates
-    .map((candidate, index) => ({ candidate, index, score: languageRowScore(candidate, siteCode) }))
+    .map((candidate, index) => ({
+      candidate,
+      index,
+      score: languageRowScore(candidate, siteCode, languageHeader)
+    }))
     .sort((left, right) => right.score - left.score || left.index - right.index)[0].candidate;
+}
+
+function assertLanguagePackageMatchesHeader(fileInfo, languageHeader, site) {
+  const expected = languageHeaderCode(languageHeader);
+  const actual = String(fileInfo?.langCode || "").trim().toLowerCase().split("-")[0];
+  if (expected && actual && expected !== actual) {
+    throw new Error(
+      `${site?.name || site?.siteCode || "站点"} 语种校验失败：Datasheet 列为 ${languageHeader}`
+      + `，但后台语言包为 ${fileInfo.langCode}（${fileInfo.languageRow || "未知语言行"}）。已停止上传。`
+    );
+  }
 }
 
 function createLanguagePackageFeature(deps) {
@@ -88,7 +141,7 @@ function multipartField(postData, fieldName) {
   return match ? match[1].trim() : "";
 }
 
-async function findLanguageRow(page, siteCode) {
+async function findLanguageRow(page, siteCode, languageHeader = "") {
   const rows = page.locator("tr");
   const rowCount = await rows.count();
   const rowCandidates = [];
@@ -122,7 +175,7 @@ async function findLanguageRow(page, siteCode) {
       });
     }
   }
-  if (rowCandidates.length) return chooseLanguageRowCandidate(rowCandidates, siteCode);
+  if (rowCandidates.length) return chooseLanguageRowCandidate(rowCandidates, siteCode, languageHeader);
   const globalActions = page.locator("a:visible,button:visible,[ng-click]:visible");
   const globalMetadata = await globalActions.evaluateAll((elements) => elements.map((element) => ({
     text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim(),
@@ -156,7 +209,8 @@ async function findLanguageRow(page, siteCode) {
       actionIndex: index,
       metadata: item
     })),
-    siteCode
+    siteCode,
+    languageHeader
   );
   const matchedDownload = selectedCandidate
     ? { item: selectedCandidate.metadata, index: selectedCandidate.actionIndex }
@@ -439,13 +493,13 @@ async function roundTripLanguagePackage(body, logs) {
   };
 }
 
-async function downloadCurrentLanguagePackageForPage(page, site, logs) {
+async function downloadCurrentLanguagePackageForPage(page, site, logs, languageHeader = "") {
   await page.goto("https://shop.ezvizlife.com/language/index", {
     waitUntil: "domcontentloaded",
     timeout: 60000
   }).catch(() => {});
   await page.waitForTimeout(2500);
-  const rowInfo = await findLanguageRow(page, site?.siteCode);
+  const rowInfo = await findLanguageRow(page, site?.siteCode, languageHeader);
   logLine(logs, `选中 ${site?.name || site?.siteCode || "当前站点"} 语言行：${rowInfo.rowText}`);
   const downloaded = await downloadLanguagePackage(page, rowInfo, logs);
   const langCode = String(rowInfo.langCode || "").trim()
@@ -453,11 +507,13 @@ async function downloadCurrentLanguagePackageForPage(page, site, logs) {
   if (!langCode) {
     throw new Error("无法从语言行或下载文件名识别 lang_code。");
   }
-  return {
+  const result = {
     ...downloaded,
     langCode,
     languageRow: rowInfo.rowText
   };
+  assertLanguagePackageMatchesHeader(result, languageHeader, site);
+  return result;
 }
 
 async function uploadLanguagePackageForPage(page, fileInfo, logs) {
@@ -780,6 +836,7 @@ function summarizeDatasheetPlan(plan) {
     changedCellCount: plan.changedCellCount,
     unchangedCellCount: plan.unchangedCellCount,
     appendedFieldCount: plan.newFields.length,
+    skippedMissingFieldCount: plan.skippedMissingFields?.length || 0,
     skippedBlankCount: plan.skippedBlankCount,
     missing: plan.missing,
     sourceMismatches: plan.sourceMismatches,
@@ -829,6 +886,7 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
   const enabledSites = (config.sites || []).filter((site) => site.enabled !== false);
   const targets = parseDatasheetTargets(body, enabledSites, parsedDatasheet);
   const fingerprints = expectedFingerprints(body);
+  const skipMissingFields = /^(1|true|yes)$/i.test(String(body?.skipMissingFields || ""));
   const results = [];
   const runDir = path.resolve(
     "outputs",
@@ -850,15 +908,31 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       downloaded = await downloadCurrentLanguagePackageForPage(
         session.page,
         target.site,
-        logs
+        logs,
+        target.languagePackageHeader
       );
       const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
       originalFingerprint = packageInfo.contentFingerprint;
-      const plan = planLanguagePackageUpdates(
+      let targetDatasheet = parsedDatasheet;
+      let plan = planLanguagePackageUpdates(
         packageInfo,
-        parsedDatasheet,
+        targetDatasheet,
         target.languagePackageHeader
       );
+      if (skipMissingFields && plan.missing.length) {
+        const missingKeys = new Set(plan.missing.map((item) => item.key));
+        const skippedMissingFields = plan.missing;
+        targetDatasheet = {
+          ...parsedDatasheet,
+          rows: parsedDatasheet.rows.filter((row) => !missingKeys.has(row.key))
+        };
+        plan = planLanguagePackageUpdates(
+          packageInfo,
+          targetDatasheet,
+          target.languagePackageHeader
+        );
+        plan.skippedMissingFields = skippedMissingFields;
+      }
       const changed = plan.changedCellCount + plan.newFields.length;
       if (!submit || !changed) {
         results.push({
@@ -880,7 +954,7 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       const generated = writeUpdatedLanguagePackageNative(
         downloaded.filePath,
         packageInfo,
-        parsedDatasheet,
+        targetDatasheet,
         plan,
         modifiedPath
       );
@@ -893,12 +967,13 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       verification = await downloadCurrentLanguagePackageForPage(
         session.page,
         target.site,
-        logs
+        logs,
+        target.languagePackageHeader
       );
       const verifiedInfo = readLanguagePackage(verification.filePath, verification.langCode);
       const verifiedPlan = planLanguagePackageUpdates(
         verifiedInfo,
-        parsedDatasheet,
+        targetDatasheet,
         target.languagePackageHeader
       );
       if (verifiedPlan.changedCellCount || verifiedPlan.missing.length) {
@@ -922,7 +997,12 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
             fileName: downloaded.fileName,
             langCode: downloaded.langCode
           }, logs);
-          const restored = await downloadCurrentLanguagePackageForPage(page, target.site, logs);
+          const restored = await downloadCurrentLanguagePackageForPage(
+            page,
+            target.site,
+            logs,
+            target.languagePackageHeader
+          );
           try {
             rollback = readLanguagePackage(restored.filePath, restored.langCode).contentFingerprint
               === originalFingerprint ? "passed" : "FAILED: 恢复后语言包内容不一致";
@@ -1083,5 +1163,7 @@ async function reviseHg24004(body, logs, submit = false) {
 module.exports = {
   createLanguagePackageFeature,
   chooseLanguageRowCandidate,
-  languageRowScore
+  languageRowScore,
+  languageHeaderCode,
+  assertLanguagePackageMatchesHeader
 };

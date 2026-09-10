@@ -28,3 +28,12 @@ test("global action fallback also selects the France locale by lang_code", () =>
 
   assert.equal(selected.actionIndex, 7);
 });
+
+test("Belgium selects its editable Dutch package for the Dutch Datasheet column", () => {
+  const selected = chooseLanguageRowCandidate([
+    { rowText: "België-BESTORE Delete Edit Download", langCode: "" },
+    { rowText: "Belgique-BEFRSTORE Delete Edit Download", langCode: "" }
+  ], "be", "13_Nederlands (Dutch-荷兰语)");
+
+  assert.match(selected.rowText, /^België/);
+});
