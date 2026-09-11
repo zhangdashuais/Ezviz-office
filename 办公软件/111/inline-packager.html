@@ -114,7 +114,7 @@
       <div id="tab-ai-badge" class="tab-content">
         <div class="card">
           <h3>图片 AI 标志</h3>
-          <p class="desc">选择图片后，系统会在右下角叠加固定标识并导出 PNG，不会上传图片或覆盖原文件。</p>
+          <p class="desc">选择图片后，系统会在右下角叠加固定标识。输出超过 512 KB 时会保持原分辨率并转为 JPG 压缩；最低画质仍超限时会提示，不会缩放、上传或覆盖原文件。</p>
           <div class="form-grid">
             <label for="aiBadgeImageInput">图片文件</label>
             <input id="aiBadgeImageInput" type="file" accept="image/*" multiple>
@@ -1065,7 +1065,7 @@
   <script src="src/css-scope.js?v=20260821-1"></script>
   <script src="src/module-task-progress.js?v=20260814-2"></script>
   <script src="src/module-inline.js"></script>
-  <script src="src/module-ai-badge.js?v=20260903-2"></script>
+  <script src="src/module-ai-badge.js?v=20260911-2"></script>
   <script src="src/module-pdf-upload.js?v=20260908-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
