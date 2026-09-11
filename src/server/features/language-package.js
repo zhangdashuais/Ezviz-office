@@ -11,7 +11,11 @@ const {
   planLanguagePackageUpdates,
   writeUpdatedLanguagePackageNative
 } = require("./language-package-workbook");
-const { generateLocalI18nDatasheet } = require("./local-i18n-datasheet");
+const {
+  generateLocalI18nDatasheet,
+  readLocalI18nPathDefaults,
+  saveLocalI18nPathDefaults
+} = require("./local-i18n-datasheet");
 
 const SITE_LANGUAGE_NEEDLES = {
   hq: ["english"], us: ["english"], uk: ["english"], eu: ["english"],
@@ -1156,7 +1160,9 @@ async function reviseHg24004(body, logs, submit = false) {
     submitFromDatasheet: (body, file, logs) => reviseFromDatasheet(body, file, logs, true),
     previewHg24004: (body, logs) => reviseHg24004(body, logs, false),
     submitHg24004: (body, logs) => reviseHg24004(body, logs, true),
-    generateLocalI18nDatasheet: (body) => generateLocalI18nDatasheet(body || {})
+    generateLocalI18nDatasheet: (body) => generateLocalI18nDatasheet(body || {}),
+    readLocalI18nPathDefaults,
+    saveLocalI18nPathDefaults
   };
 }
 

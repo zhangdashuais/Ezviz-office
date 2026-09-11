@@ -26,7 +26,10 @@
     localI18nHtmlPath: document.getElementById("localI18nHtmlPath"),
     localI18nProductPackagePath: document.getElementById("localI18nProductPackagePath"),
     localI18nGlobalPackagePath: document.getElementById("localI18nGlobalPackagePath"),
-    localI18nOutputPath: document.getElementById("localI18nOutputPath")
+    localI18nTemplatePath: document.getElementById("localI18nTemplatePath"),
+    localI18nOutputPath: document.getElementById("localI18nOutputPath"),
+    localI18nOutputFilePath: document.getElementById("localI18nOutputFilePath"),
+    localI18nSyncPaths: document.getElementById("localI18nSyncPathsBtn")
   };
 
   if (!el.sites || !el.upload) return;
@@ -155,16 +158,62 @@
     el.localI18nStatus.className = "status" + (type ? " " + type : "");
   }
 
-  function showLocalI18nPaths(result = {}) {
+  function localI18nPathInputs() {
+    return {
+      htmlFile: el.localI18nHtmlPath,
+      productFile: el.localI18nProductPackagePath,
+      globalFile: el.localI18nGlobalPackagePath,
+      templateFile: el.localI18nTemplatePath,
+      outputDir: el.localI18nOutputPath,
+      outputFile: el.localI18nOutputFilePath
+    };
+  }
+
+  function localI18nPathValues() {
+    return Object.fromEntries(Object.entries(localI18nPathInputs()).map(([key, input]) => [key, input?.value.trim() || ""]));
+  }
+
+  function showLocalI18nPaths() {
     const productName = el.localI18nProductName?.value.trim() || "产品名称";
-    el.localI18nHtmlPath.value = result.htmlFile
-      || `D:\\代码存放\\产品代码\\ezviz\\（自动匹配 ${productName} 的 HTML）`;
-    el.localI18nProductPackagePath.value = result.productFile
-      || `D:\\产品\\${productName}\\（自动匹配单产品 Excel）`;
-    el.localI18nGlobalPackagePath.value = result.globalFile
-      || "C:\\Users\\zhangtianle7\\Downloads\\en-US (数字后缀最大).xls/xlsx";
-    el.localI18nOutputPath.value = result.outputFile
-      || `D:\\产品\\${productName}\\upload\\${productName} datasheet.xlsx`;
+    el.localI18nHtmlPath.placeholder = `自动匹配 ${productName} 的 HTML`;
+    el.localI18nProductPackagePath.placeholder = `自动匹配 D:\\产品\\${productName} 内的单产品 Excel`;
+    el.localI18nGlobalPackagePath.placeholder = "自动使用 Downloads 中数字后缀最大的 en-US.xls/xlsx";
+    el.localI18nTemplatePath.placeholder = "D:\\产品\\HB90 Dual 3K Kit\\upload\\HB90 Dual 3K Kit datasheet.xlsx";
+    el.localI18nOutputPath.placeholder = `D:\\产品\\${productName}\\upload`;
+    el.localI18nOutputFilePath.placeholder = `D:\\产品\\${productName}\\upload\\${productName} datasheet.xlsx`;
+  }
+
+  async function loadLocalI18nPaths() {
+    try {
+      const response = await fetch(serviceBase + "/api/language-package/local-i18n-paths");
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "默认路径读取失败");
+      const paths = payload.paths || {};
+      Object.entries(localI18nPathInputs()).forEach(([key, input]) => { input.value = paths[key] || ""; });
+      showLocalI18nPaths();
+    } catch (error) {
+      setLocalI18nStatus("默认路径读取失败：" + (error.message || error), "warn");
+    }
+  }
+
+  async function syncLocalI18nPaths() {
+    el.localI18nSyncPaths.disabled = true;
+    try {
+      const response = await fetch(serviceBase + "/api/language-package/local-i18n-paths", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(localI18nPathValues())
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "默认路径保存失败");
+      Object.entries(localI18nPathInputs()).forEach(([key, input]) => { input.value = payload.paths?.[key] || ""; });
+      showLocalI18nPaths();
+      setLocalI18nStatus("所有默认路径已同步。", "ok");
+    } catch (error) {
+      setLocalI18nStatus("默认路径同步失败：" + (error.message || error), "warn");
+    } finally {
+      el.localI18nSyncPaths.disabled = false;
+    }
   }
 
   async function generateLocalI18nDatasheet() {
@@ -180,12 +229,11 @@
       const response = await fetch(serviceBase + "/api/language-package/local-i18n-datasheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName })
+        body: JSON.stringify({ productName, ...localI18nPathValues() })
       });
       const payload = await response.json();
       if (!response.ok || payload.ok === false) throw new Error(payload.error || "生成失败");
       const result = payload.result || {};
-      showLocalI18nPaths(result);
       el.localI18nOutput.value = [
         "生成完成",
         "输出文件：" + result.outputFile,
@@ -194,6 +242,8 @@
         "HTML 字段替换：" + result.htmlReplacementCount + " 处",
         "总语言包：" + result.globalFile,
         "单产品 Excel：" + result.productFile,
+        "样式模板：" + result.templateFile,
+        "输出目录：" + result.outputDir,
         "本产品字段：" + result.productFieldCount,
         "需复查字段：" + result.foreignFieldCount
       ].join("\n");
@@ -399,8 +449,10 @@
 
   loadSites();
   if (el.localI18nGenerate) el.localI18nGenerate.addEventListener("click", generateLocalI18nDatasheet);
+  if (el.localI18nSyncPaths) el.localI18nSyncPaths.addEventListener("click", syncLocalI18nPaths);
   if (el.localI18nProductName) {
     el.localI18nProductName.addEventListener("input", () => showLocalI18nPaths());
     showLocalI18nPaths();
+    loadLocalI18nPaths();
   }
 })();

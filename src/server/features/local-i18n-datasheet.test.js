@@ -1,6 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { extractNewProductRows, replaceHtmlText, isProductNameOnlyText } = require("./local-i18n-datasheet");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const {
+  extractNewProductRows,
+  replaceHtmlText,
+  isProductNameOnlyText,
+  normalizePathDefaults
+} = require("./local-i18n-datasheet");
 
 test("puts new product copy above the separator and reuses old product copy below it", () => {
   const productData = {
@@ -61,4 +69,15 @@ test("converts text whose quotation mark is encoded as an HTML entity", () => {
     replaceHtmlText(html, result.replacements),
     "<p>{{t(&#39;goods.TY1_G1_3K_1&#39;)}}</p>"
   );
+});
+
+test("accepts absolute custom paths and rejects relative paths", (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "local-i18n-paths-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const htmlFile = path.join(folder, "product.html");
+  const outputFile = path.join(folder, "final.xlsx");
+  fs.writeFileSync(htmlFile, "<p>Product copy</p>");
+  assert.deepEqual(normalizePathDefaults({ htmlFile, outputDir: folder, outputFile }), { htmlFile, outputDir: folder, outputFile });
+  assert.throws(() => normalizePathDefaults({ htmlFile: "product.html" }), /绝对路径/);
+  assert.throws(() => normalizePathDefaults({ outputFile: path.join(folder, "final.xls") }), /\.xlsx/);
 });

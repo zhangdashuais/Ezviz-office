@@ -317,20 +317,25 @@
 
         <div class="card">
           <h3>本地 i18n Datasheet 生成</h3>
-          <p class="desc">只需填写产品名称。系统会自动读取产品 HTML、下载目录中后缀最新的 en-US 总语言包，以及产品文件夹内的单产品 Excel；生成文件默认保存到产品文件夹的 upload 目录。</p>
+          <p class="desc">路径留空时自动匹配；需要修改时直接填写，点击“同步所有默认路径”即可一次保存全部路径。清空某项后同步，会恢复该项自动匹配。</p>
           <div class="form-grid">
             <label for="localI18nProductName">产品名称</label>
             <input id="localI18nProductName" type="text" placeholder="例如 TY1 G1 3K">
             <label for="localI18nHtmlPath">HTML 路径</label>
-            <input id="localI18nHtmlPath" type="text" readonly>
+            <input id="localI18nHtmlPath" type="text">
             <label for="localI18nProductPackagePath">单产品语言包路径</label>
-            <input id="localI18nProductPackagePath" type="text" readonly>
+            <input id="localI18nProductPackagePath" type="text">
             <label for="localI18nGlobalPackagePath">总语言包路径</label>
-            <input id="localI18nGlobalPackagePath" type="text" readonly>
-            <label for="localI18nOutputPath">存储路径</label>
-            <input id="localI18nOutputPath" type="text" readonly>
+            <input id="localI18nGlobalPackagePath" type="text">
+            <label for="localI18nTemplatePath">样式模板路径</label>
+            <input id="localI18nTemplatePath" type="text">
+            <label for="localI18nOutputPath">输出目录</label>
+            <input id="localI18nOutputPath" type="text">
+            <label for="localI18nOutputFilePath">最终保存路径</label>
+            <input id="localI18nOutputFilePath" type="text" placeholder="请选择或填写完整 .xlsx 路径">
           </div>
-          <div class="row">
+          <div class="row" style="margin-top: 10px;">
+            <button id="localI18nSyncPathsBtn" type="button">同步所有默认路径</button>
             <button id="localI18nGenerateBtn" type="button">生成 i18n Datasheet</button>
           </div>
           <div id="localI18nStatus" class="status">请输入产品名称后生成。</div>
@@ -1078,7 +1083,7 @@
   <script src="src/i18n-conversion-rules.js?v=20260807-2"></script>
   <script src="src/module-text.js?v=20260826-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
-  <script src="src/module-language-package.js?v=20260908-1"></script>
+  <script src="src/module-language-package.js?v=20260911-1"></script>
   <script src="src/product-publishing-input-rules.js?v=20260908-2"></script>
   <script src="src/module-product-revision-sync.js?v=20260908-2"></script>
   <script src="src/module-product-direct-revision.js?v=20260825-1"></script>

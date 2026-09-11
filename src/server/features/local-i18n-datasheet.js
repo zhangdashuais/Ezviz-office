@@ -8,8 +8,10 @@ const i18nRules = require("../../../办公软件/111/src/i18n-conversion-rules")
 const HTML_ROOT = "D:\\代码存放\\产品代码\\ezviz";
 const PRODUCT_ROOT = "D:\\产品";
 const DOWNLOADS_ROOT = "C:\\Users\\zhangtianle7\\Downloads";
-const TEMPLATE_PATH = "D:\\产品\\HB90 Dual 3K Kit\\upload\\HB90 Dual 3K Kit datasheet.xlsx";
+const DEFAULT_TEMPLATE_PATH = "D:\\产品\\HB90 Dual 3K Kit\\upload\\HB90 Dual 3K Kit datasheet.xlsx";
+const PATH_CONFIG_FILE = path.resolve(__dirname, "../../../runtime/local-i18n-paths.json");
 const YELLOW = "FFFF00";
+const PATH_KEYS = ["htmlFile", "productFile", "globalFile", "templateFile", "outputDir", "outputFile"];
 
 function text(value) {
   return String(value == null ? "" : value).replace(/\u00a0/g, " ").trim();
@@ -42,6 +44,48 @@ function isProductNameOnlyText(value, productName) {
   const source = normalizeName(value);
   const parts = normalizeName(productName).split(" ").filter(Boolean);
   return parts.some((_part, index) => source === parts.slice(0, index + 1).join(" "));
+}
+
+function normalizePathDefaults(input = {}) {
+  const result = {};
+  PATH_KEYS.forEach((key) => {
+    const value = text(input[key]);
+    if (!value) return;
+    if (!path.isAbsolute(value)) throw new Error(`${key} 必须填写绝对路径。`);
+    if (key === "outputFile") {
+      if (!/\.xlsx$/i.test(value)) throw new Error("outputFile 必须是 .xlsx 文件路径。");
+    } else if (key !== "outputDir") {
+      const allowed = key === "htmlFile" ? /\.html?$/i : /\.xlsx?$/i;
+      if (!allowed.test(value)) throw new Error(`${key} 文件类型不正确。`);
+      if (!fs.existsSync(value) || !fs.statSync(value).isFile()) throw new Error(`${key} 文件不存在：${value}`);
+    }
+    result[key] = path.normalize(value);
+  });
+  return result;
+}
+
+function readLocalI18nPathDefaults() {
+  try {
+    return normalizePathDefaults(JSON.parse(fs.readFileSync(PATH_CONFIG_FILE, "utf8")));
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw error;
+  }
+}
+
+function saveLocalI18nPathDefaults(input) {
+  const config = normalizePathDefaults(input);
+  fs.mkdirSync(path.dirname(PATH_CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(PATH_CONFIG_FILE, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  return config;
+}
+
+function configuredFile(value, fallback, label, extensionPattern) {
+  const file = text(value);
+  if (!file) return fallback();
+  if (!path.isAbsolute(file) || !extensionPattern.test(file)) throw new Error(`${label}路径无效：${file}`);
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`${label}不存在：${file}`);
+  return path.normalize(file);
 }
 
 function cell(sheet, row, column) {
@@ -296,8 +340,8 @@ function backupAndWriteHtml(htmlFile, html) {
   return backupFile;
 }
 
-function buildWorkbook({ productName, productKey, productData, globalEntries, htmlKeys, newProductRows }) {
-  const template = XLSX.readFile(TEMPLATE_PATH, { cellStyles: true });
+function buildWorkbook({ productName, productKey, productData, globalEntries, htmlKeys, newProductRows, templateFile }) {
+  const template = XLSX.readFile(templateFile, { cellStyles: true });
   const templateSheet = template.Sheets[template.SheetNames.find((name) => /datasheet/i.test(name)) || template.SheetNames[0]];
   const headers = productData.headers;
   const productRows = newProductRows;
@@ -343,19 +387,29 @@ function buildWorkbook({ productName, productKey, productData, globalEntries, ht
   return { workbook, productFieldCount: productRows.length, foreignFieldCount: foreignRows.length };
 }
 
-function generateLocalI18nDatasheet({ productName, outputDir }) {
+function generateLocalI18nDatasheet(input = {}) {
+  const { productName } = input;
   const cleanName = text(productName);
   if (!cleanName || /[<>:"/\\|?*\x00-\x1F]/.test(cleanName)) throw new Error("请输入有效的产品名称。");
-  const htmlFile = findHtml(cleanName);
-  const globalFile = latestGlobalPackage();
-  const productFile = findProductWorkbook(cleanName);
+  const defaults = readLocalI18nPathDefaults();
+  const htmlFile = configuredFile(input.htmlFile || defaults.htmlFile, () => findHtml(cleanName), "HTML 文件", /\.html?$/i);
+  const globalFile = configuredFile(input.globalFile || defaults.globalFile, latestGlobalPackage, "总语言包", /\.xlsx?$/i);
+  const productFile = configuredFile(input.productFile || defaults.productFile, () => findProductWorkbook(cleanName), "单产品语言包", /\.xlsx?$/i);
+  const templateFile = configuredFile(input.templateFile || defaults.templateFile, () => DEFAULT_TEMPLATE_PATH, "样式模板", /\.xlsx?$/i);
   const globalEntries = parseGlobalPackage(globalFile);
   const productKey = token(cleanName);
-  const destination = outputDir || (fs.existsSync(path.join(PRODUCT_ROOT, cleanName, "upload"))
+  const configuredOutputFile = text(input.outputFile || defaults.outputFile);
+  if (configuredOutputFile && (!path.isAbsolute(configuredOutputFile) || !/\.xlsx$/i.test(configuredOutputFile))) {
+    throw new Error("最终保存路径必须是绝对 .xlsx 文件路径。");
+  }
+  const configuredOutputDir = text(input.outputDir || defaults.outputDir);
+  if (configuredOutputDir && !path.isAbsolute(configuredOutputDir)) throw new Error("输出目录必须填写绝对路径。");
+  const destination = configuredOutputFile ? path.dirname(configuredOutputFile) : configuredOutputDir || (fs.existsSync(path.join(PRODUCT_ROOT, cleanName, "upload"))
     ? path.join(PRODUCT_ROOT, cleanName, "upload")
     : path.join(PRODUCT_ROOT, cleanName));
+  if (fs.existsSync(destination) && !fs.statSync(destination).isDirectory()) throw new Error(`输出目录不是文件夹：${destination}`);
   fs.mkdirSync(destination, { recursive: true });
-  let outputFile = path.join(destination, `${cleanName} datasheet.xlsx`);
+  let outputFile = configuredOutputFile ? path.normalize(configuredOutputFile) : path.join(destination, `${cleanName} datasheet.xlsx`);
   const productData = parseProductDatasheet(productFile);
   mergeGeneratedOutputHistory(productData, destination, cleanName, outputFile);
   if (fs.existsSync(outputFile)) {
@@ -384,18 +438,22 @@ function generateLocalI18nDatasheet({ productName, outputDir }) {
     productData,
     globalEntries,
     htmlKeys: [...reusedKeys.values()],
-    newProductRows: [...currentProductRows.values()].sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }))
+    newProductRows: [...currentProductRows.values()].sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true })),
+    templateFile
   });
   try {
     XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
   } catch (error) {
+    if (configuredOutputFile && ['EBUSY', 'EPERM'].includes(error.code)) {
+      throw new Error(`最终保存文件正在被占用，请关闭 Excel 后重试：${outputFile}`);
+    }
     if (!['EBUSY', 'EPERM'].includes(error.code)) throw error;
     outputFile = path.join(destination, `${cleanName} datasheet.updated.xlsx`);
     XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
   }
   const styleResult = childProcess.spawnSync(
     process.env.PYTHON || "python",
-    [path.join(__dirname, "local-i18n-datasheet-style.py"), TEMPLATE_PATH, outputFile],
+    [path.join(__dirname, "local-i18n-datasheet-style.py"), templateFile, outputFile],
     { encoding: "utf8" }
   );
   if (styleResult.error || styleResult.status !== 0) {
@@ -410,6 +468,8 @@ function generateLocalI18nDatasheet({ productName, outputDir }) {
     htmlReplacementCount: extracted.replacements.length,
     globalFile,
     productFile,
+    templateFile,
+    outputDir: destination,
     ...stats
   };
 }
@@ -418,5 +478,8 @@ module.exports = {
   generateLocalI18nDatasheet,
   extractNewProductRows,
   replaceHtmlText,
-  isProductNameOnlyText
+  isProductNameOnlyText,
+  normalizePathDefaults,
+  readLocalI18nPathDefaults,
+  saveLocalI18nPathDefaults
 };

@@ -5,6 +5,22 @@ function registerLanguagePackageRoutes(app, deps) {
   const { upload, languagePackageFeature, logLine } = deps;
   let activeDatasheetAction = "";
 
+  app.get("/api/language-package/local-i18n-paths", (_req, res) => {
+    try {
+      res.json({ ok: true, paths: languagePackageFeature.readLocalI18nPathDefaults() });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: error.message || String(error) });
+    }
+  });
+
+  app.post("/api/language-package/local-i18n-paths", (req, res) => {
+    try {
+      res.json({ ok: true, paths: languagePackageFeature.saveLocalI18nPathDefaults(req.body || {}) });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message || String(error) });
+    }
+  });
+
   app.post("/api/language-package/local-i18n-datasheet", (req, res) => {
     const logs = [];
     try {
