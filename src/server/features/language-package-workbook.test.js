@@ -13,7 +13,8 @@ const {
   writeUpdatedLanguagePackage,
   writeUpdatedLanguagePackageNative,
   normalizeSourceForComparison,
-  normalizeTranslationForComparison
+  normalizeTranslationForComparison,
+  workbookContentFingerprintForGlobalRebase
 } = require("./language-package-workbook");
 
 test("source comparison ignores casing and whitespace but not changed words", () => {
@@ -176,6 +177,8 @@ test("copies translations by stable key while only reporting a source mismatch",
   const plan = planLanguagePackageUpdates(languagePackage, datasheet, "Spanish");
   assert.equal(plan.safe, true);
   assert.equal(plan.sourceMismatches.length, 1);
+  assert.equal(plan.sourceChangedCellCount, 1);
+  assert.equal(plan.sourceUpdates[0].source, "Revised source");
   assert.equal(plan.changedCellCount, 1);
   assert.doesNotThrow(() => assertSafePlan(plan));
 });
@@ -220,6 +223,38 @@ test("appends new Datasheet fields to the language package end", () => {
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }
+});
+
+test("ignores formatted blank rows when choosing the append position", () => {
+  const workbook = XLSX.read(packageBuffer(), { type: "buffer" });
+  workbook.Sheets.Sheet1["!ref"] = "A1:F8";
+  const languagePackage = readLanguagePackage(
+    XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }),
+    "es-ES"
+  );
+  assert.equal(languagePackage.sections[0].lastDataRow, 4);
+});
+
+test("Global rebase fingerprint ignores only the propagated source cell", () => {
+  const packageWith = (source, translation) => readLanguagePackage(workbookBuffer([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "product_title", source, translation]
+  ]), "es-ES");
+  const probe = { existingKeys: ["product_title"], newKeys: [] };
+  const before = workbookContentFingerprintForGlobalRebase(
+    packageWith("Old source", "Anterior"),
+    probe
+  );
+  const propagated = workbookContentFingerprintForGlobalRebase(
+    packageWith("New source", "Anterior"),
+    probe
+  );
+  const externallyChanged = workbookContentFingerprintForGlobalRebase(
+    packageWith("New source", "Cambio externo"),
+    probe
+  );
+  assert.equal(before, propagated);
+  assert.notEqual(before, externallyChanged);
 });
 
 test("appends each new field only once when a package has multiple language sheets", () => {
@@ -292,6 +327,41 @@ test("uses native Excel to update and append fields without rebuilding the xls",
     assert.equal(verified.workbook.Sheets.Sheet1.E2.v, "Nuevo");
     assert.equal(verified.workbook.Sheets.Sheet1.C6.v, "new_field");
     assert.equal(verified.workbook.Sheets.Sheet1.E6.v, "Nueva traduccion");
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("native Global update can synchronize source and translation columns", {
+  skip: process.platform !== "win32",
+  timeout: 30000
+}, () => {
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "language-package-global-"));
+  try {
+    const inputPath = path.join(temporaryDirectory, "before.xls");
+    const outputPath = path.join(temporaryDirectory, "after.xls");
+    fs.writeFileSync(inputPath, workbookBuffer([
+      ["Category", "Serial", "Single word", "en-US", "need translation"],
+      ["goods", "G1", "product_title", "Old source", "Old translation"]
+    ], "biff8"));
+    const parsed = parseLanguageDatasheet(workbookBuffer([
+      ["Field", "Source", "English"],
+      ["product_title", "Revised English", "Revised English"]
+    ]));
+    const languagePackage = readLanguagePackage(inputPath, "en-US");
+    const plan = planLanguagePackageUpdates(languagePackage, parsed, "English");
+    const result = writeUpdatedLanguagePackageNative(
+      inputPath,
+      languagePackage,
+      parsed,
+      plan,
+      outputPath,
+      { syncSource: true }
+    );
+    const sheet = readLanguagePackage(outputPath, "en-US").workbook.Sheets.Sheet1;
+    assert.equal(result.verifiedCellCount, 2);
+    assert.equal(sheet.D2.v, "Revised English");
+    assert.equal(sheet.E2.v, "Revised English");
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }

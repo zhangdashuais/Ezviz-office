@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { createEcadminPlatformFeature } = require("./ecadmin-platform");
 
@@ -57,6 +59,7 @@ test("language completion can run without creating download material", async () 
     async newPage() { return existingPage; }
   };
   const feature = createEcadminPlatformFeature({
+    fs,
     path,
     logLine(logs, message) { logs.push(message); },
     normalizeBool(value) { return value === true || value === "1"; },
@@ -67,7 +70,6 @@ test("language completion can run without creating download material", async () 
     setFileByLabel() {},
     async ensureLoggedIn() {},
     async getContext() { return context; },
-    SHAREPOINT_DEFAULTS: { translationRoot: "translation", materialRoot: "material" }
   });
 
   const result = await feature.runEcadminPlatform({
@@ -75,8 +77,7 @@ test("language completion can run without creating download material", async () 
     createDownload: "0",
     extendLanguages: "1",
     updateProductImage: "0",
-    sharePoint: "0"
-  }, { allFiles: [] }, []);
+  }, []);
 
   assert.deepEqual(fills, [["search", "EP8 Ultra"], ["languageTitle", "EP8 Ultra"]]);
   assert.equal(result.languageCompletion.count, 3);
@@ -84,18 +85,24 @@ test("language completion can run without creating download material", async () 
   assert.match(result.languageCompletion.listUrl, /SupportDownloadInfoList/);
 });
 
-test("SharePoint archive rejects a material category outside the fixed list", async () => {
+test("local upload files are selected from the matching product folder", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ecadmin-product-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const upload = path.join(root, "TY1 G1 3K", "upload");
+  fs.mkdirSync(upload, { recursive: true });
+  fs.writeFileSync(path.join(upload, "TY1 G1 3K-Datasheet.pdf"), "pdf");
+  fs.writeFileSync(path.join(upload, "高清图.png"), "png");
+  fs.writeFileSync(path.join(upload, "pc_banner.png"), "banner");
   const feature = createEcadminPlatformFeature({
+    fs,
     path,
     logLine() {},
     normalizeBool(value) { return value === true || value === "1"; },
-    getContext() { throw new Error("不应打开浏览器"); },
-    SHAREPOINT_DEFAULTS: { translationRoot: "translation", materialRoot: "material" }
+    productRoot: root
   });
 
-  await assert.rejects(() => feature.runEcadminPlatform({
-    title: "EP8 Ultra",
-    sharePoint: "1",
-    materialCategory: "05_Other"
-  }, { allFiles: [] }, []), /素材类目不在允许范围/);
+  const files = feature.inspectLocalFiles("ty1 g1 3k");
+  assert.equal(files.datasheet.originalname, "TY1 G1 3K-Datasheet.pdf");
+  assert.equal(files.highResImage.originalname, "高清图.png");
+  assert.equal(files.allFiles.length, 3);
 });

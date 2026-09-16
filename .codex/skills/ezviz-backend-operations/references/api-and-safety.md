@@ -21,6 +21,7 @@
 | POST | `/api/campaign/banner-fix-utm` | 写后台 |
 | POST | `/api/campaign/popup-plan` | 只生成清单 |
 | POST | `/api/campaign/popup-submit` | 写后台，可能启用 |
+| POST | `/api/campaign/dtc-assets` | 只读检查 DTC 本地素材目录，不上传、不写后台 |
 | POST | `/api/campaign/dtc-plan` | 只生成 DTC 德法西意荷 Banner + Popup 清单 |
 | POST | `/api/campaign/dtc-submit` | 写后台，固定提交 DTC 德法西意荷 Banner + Popup |
 | POST | `/api/campaign/popup-delete-existing` | 单站点恰好存在一条 Popup 时删除并回读确认 |
@@ -49,7 +50,7 @@ utm_campaign=web_{siteCode}_popup
 
 外部链接不自动添加 UTM。坏链只报告，不自动替换。
 
-DTC 专用入口固定站点为 `de/fr/es/it/nl`，不读取页面勾选站点。Banner 与 Popup 使用同一组上线/下线时间；Banner `model` 自动映射为：`de=Angebote`、`fr=Promotion`、`es=Venta Especial`、`it=Offerte top`、`nl=Mega deal`。先运行 `/api/campaign/dtc-plan`，确认清单后再运行 `/api/campaign/dtc-submit`。
+DTC 专用入口固定站点为 `de/fr/es/it/nl`，不读取页面勾选站点和普通 Banner/Popup 表单。请求只需 `assetRootPath`、`onlineAtUtc`、`offlineAtUtc`；三项均为必填。Banner 标题固定为 `&nbsp;`，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 后再添加 Banner UTM，`model` 映射为：`de=Angebote`、`fr=Promotion`、`es=Venta Especial`、`it=Offerte top`、`nl=Mega deal`；固定隐藏 More、新窗口打开并直接发布。Popup Name 使用对应 Model，Brief 为空，Web/Mobile 链接使用同一 Hot Sale 地址并添加 Popup UTM，展示范围为全站、频率为每日一次，创建后直接启用。素材根目录按国家代码、英文名、本地名或中文名分类，素材名或子目录名需包含 `banner-pc`、`banner-mobile`、`popup`。Mobile 缺失时回退 PC 图。单文件默认上限 10 MB，缺失、重复匹配或超限会跳过对应国家并返回原因，其他国家继续。先运行 `/api/campaign/dtc-assets` 或 `/api/campaign/dtc-plan`，确认清单后再运行 `/api/campaign/dtc-submit`。
 
 ## TDK
 
@@ -96,12 +97,17 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/product-publishing/batch-preview` | 多产品、逐目标站预览上架；目标站已有同名产品时跳过复制，改为只预览资料/语言包更新，不提交 |
 | POST | `/api/product-publishing/batch-submit` | 多产品、逐目标站执行；未存在则复制上架，已存在则只更新资料/语言包并回读 |
 
+`/api/campaign/shop-login-check` 携带 `targetUrl=/goods/int-goods-list` 与 `inspectIntGoodsCopy=true` 时可只读检查国际产品复制列表；快照返回 `goods_id` 等列表字段。响应未包含 `isSearchable` 时，不得据此推断 Detail 开关状态。
+
 产品上架与修订写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列。后台自定义字段名 `vm.pcView.customs[n].name`（Custom Page Name 输入框）使用官网 tab 固定文案，HTML 顶部 Specification 标题使用规格内容标题；未知站点回退到工作簿标题。Custom Page Name 固定映射包括：荷兰/比利时 `Specificaties`，德国 `Technische Daten`，法国 `Spécifications`，西班牙/拉美/阿根廷 `Especificaciones`，意大利 `Specifiche`，捷克 `Technické údaje`，泰国 `รายละเอียด`。
 保存产品资料前会自动把空的 Ads Additional Information → Product Title 补为当前产品名称；已有值不覆盖。
 | POST | `/api/language-package/upload` | 上传语言包 |
+| GET/POST | `/api/language-package/local-i18n-paths` | 读取或保存本机 i18n Datasheet 默认路径 |
+| POST | `/api/language-package/local-i18n-path-picker` | 打开本机 HTML、Excel、输出目录或最终 `.xlsx` 保存路径选择器 |
+| POST | `/api/language-package/local-i18n-datasheet` | 使用请求路径、已保存默认路径或自动匹配路径生成 Datasheet 并替换 HTML |
 | POST | `/api/language-package/datasheet-inspect` | 识别单产品 Datasheet 的语种列和字段，不访问商城后台 |
-| POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖预览；页面默认跳过站点缺失 Key，不上传 |
-| POST | `/api/language-package/datasheet-submit` | 单任务运行；校验语种与预览指纹后原生修改、上传并重新下载回读；失败时回滚原包 |
+| POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖预览；没有 Edit/Download 行的英文站点可使用明确带匹配 `lang_code` 的 Download Language Template；页面默认跳过站点缺失 Key，不上传 |
+| POST | `/api/language-package/datasheet-submit` | 单任务运行；只提交预览为 `ready` 的站点，`failed` / `no-change` 站点跳过且不阻塞批次。Global 的 `English (Source)` 同时更新原文列和译文列并双列回读。含待更新 Global 的全站任务先提交 Global，再等待英文源同步并仅对已验证源字段自动刷新其余站点基线；其他变化仍按预览指纹拦截。随后原生修改、上传并重新下载回读，失败时回滚原包 |
 | POST | `/api/language-package/hg2-400-4-preview` | 逐站下载语言包并预览 `HG2_400_4` E 列秒数删除，不上传 |
 | POST | `/api/language-package/hg2-400-4-submit` | 按预览指纹逐站修改、上传并重新下载回读；失败时回滚原包 |
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |

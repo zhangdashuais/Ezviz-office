@@ -99,6 +99,10 @@ function registerCampaignRoutes(app, deps) {
     { name: "bannerMobileImage", maxCount: 1 },
     { name: "popupImage", maxCount: 1 }
   ]);
+  app.post("/api/campaign/dtc-assets", dtcUpload, (req, res) => {
+    try { res.json({ ok: true, inspection: dtc.inspectAssets(req.body || {}) }); }
+    catch (error) { res.status(400).json({ ok: false, error: errorMessage(error) }); }
+  });
   app.post("/api/campaign/dtc-plan", dtcUpload,
     (req, res) => { try { res.json({ ok: true, plan: dtc.buildPlan(req.body || {}, req.files || {}) }); } catch (error) { res.status(500).json({ ok: false, error: errorMessage(error) }); } });
   app.post("/api/campaign/dtc-submit", dtcUpload, async (req, res) => {

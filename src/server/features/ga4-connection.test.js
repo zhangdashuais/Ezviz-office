@@ -52,6 +52,7 @@ test("GA4 OAuth completes authorization and reads a report", async (t) => {
   assert.deepEqual(feature.status(), {
     configured: true,
     connected: true,
+    sheetsConnected: true,
     propertyId: "311294431"
   });
 });
@@ -99,4 +100,42 @@ test("Search Console lists sites and queries search analytics", async (t) => {
   assert.equal(query.rows[0].clicks, 3);
   assert.match(requests[1][0], /\/sites\/https%3A%2F%2Fwww\.ezviz\.com%2F\/searchAnalytics\/query$/);
   assert.equal(JSON.parse(requests[1][1].body).dimensions[0], "date");
+});
+
+test("service center tracker copies the exemplar row, appends values, and verifies", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "sheets-oauth-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const files = {
+    clientPath: path.join(root, "client.json"),
+    configPath: path.join(root, "config.json"),
+    tokenPath: path.join(root, "token.json")
+  };
+  fs.writeFileSync(files.clientPath, JSON.stringify({ installed: { client_id: "id", client_secret: "secret" } }));
+  fs.writeFileSync(files.tokenPath, JSON.stringify({ access_token: "token", refresh_token: "refresh", expires_at: Date.now() + 3600000 }));
+  let appended = false;
+  let batchBody;
+  const feature = createGa4Connection({
+    ...files,
+    redirectUri: "http://localhost/callback",
+    fetchImpl: async (url, options = {}) => {
+      if (url.includes(":batchUpdate")) {
+        appended = true;
+        batchBody = JSON.parse(options.body);
+        return { ok: true, json: async () => ({}) };
+      }
+      if (url.includes("/values/")) {
+        const rows = [["Product", "Date", "Service", "Website"], ["A", "2026/9/7", "Live", "Live"], ["B", "2026/9/8", "Live", "Live"], ["Existing", "2026/9/9", "Live", "Live"]];
+        if (appended) rows.push(["New Product", "2026/9/10", "Live", "Live"]);
+        return { ok: true, json: async () => ({ values: rows }) };
+      }
+      return { ok: true, json: async () => ({ sheets: [{ properties: { sheetId: 0, title: "Product Status" } }] }) };
+    }
+  });
+
+  const result = await feature.syncServiceCenterProduct("New Product");
+  assert.equal(result.status, "appended");
+  assert.equal(result.row, 5);
+  assert.equal(batchBody.requests[0].copyPaste.pasteType, "PASTE_NORMAL");
+  assert.equal(batchBody.requests[1].updateCells.rows[0].values[0].userEnteredValue.stringValue, "New Product");
+  assert.equal(batchBody.requests[1].updateCells.rows[0].values[2].userEnteredValue.stringValue, "Live");
 });

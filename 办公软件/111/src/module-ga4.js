@@ -19,9 +19,9 @@
     return data.result ?? data;
   }
 
-  function write(lines, message) {
+  function write(lines, message, type = "ok") {
     outputElement.value = lines.join("\n");
-    status(message, "ok");
+    status(message, type);
   }
 
   function setDataButtons(enabled) {
@@ -47,10 +47,10 @@
     const report = result.report || {};
     write([
       `GA4 connected: Property ${result.propertyId}`,
-      "Scopes: analytics.readonly + webmasters.readonly",
+      "Scopes: GA4 + Search Console + " + (result.sheetsConnected ? "Google Sheets read/write" : "Google Sheets 未授权"),
       "",
       ...(report.headers ? [report.headers.join("\t"), ...report.rows.map((row) => row.join("\t"))] : [])
-    ], "Google data connection OK.");
+    ], result.sheetsConnected ? "Google data connection OK." : "GA4 可用；请点击“登录 Google 并连接”重新授权 Google Sheets。", result.sheetsConnected ? "ok" : "warn");
   }
 
   function showGscQuery(result) {

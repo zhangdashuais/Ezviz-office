@@ -1,0 +1,7 @@
+interface:
+  display_name: "GA4 商品外链点击规范"
+  short_description: "规范商品按钮埋点并生成按页面统计的 GA4 商品点击报告"
+  default_prompt: "使用 $ga4-product-outbound-tracking 检查商品按钮并配置 GA4 外链点击报告。"
+
+policy:
+  allow_implicit_invocation: true

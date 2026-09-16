@@ -116,13 +116,6 @@ app.use((req, res, next) => {
   next();
 });
 
-const SHAREPOINT_DEFAULTS = {
-  hostname: "vsshpd01:81",
-  sitePath: "/sites/EZVIZ MKT",
-  translationRoot: "Shared Documents/05_Website/00_Product Translation",
-  materialRoot: "Shared Documents/05_Website"
-};
-
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
@@ -758,7 +751,15 @@ const languagePackageFeature = createLanguagePackageFeature({
   SHOP_DASHBOARD_URL
 });
 
+const ga4Feature = createGa4Connection({
+  clientPath: path.join(CREDENTIAL_ROOT, "ga4-oauth-client.json"),
+  configPath: GA4_CONFIG_PATH,
+  tokenPath: path.join(ROOT, "runtime", "ga4-oauth-token.json"),
+  redirectUri: `http://localhost:${PORT}/api/ga4/oauth/callback`
+});
+
 const ecadminPlatformFeature = createEcadminPlatformFeature({
+  fs,
   path,
   logLine,
   normalizeBool,
@@ -769,7 +770,9 @@ const ecadminPlatformFeature = createEcadminPlatformFeature({
   setFileByLabel: browserAuth.setFileByLabel,
   ensureLoggedIn: browserAuth.ensureLoggedIn,
   getContext: browserAuth.getContext,
-  SHAREPOINT_DEFAULTS
+  productRoot: process.env.EZVIZ_PRODUCT_ROOT || "D:\\产品",
+  inspectProductTracker: ga4Feature.inspectServiceCenterProduct,
+  syncProductTracker: ga4Feature.syncServiceCenterProduct
 });
 
 registerCampaignRoutes(app, {
@@ -857,13 +860,6 @@ const productDelistingFeature = createProductDelistingFeature({
   credentialDomainForSite,
   openProductEditorByName: productManagement.openByName
 });
-const ga4Feature = createGa4Connection({
-  clientPath: path.join(CREDENTIAL_ROOT, "ga4-oauth-client.json"),
-  configPath: GA4_CONFIG_PATH,
-  tokenPath: path.join(ROOT, "runtime", "ga4-oauth-token.json"),
-  redirectUri: `http://localhost:${PORT}/api/ga4/oauth/callback`
-});
-
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
 registerLanguagePackageRoutes(app, { upload, languagePackageFeature, logLine });
 registerTdkRoutes(app, { upload, tdkManagement, logLine });
@@ -895,7 +891,7 @@ registerSpecificationTranslationRoutes(app, {
   getCampaignSites
 });
 
-registerEcadminPlatformRoutes(app, { upload, ecadminPlatformFeature, logLine });
+registerEcadminPlatformRoutes(app, { ecadminPlatformFeature, logLine });
 registerEzvizSiteAuditRoutes(app, { feature: ezvizSiteAuditFeature, scheduler: ezvizSiteAuditScheduler });
 registerGa4Routes(app, { feature: ga4Feature });
 

@@ -6,45 +6,9 @@ function cleanFolderSegment(value) {
     .slice(0, 120);
 }
 
-function validateSharePointRoot(value, label) {
-  const normalized = String(value || "")
-    .replace(/\\/g, "/")
-    .split("/")
-    .filter(Boolean)
-    .join("/");
-  const parts = normalized.split("/");
-  const hasWebsiteRoot = parts.includes("05_Website") && !normalized.includes("..");
-  if (!hasWebsiteRoot) {
-    throw new Error(`${label || "SharePoint 目录"}必须位于 05_Website 下。`);
-  }
-  return normalized;
-}
-
-function isSharePointTranslationExcel(file) {
-  const name = String(file?.originalname || file?.filename || "");
-  return /\.xlsx$/i.test(name);
-}
-
-function sharePointTranslationRole(file) {
-  return isSharePointTranslationExcel(file) ? "translationExcel" : "material";
-}
-
-function productFolderNameFromDatasheet(files) {
-  const list = files?.allFiles || [];
-  const datasheet = list.find((file) => /datasheet/i.test(String(file?.originalname || file?.filename || "")));
-  if (!datasheet) throw new Error("缺少 Datasheet 文件，无法推断产品文件夹名。");
-  const baseName = String(datasheet.originalname || datasheet.filename || "")
-    .replace(/\\/g, "/")
-    .split("/")
-    .pop()
-    .replace(/\.[^.]+$/, "");
-  const productName = baseName.replace(/[\s_-]*datasheet.*$/i, "").trim();
-  if (!productName) throw new Error("Datasheet 文件名缺少产品名称。");
-  return cleanFolderSegment(productName);
-}
-
 function createEcadminPlatformFeature(deps) {
   const {
+    fs,
     path,
     logLine,
     normalizeBool,
@@ -55,15 +19,44 @@ function createEcadminPlatformFeature(deps) {
     setFileByLabel,
     ensureLoggedIn,
     getContext,
-    SHAREPOINT_DEFAULTS
+    productRoot = "D:\\产品",
+    inspectProductTracker,
+    syncProductTracker
   } = deps;
 
-  const SHAREPOINT_MATERIAL_CATEGORIES = new Set([
-    "02_Security Camera",
-    "03_Home Sensor & Control",
-    "04_NVR & Network",
-    "07_Smart Home"
-  ]);
+  function findProductFolder(productName) {
+    if (/[\\/]/.test(productName) || productName.includes("..")) throw new Error("产品名称不能包含路径字符。");
+    if (!fs.existsSync(productRoot)) throw new Error(`产品根目录不存在：${productRoot}`);
+    const direct = path.join(productRoot, productName);
+    if (fs.existsSync(direct) && fs.statSync(direct).isDirectory()) return direct;
+    const normalized = productName.trim().replace(/\s+/g, " ").toLowerCase();
+    const match = fs.readdirSync(productRoot, { withFileTypes: true }).find((entry) => (
+      entry.isDirectory() && entry.name.trim().replace(/\s+/g, " ").toLowerCase() === normalized
+    ));
+    if (!match) throw new Error(`未找到产品目录：${direct}`);
+    return path.join(productRoot, match.name);
+  }
+
+  function inspectLocalFiles(productName) {
+    if (!String(productName || "").trim()) throw new Error("产品名称不能为空。");
+    const productFolder = findProductFolder(productName);
+    const uploadFolder = path.join(productFolder, "upload");
+    if (!fs.existsSync(uploadFolder) || !fs.statSync(uploadFolder).isDirectory()) {
+      throw new Error(`未找到 upload 文件夹：${uploadFolder}`);
+    }
+    const allFiles = fs.readdirSync(uploadFolder, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => {
+        const filePath = path.join(uploadFolder, entry.name);
+        return { path: filePath, originalname: entry.name, filename: entry.name, size: fs.statSync(filePath).size };
+      });
+    const datasheet = allFiles.find((file) => /datasheet.*\.pdf$|\.pdf$.*datasheet/i.test(file.originalname))
+      || allFiles.find((file) => /\.pdf$/i.test(file.originalname));
+    const images = allFiles.filter((file) => /\.(png|jpe?g|gif|webp)$/i.test(file.originalname));
+    const highResImage = images.find((file) => /高清图|high[\s_-]*res|product[\s_-]*image/i.test(file.originalname));
+    const specExcel = allFiles.find((file) => /(?:spec|规格|参数).*\.(xlsx|xls)$/i.test(file.originalname));
+    return { productFolder, uploadFolder, datasheet, highResImage, specExcel, allFiles };
+  }
 
 async function createDownloadInfo(page, payload, files, logs) {
   const createUrl = "https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportDownloadCenter/SupportDownloadInfo/SupportDownloadInfoCreate";
@@ -243,66 +236,7 @@ async function updateProductImage(page, payload, file, logs) {
   return after;
 }
 
-function isSameUpload(a, b) {
-  if (!a || !b) return false;
-  return a.path === b.path || (a.originalname === b.originalname && a.size === b.size);
-}
-
-function buildSharePointPlan(payload, files, logs) {
-  const productFolder = cleanFolderSegment(payload.title);
-  const translationRoot = payload.translationRoot || SHAREPOINT_DEFAULTS.translationRoot;
-  const materialRoot = payload.materialRoot || SHAREPOINT_DEFAULTS.materialRoot;
-  const category = cleanFolderSegment(payload.materialCategory);
-  const allFiles = files.allFiles || [];
-
-  const specExcel = files.specExcel || allFiles.find((file) => /\.(xlsx|xls)$/i.test(file.originalname || file.filename));
-  const translationFiles = [files.datasheet, specExcel].filter(Boolean);
-  const materialFiles = allFiles.filter((file) => {
-    return !translationFiles.some((picked) => isSameUpload(file, picked));
-  });
-
-  const translationFolder = `${translationRoot}/${productFolder}`;
-  const materialFolder = category ? `${materialRoot}/${category}/${productFolder}` : "";
-
-  const plan = {
-    status: "planned",
-    note: "当前本地服务不能直接调用 Codex SharePoint 连接器；已生成可执行归档计划。若接入企业 SharePoint 授权或浏览器上传流程，可按此计划执行。",
-    site: {
-      hostname: SHAREPOINT_DEFAULTS.hostname,
-      sitePath: SHAREPOINT_DEFAULTS.sitePath
-    },
-    folders: {
-      translationFolder,
-      materialFolder
-    },
-    translationFiles: translationFiles.map((file) => ({
-      name: file.originalname || file.filename,
-      localPath: file.path,
-      role: isSameUpload(file, files.datasheet) ? "datasheet" : "specExcel"
-    })),
-    materialFiles: materialFiles.map((file) => ({
-      name: file.originalname || file.filename,
-      localPath: file.path
-    }))
-  };
-
-  if (!specExcel) {
-    plan.warning = "未识别到 spec Excel。Product Translation 文件夹将只包含 datasheet。";
-  }
-
-  if (!category) {
-    plan.warning = [plan.warning, "未选择素材类目，素材归档目标文件夹为空。"].filter(Boolean).join(" ");
-  }
-
-  logLine(logs, "SharePoint 归档计划已生成。");
-  logLine(logs, "Product Translation 文件夹：" + translationFolder);
-  if (materialFolder) logLine(logs, "素材类目文件夹：" + materialFolder);
-  logLine(logs, "Product Translation 文件数：" + plan.translationFiles.length);
-  logLine(logs, "素材文件数：" + plan.materialFiles.length);
-  return plan;
-}
-
-  async function runEcadminPlatform(body, files, logs) {
+  async function runEcadminPlatform(body, logs) {
     const payload = {
       title: String(body.title || "").trim(),
       productSearch: String(body.productSearch || body.title || "").trim(),
@@ -313,27 +247,30 @@ function buildSharePointPlan(payload, files, logs) {
       password: String(body.password || ""),
       createDownload: normalizeBool(body.createDownload),
       extendLanguages: normalizeBool(body.extendLanguages),
-      updateProductImage: normalizeBool(body.updateProductImage),
-      sharePoint: normalizeBool(body.sharePoint),
-      translationRoot: String(body.translationRoot || SHAREPOINT_DEFAULTS.translationRoot).trim(),
-      materialRoot: String(body.materialRoot || SHAREPOINT_DEFAULTS.materialRoot).trim(),
-      materialCategory: String(body.materialCategory || "").trim()
+      updateProductImage: normalizeBool(body.updateProductImage)
     };
 
     if (!payload.title) throw new Error("产品标题不能为空。");
-    if (payload.materialCategory && !SHAREPOINT_MATERIAL_CATEGORIES.has(payload.materialCategory)) {
-      throw new Error("SharePoint 素材类目不在允许范围内。");
+    const needsFiles = payload.createDownload || payload.updateProductImage;
+    let files = { datasheet: null, highResImage: null, specExcel: null, allFiles: [] };
+    if (needsFiles) {
+      files = inspectLocalFiles(payload.title);
+      logLine(logs, "本地资料目录：" + files.uploadFolder);
+      logLine(logs, "识别到文件：" + files.allFiles.length + " 个");
+      logLine(logs, "Datasheet：" + (files.datasheet?.originalname || "未识别"));
+      logLine(logs, "高清图：" + (files.highResImage?.originalname || "未识别"));
     }
     if (payload.createDownload && (!files.datasheet || !files.highResImage)) {
-      throw new Error("创建下载资料需要 datasheet 和高清图。");
+      throw new Error("创建下载资料需要 upload 文件夹内同时存在 Datasheet PDF 和命名含“高清图”的图片。");
     }
     if (payload.updateProductImage && !files.highResImage) {
       throw new Error("更新产品背景图需要高清图。");
     }
 
-    const result = {};
-    if (payload.sharePoint) {
-      result.sharePointPlan = buildSharePointPlan(payload, files, logs);
+    const result = { localFiles: files };
+    if (inspectProductTracker) {
+      result.productTrackerBefore = await inspectProductTracker(payload.title);
+      logLine(logs, result.productTrackerBefore.exists ? "Google Sheet 已有该产品。" : "Google Sheet 尚无该产品，成功后将追加。");
     }
 
     const needsEcadmin = payload.createDownload || payload.extendLanguages || payload.updateProductImage;
@@ -353,17 +290,20 @@ function buildSharePointPlan(payload, files, logs) {
       result.productImageUrl = await updateProductImage(page, payload, files.highResImage, logs);
     }
 
+    if (syncProductTracker) {
+      result.productTracker = await syncProductTracker(payload.title);
+      logLine(logs, result.productTracker.status === "appended"
+        ? `Google Sheet 已追加到第 ${result.productTracker.row} 行。`
+        : `Google Sheet 第 ${result.productTracker.row} 行已存在，无需重复填写。`);
+    }
+
     return result;
   }
 
-  return { runEcadminPlatform };
+  return { runEcadminPlatform, inspectLocalFiles };
 }
 
 module.exports = {
   createEcadminPlatformFeature,
-  cleanFolderSegment,
-  validateSharePointRoot,
-  isSharePointTranslationExcel,
-  sharePointTranslationRole,
-  productFolderNameFromDatasheet
+  cleanFolderSegment
 };

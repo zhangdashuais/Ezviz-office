@@ -5,6 +5,8 @@
       const outputEl = document.getElementById("output");
       const cssOutputEl = document.getElementById("cssOutput");
       const cssDownloadBtn = document.getElementById("cssDownloadBtn");
+      const includeHeadCheckbox = document.getElementById("inlineIncludeHeadCheckbox");
+      const includeBodyCheckbox = document.getElementById("inlineIncludeBodyCheckbox");
       let packagedCss = "";
 
       function setStatus(message, type) {
@@ -550,7 +552,9 @@
 
         allScripts.forEach((node) => node.remove());
 
-        const bodyInner = `<div class="page page-webflow"><link rel="stylesheet" href="__EZVIZ_REMOTE_CSS__">\n${doc.body.innerHTML.trim()}`;
+        const includeHead = !!includeHeadCheckbox?.checked;
+        const stylesheetLink = '<link rel="stylesheet" href="__EZVIZ_REMOTE_CSS__">';
+        const bodyInner = `<div class="page page-webflow">${includeHead ? "" : stylesheetLink + "\n"}${doc.body.innerHTML.trim()}`;
 
         const rawStyleContent = cssBlocks.join("\n\n");
         const cssStats = sanitizeGeneratedCss(rawStyleContent);
@@ -567,13 +571,14 @@
           "<script>window.$ = window.jQuery = jq_1;</script></div>"
         ].join("\n");
 
-        const resultRaw = [
-          "<!-- product detail webflow -->",
-          bodyInner,
-          scriptBlock
-        ]
-          .filter(Boolean)
-          .join("\n");
+        if (!window.EzvizInlineOutput?.wrap) {
+          throw new Error("Inline output module is not loaded.");
+        }
+        const resultRaw = window.EzvizInlineOutput.wrap(
+          [bodyInner, scriptBlock].join("\n"),
+          stylesheetLink,
+          { includeHead, includeBody: !!includeBodyCheckbox?.checked }
+        );
 
         if (!webflowScriptFile) {
           warnings.push("Webflow JS upload pending: missing local js/webflow.js");

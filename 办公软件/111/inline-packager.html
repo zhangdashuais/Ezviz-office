@@ -73,7 +73,7 @@
           <p class="desc">批量处理 HTML、CSS 和 JS 资源，并自动为 Webflow CSS 添加 <code>.page.page-webflow</code> 作用域。完成后同时返回 HTML 与独立 CSS 文件。</p>
 
           <select id="versionSelect" hidden>
-            <option value="src/main-default.js?v=20260908-1" selected>Standard</option>
+            <option value="src/main-default.js?v=20260915-1" selected>Standard</option>
           </select>
           <select id="imageModeSelect" hidden>
             <option value="upload" selected>Upload Assets</option>
@@ -94,6 +94,11 @@
             <label>HTML</label>
             <select id="htmlSelect" style="width: 200px;"></select>
             <button id="runBtn" class="transform el-button mt-4 mb-4 el-button--danger el-button--mini" type="button">开始一键打包</button>
+          </div>
+
+          <div class="check-row" style="margin-bottom: 0;">
+            <label><input id="inlineIncludeHeadCheckbox" type="checkbox"> 输出 <code>&lt;head&gt;</code> 标签</label>
+            <label><input id="inlineIncludeBodyCheckbox" type="checkbox"> 输出 <code>&lt;body&gt;</code> 标签</label>
           </div>
         </div>
 
@@ -587,78 +592,22 @@
       <div id="tab-ecadmin-platform" class="tab-content">
         <div class="card">
           <h3>服务中心资料上传平台</h3>
-          <p class="desc">系统可识别资料文件并按选项创建下载资料、更新产品背景图和生成归档计划；“访问扩展接口生成语言”可独立执行，无需选择文件或创建资料。</p>
+          <p class="desc">只需填写产品名称。系统会自动读取 D:\产品\产品名称\upload，创建下载资料、补全多语言并更新产品背景图；全部完成后自动检查 Product Status，未登记的产品会追加到末行。</p>
 
           <div class="form-grid">
-            <label>产品标题</label>
-            <input id="ecProductTitleInput" type="text" placeholder="例如 EP8 Ultra">
-
-            <label>关联产品搜索</label>
-            <input id="ecProductSearchInput" type="text" placeholder="默认使用产品标题">
-
-            <label>文件类型</label>
-            <select id="ecFileTypeSelect">
-              <option value="Product Datasheet" selected>Product Datasheet</option>
-              <option value="Firmware and Software">Firmware and Software</option>
-              <option value="Limited Warranty">Limited Warranty</option>
-              <option value="Other">Other</option>
-            </select>
-
-            <label>状态</label>
-            <select id="ecStatusSelect">
-              <option value="enabled" selected>启用</option>
-              <option value="disabled">停用</option>
-            </select>
-
-            <label>权重</label>
-            <input id="ecWeightInput" type="number" value="0" min="0">
-
-            <label>后台账号</label>
-            <input id="ecUsernameInput" type="text" placeholder="已登录可留空">
-
-            <label>后台密码</label>
-            <input id="ecPasswordInput" type="password" placeholder="已登录可留空">
-          </div>
-
-          <div class="row">
-            <label>资料文件夹</label>
-            <input id="ecFilesInput" type="file" multiple webkitdirectory directory>
-          </div>
-
-          <div class="row">
-            <label>或选择文件</label>
-            <input id="ecFilesLooseInput" type="file" multiple>
+            <label>产品名称</label>
+            <input id="ecProductTitleInput" type="text" placeholder="例如 TY1 G1 3K">
+            <label>本地读取路径</label>
+            <input id="ecUploadPathInput" type="text" readonly value="D:\产品\&lt;产品名称&gt;\upload">
           </div>
 
           <div class="check-row">
-            <label><input id="ecSharePointCheckbox" type="checkbox" checked> 生成 SharePoint 归档计划（不上传）</label>
             <label><input id="ecCreateDownloadCheckbox" type="checkbox" checked> 创建下载中心资料</label>
             <label><input id="ecExtendLanguagesCheckbox" type="checkbox" checked> 在程序下载管理中补全多语言（可独立执行）</label>
             <label><input id="ecUpdateProductImageCheckbox" type="checkbox" checked> 更新产品背景图</label>
           </div>
 
-          <div class="card inner-card">
-            <h3>SharePoint 归档</h3>
-            <p class="desc">当前只生成 SharePoint 归档计划，不会实际上传文件。Datasheet 和 spec Excel 会列入 Product Translation 下的产品文件夹计划；其余素材会按你选择的素材类目列入对应文件夹计划。</p>
-            <div class="form-grid">
-              <label>Product Translation</label>
-              <input id="ecTranslationRootInput" type="text" value="Shared Documents/05_Website/00_Product Translation">
-
-              <label>素材根目录</label>
-              <input id="ecMaterialRootInput" type="text" value="Shared Documents/05_Website">
-
-              <label>素材类目</label>
-              <select id="ecMaterialCategorySelect">
-                <option value="">请选择类目</option>
-                <option value="02_Security Camera">02_Security Camera</option>
-                <option value="03_Home Sensor &amp; Control">03_Home Sensor &amp; Control</option>
-                <option value="04_NVR &amp; Network">04_NVR &amp; Network</option>
-                <option value="07_Smart Home">07_Smart Home</option>
-              </select>
-            </div>
-          </div>
-
-          <div id="ecDetectedFiles" class="detected-files">等待选择文件。</div>
+          <div id="ecDetectedFiles" class="detected-files">填写产品名称后可先识别本地文件。</div>
 
           <div class="row" style="margin-bottom: 0;">
             <button id="ecRunBtn">开始执行</button>
@@ -820,14 +769,18 @@
           <h3>Banner 数据</h3>
           <div class="sub-card">
             <h4>DTC 德法西意荷专用</h4>
-            <p class="desc">固定站点：德国、法国、西班牙、意大利、荷兰。Banner 与 Popup 共用这里的上线/下线时间；Banner Model 自动写入：DE Angebote / FR Promotion / ES Venta Especial / IT Offerte top / NL Mega deal。其余标题、链接、图片复用本卡片和下方 Popup 表单。</p>
+            <p class="desc">固定站点：德国、法国、西班牙、意大利、荷兰。只需填写本地素材根路径和统一上线/下线时间。Banner 标题固定为空白占位，Model 自动写入：DE Angebote / FR Promotion / ES Venta Especial / IT Offerte top / NL Mega deal；链接固定为各站点 <code>/store/topic/hot-sale</code> 并自动添加 UTM。默认隐藏 More、新窗口打开、直接发布，同时创建并启用 Popup。</p>
             <div class="form-grid">
+              <label>DTC 本地素材根路径</label>
+              <input id="dtcAssetRootPathInput" type="text" placeholder="例如 D:\DTC\2026-09；内含 de/fr/es/it/nl 国家目录" required>
               <label>DTC 统一上线时间</label>
-              <input id="dtcOnlineInput" type="datetime-local">
+              <input id="dtcOnlineInput" type="datetime-local" required>
               <label>DTC 统一下线时间</label>
-              <input id="dtcOfflineInput" type="datetime-local">
+              <input id="dtcOfflineInput" type="datetime-local" required>
             </div>
+            <p class="desc">每个国家目录内用 <code>banner-pc</code>、<code>banner-mobile</code>、<code>popup</code> 标识素材（也可作为子目录名）。单文件上限 10 MB；Mobile 缺失时回退使用 PC 图。缺失、重复或超限只跳过对应国家。</p>
             <div class="row">
+              <button id="dtcInspectAssetsBtn" type="button">读取并检查本地素材</button>
               <button id="dtcBuildPlanBtn" type="button">生成 DTC 清单（不提交后台）</button>
               <button id="dtcSubmitBtn" type="button">执行 DTC Banner + Popup</button>
             </div>
@@ -936,8 +889,8 @@
 
       <div id="tab-ga4" class="tab-content">
         <div class="card">
-          <h3>连接 GA4 / Search Console</h3>
-          <p class="desc">使用 Google OAuth 登录并授予 GA4 与 Search Console 只读权限，不保存 Google 账号密码。首次连接需要 Google Cloud 下载的 OAuth 桌面客户端 JSON，后续只需重新登录授权。</p>
+          <h3>连接 GA4 / Search Console / Google Sheets</h3>
+          <p class="desc">使用 Google OAuth 授予 GA4、Search Console 与 Google Sheets 权限，不保存 Google 账号密码。Google Sheets 读写权限用于服务中心流程完成后的 Product Status 查重和追加。</p>
           <div class="row">
             <label for="ga4PropertyId">Property ID</label>
             <input id="ga4PropertyId" type="text" inputmode="numeric" value="311294431" placeholder="例如 123456789">
@@ -1068,6 +1021,7 @@
 
   <script src="src/ui.js"></script>
   <script src="src/css-scope.js?v=20260821-1"></script>
+  <script src="src/inline-output.js?v=20260915-1"></script>
   <script src="src/module-task-progress.js?v=20260814-2"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-ai-badge.js?v=20260911-2"></script>

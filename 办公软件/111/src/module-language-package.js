@@ -320,6 +320,9 @@
     formData.append("shopPassword", el.password.value);
     if (submit) {
       formData.append("expectedDatasheetFingerprint", datasheetPreview.datasheet.fingerprint);
+      formData.append("approvedSiteCodes", JSON.stringify(
+        datasheetPreview.sites.filter((item) => item.status === "ready").map((item) => item.site.siteCode)
+      ));
       const fingerprints = {};
       datasheetPreview.sites.forEach((item) => {
         if (item.fingerprint) fingerprints[item.site.siteCode] = item.fingerprint;
@@ -340,6 +343,7 @@
       const plan = item.plan || {};
       lines.push((item.site?.name || item.site?.siteCode || "站点") + "：" + item.status);
       if (item.error) lines.push("  错误：" + item.error);
+      if (item.reason) lines.push("  跳过原因：" + item.reason);
       if (item.rollback) lines.push("  回滚：" + item.rollback);
       if (plan.translationHeader) lines.push("  译文列：" + plan.translationHeader);
       if (item.plan) {
@@ -398,10 +402,13 @@
       el.datasheetOutput.value = formatDatasheetResult(payload);
       if (!submit) {
         datasheetPreview = payload.result;
-        el.datasheetSubmit.disabled = payload.result.sites.some((item) => item.status === "failed")
-          || !payload.result.sites.some((item) => item.status === "ready");
+        el.datasheetSubmit.disabled = !payload.result.sites.some((item) => item.status === "ready");
       }
-      setDatasheetStatus(submit ? "语言包更新流程完成。" : "预览完成，请核对后确认上传。", "ok");
+      const readyCount = (payload.result.sites || []).filter((item) => item.status === "ready").length;
+      const skippedCount = (payload.result.sites || []).filter((item) => ["failed", "no-change", "skipped"].includes(item.status)).length;
+      setDatasheetStatus(submit
+        ? "语言包更新流程完成；未获批准的站点已跳过。"
+        : `预览完成：可上传 ${readyCount} 个站点，跳过 ${skippedCount} 个；请核对后确认上传。`, "ok");
     } catch (error) {
       setDatasheetStatus("操作失败：" + (error.message || error), "warn");
       el.datasheetOutput.value = "操作失败：\n" + (error.message || error);

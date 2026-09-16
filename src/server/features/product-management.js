@@ -294,6 +294,13 @@ function createProductManagement({ logLine, normalizeBool }) {
         collect(good, "good");
         return {
           name: (title?.innerText || title?.textContent || "").trim(),
+          goodsId: good?.goods_id == null ? "" : String(good.goods_id),
+          bn: good?.bn == null ? "" : String(good.bn),
+          goodsType: good?.goods_type == null ? "" : String(good.goods_type),
+          isOnsale: good?.is_onsale == null ? null : Number(good.is_onsale),
+          isSearchable: good?.isSearchable ?? good?.is_searchable ?? null,
+          createTime: good?.create_time == null ? "" : String(good.create_time),
+          url: good?.url == null ? "" : String(good.url),
           itemNgRepeat: item.getAttribute("ng-repeat") || "",
           copyNgClick: copy?.getAttribute("ng-click") || "",
           copyHref: copy?.getAttribute("href") || "",

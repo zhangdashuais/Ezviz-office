@@ -6,7 +6,7 @@
 
 机器可读配置位于 `src/server/config/shop-navigation.json`，辅助查询方法位于 `src/server/features/shop-navigation.js`。
 
-本地平台的“一键内联打包”会同步完成 Webflow CSS 作用域处理，下载 `store.html` 的同时在页面展示最终 CSS，并提供 `webflow.scoped.css` 下载。“图片 AI 标志”的输出超过 512 KB 时会保持原分辨率转为 JPG 并降低画质；最低画质仍超限时明确报错，不会缩放图片。其“PDF / HTML 文字对比”可上传总语言包还原 `goods.xxx` 字段；生成字段修改建议后，可将建议应用到原始 HTML 的对应语言字段，并在页面显示完整修改版源码，不覆盖用户原文件。若原始 HTML 是片段，输出仍保持片段，不额外补 `DOCTYPE` / `html` / `head` / `body` 外层标签。
+本地平台的“一键内联打包”会同步完成 Webflow CSS 作用域处理，可选输出 `head`、`body` 标签；默认不输出，便于粘贴到商城后台。输出正文以 `<!-- product detail webflow -->` 标记开头，保留 `body` 时标记位于其下一行。下载 `store.html` 的同时在页面展示最终 CSS，并提供 `webflow.scoped.css` 下载。“图片 AI 标志”的输出超过 512 KB 时会保持原分辨率转为 JPG 并降低画质；最低画质仍超限时明确报错，不会缩放图片。其“PDF / HTML 文字对比”可上传总语言包还原 `goods.xxx` 字段；生成字段修改建议后，可将建议应用到原始 HTML 的对应语言字段，并在页面显示完整修改版源码，不覆盖用户原文件。若原始 HTML 是片段，输出仍保持片段，不额外补 `DOCTYPE` / `html` 外层标签。
 
 ## 菜单结构
 
@@ -61,9 +61,11 @@ const popupUrl = resolveShopNavigationUrl("popup", { preferAutomationUrl: true }
 
 TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife.com/tdk/index`。Popup 自动化目前使用 `new-shop.ezvizlife.com/popup/index`，与旧侧栏路由 `/config/popup` 并存。Banner 不使用新版 Custom Page 入口；Homepage 管理固定直接访问 `https://shop.ezvizlife.com/pages/index`。
 
+DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/下线时间。它不读取普通 Banner/Popup 表单：标题固定为空白占位，Model 使用五国固定文案，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 并分别添加 Banner/Popup UTM；Banner 默认隐藏 More、新窗口打开、直接发布，Popup 默认全站每日一次并直接启用。根目录下按 `de/fr/es/it/nl`（亦支持国家英文名、本地名和中文名）分类；文件名或子目录名用 `banner-pc`、`banner-mobile`、`popup` 标识用途。`POST /api/campaign/dtc-assets` 只读预检目录；单文件超过 10 MB、必需素材缺失或同一用途匹配多个文件时，该国家会被跳过并返回原因，不影响其他国家继续执行。
+
 ## 添加产品特殊入口
 
-从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。
+从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。只读页面快照同时返回列表产品的 `goods_id`、型号、类型、上架状态、创建时间、URL，以及响应中实际存在的 Searchable 字段；未返回该字段时不得由列表数据推断 Detail 开关。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。
 
 本地完整上架流程提供 `POST /api/product-publishing/preview` 和 `POST /api/product-publishing/submit`。产品上架只登录目标国家站账号，不登录国际站账号；目标站没有同名产品时，在目标站会话中打开 `/goods/int-goods-list`，明确把复制来源站选择为“国际站”，再等待目标分类的产品列表真实刷新后精确匹配。预览读取 `goods_id`、摘要和列表图片并生成复制源指纹，不打开尚未复制的空 Detail；提交时先复制国际产品，再从目标站新产品回读完整 Detail、Specification 图片和 Product Description，随后执行本地化更新。目标站已有同名产品时跳过国际复制，直接读取现有产品并只更新 Specification、Product Description 和语言包，Overview 保持不变。预览接口不写入后台。
 保存产品资料前，空的 Ads Additional Information → Product Title 会自动补为当前产品名称；已有值不覆盖。
@@ -74,7 +76,7 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 
 语言包定向修订提供 `/api/language-package/hg2-400-4-preview` 与 `/api/language-package/hg2-400-4-submit`。流程逐站下载语言包，精确定位 `HG2_400_4` 并只处理 E 列中的 `15s / 18s / 20s`；E 列为空或不含目标内容时不上传。旧 `.xls` 使用本机 Excel 原生保存以保留后台要求的文件结构，提交后重新下载回读，失败时恢复原包。
 
-语言包页另有独立的“按单产品 Datasheet 更新站点语言包”功能。`datasheet-inspect` 识别第三列起的语种说明；`datasheet-preview` 按字段 Key 对比所选站点当前语言包；`datasheet-submit` 将所选语种覆盖到目标列。页面默认跳过站点不存在的 Key，避免追加缺少后台元数据的行。空译文跳过，英文原文差异只提示并以站点语言包固有列为准；实际下载语言代码必须与 Datasheet 语种一致，预览后 Datasheet 或站点语言包发生变化时停止提交。同一时间只允许一个 Datasheet 预览或提交任务。旧 `.xls` 仍由本机 Excel 原生保存，上传后重新下载回读，失败时恢复原包。
+语言包页另有独立的“按单产品 Datasheet 更新站点语言包”功能。`datasheet-inspect` 识别第三列起的语种说明；`datasheet-preview` 按字段 Key 对比所选站点当前语言包；`datasheet-submit` 只提交预览状态为 `ready` 的站点，`failed` 与 `no-change` 会显示为跳过，不再禁用整批确认按钮，也不会在提交阶段再次登录这些站点。Global 选择 `English (Source)` 时会同时覆盖 `en-US` 原文列和译文列，并在上传后双列回读；其他站点仍只覆盖译文列。没有 Edit/Download 行、但明确提供带 `lang_code` 的 `Download Language Template` 时，英文站点可用该链接读取当前模板，语种不匹配时仍拒绝。页面默认跳过站点不存在的 Key，避免追加缺少后台元数据的行。空译文跳过，实际下载语言代码必须与 Datasheet 语种一致。全站提交中 Global 为 `ready` 时会强制先更新 Global，再等待英文原文同步到其他站点并自动刷新这些站点的预览基线；基线只忽略本批次已验证的英文源字段变化，其他字段变化仍停止提交。同一时间只允许一个 Datasheet 预览或提交任务。旧 `.xls` 仍由本机 Excel 原生保存，尾部格式化空行不会被当成追加模板行；上传后重新下载回读，失败时恢复原包。
 
 “本地 i18n Datasheet 生成”从产品 HTML 提取未 i18n 化的英文文案，将当前产品的新字段放在黄色提示行上方；HTML 已引用或按英文原文复用的旧字段放在黄色提示行下方。生成成功后先备份原 HTML，再把硬编码文案写回对应的 `goods.*` 字段；重复执行会复用现有输出并保持字段归类不变。
 产品名及其从左到右的名称前缀（如 `TY1`、`TY1 G1`、`TY1 G1 3K`）视为型号，不生成语言包字段；包含型号的完整描述句不受此规则影响。
@@ -97,9 +99,7 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 ## 服务中心资料平台
 
-本地入口 `POST /api/ecadmin/run` 支持按选项创建下载资料、补全多语言、更新产品背景图和生成 SharePoint 归档计划。补全多语言会在 UMP 的“服务中心 → 下载中心管理 → 程序下载管理”中按标题精确搜索资料，点击“补全多语言”，并提交弹窗中的标题；它可独立执行，不要求本轮创建资料或上传文件。提交后读取后台返回的新增多语言记录数量；若本轮同时创建资料，则会在日志中关联新生成的 `downloadId`。
-
-SharePoint 素材归档类目固定为 `02_Security Camera`、`03_Home Sensor & Control`、`04_NVR & Network`、`07_Smart Home`，接口会拒绝其他非空类目值。
+本地入口 `POST /api/ecadmin/local-files` 根据产品名读取 `D:\产品\<产品名称>\upload`；`POST /api/ecadmin/run` 支持按选项创建下载资料、补全多语言和更新产品背景图，不再接收浏览器上传文件，也不再生成 SharePoint 归档计划。补全多语言会在 UMP 的“服务中心 → 下载中心管理 → 程序下载管理”中按标题精确搜索资料并提交弹窗标题。全部动作成功后，接口通过 Google Sheets API 精确查重 `Product Status`，缺失时复制上一数据行的格式和下拉验证，再写入产品名、当天日期及两个 `Live`，最后回读验证。
 
 ## 商城后台登录兼容
 

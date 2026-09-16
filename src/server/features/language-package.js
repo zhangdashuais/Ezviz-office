@@ -9,6 +9,7 @@ const {
   parseLanguageDatasheet,
   readLanguagePackage,
   planLanguagePackageUpdates,
+  workbookContentFingerprintForGlobalRebase,
   writeUpdatedLanguagePackageNative
 } = require("./language-package-workbook");
 const {
@@ -112,6 +113,66 @@ function assertLanguagePackageMatchesHeader(fileInfo, languageHeader, site) {
   }
 }
 
+function chooseLanguageTemplateCandidate(actions, languageHeader) {
+  const expected = languageHeaderCode(languageHeader);
+  if (!expected) return null;
+  return actions.map((item, index) => {
+    const match = String(item?.href || "").match(/[?&]lang_code=([^&#]+)/i);
+    const langCode = match ? decodeURIComponent(match[1]) : "";
+    return { item, index, langCode };
+  }).find(({ item, langCode }) =>
+    /download\s+language\s+template/i.test(String(item?.text || ""))
+    && langCode.toLowerCase().split("-")[0] === expected
+  ) || null;
+}
+
+function globalFirst(targets) {
+  return [...targets].sort((left, right) =>
+    Number(right.site.siteCode === "hq") - Number(left.site.siteCode === "hq")
+  );
+}
+
+function buildGlobalPropagationProbe(parsedDatasheet, plan) {
+  const existingKeys = [...new Set(plan.updates.map((item) => item.key))];
+  const newKeys = [...new Set(plan.newFields.map((item) => item.key))];
+  const changedKeys = new Set([...existingKeys, ...newKeys]);
+  if (!changedKeys.size) return null;
+  return {
+    ...parsedDatasheet,
+    rows: parsedDatasheet.rows.filter((row) => changedKeys.has(row.key)),
+    existingKeys,
+    newKeys
+  };
+}
+
+function hasGlobalSourcePropagation(packageInfo, probeDatasheet, translationHeader) {
+  const comparableDatasheet = {
+    ...probeDatasheet,
+    rows: probeDatasheet.rows.map((row) => ({
+      ...row,
+      translations: { ...row.translations, [translationHeader]: row.source }
+    }))
+  };
+  const probe = planLanguagePackageUpdates(packageInfo, comparableDatasheet, translationHeader);
+  return probe.missing.length === 0 && probe.sourceMismatches.length === 0;
+}
+
+function approvedDatasheetSiteCodes(body, targets) {
+  if (body?.approvedSiteCodes == null || body.approvedSiteCodes === "") return null;
+  let requested = body.approvedSiteCodes;
+  if (typeof requested === "string") {
+    try { requested = JSON.parse(requested); }
+    catch { throw new Error("确认上传的站点列表格式不正确，请重新预览。"); }
+  }
+  if (!Array.isArray(requested)) throw new Error("确认上传的站点列表格式不正确，请重新预览。");
+  const allowed = new Set(targets.map((target) => target.site.siteCode));
+  const codes = requested.map((code) => String(code || "").trim());
+  if (new Set(codes).size !== codes.length || codes.some((code) => !allowed.has(code))) {
+    throw new Error("确认上传的站点列表与当前预览不一致，请重新预览。");
+  }
+  return new Set(codes);
+}
+
 function createLanguagePackageFeature(deps) {
   const {
     fs,
@@ -185,6 +246,7 @@ async function findLanguageRow(page, siteCode, languageHeader = "") {
     text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim(),
     ngClick: element.getAttribute("ng-click") || "",
     title: element.getAttribute("title") || "",
+    href: element.getAttribute("href") || "",
     langCode: (() => {
       try {
         const scope = window.angular?.element(element).scope();
@@ -237,6 +299,16 @@ async function findLanguageRow(page, siteCode, languageHeader = "") {
       langCode: selectedDownload?.langCode || "",
       downloadAction,
       editAction: globalActions.nth(editIndex)
+    };
+  }
+  const template = chooseLanguageTemplateCandidate(globalMetadata, languageHeader);
+  if (template) {
+    return {
+      row: null,
+      rowText: template.item.text,
+      langCode: template.langCode,
+      downloadAction: globalActions.nth(template.index),
+      editAction: null
     };
   }
   const diagnostics = await page.evaluate(() => [...document.querySelectorAll(
@@ -844,6 +916,7 @@ function summarizeDatasheetPlan(plan) {
     skippedBlankCount: plan.skippedBlankCount,
     missing: plan.missing,
     sourceMismatches: plan.sourceMismatches,
+    sourceChangedCellCount: plan.sourceChangedCellCount,
     updates: plan.updates.slice(0, 100).map((item) => ({
       key: item.key,
       sheetName: item.sheetName,
@@ -888,7 +961,8 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
   }
   const config = readCampaignConfig();
   const enabledSites = (config.sites || []).filter((site) => site.enabled !== false);
-  const targets = parseDatasheetTargets(body, enabledSites, parsedDatasheet);
+  const targets = globalFirst(parseDatasheetTargets(body, enabledSites, parsedDatasheet));
+  const approvedSites = submit ? approvedDatasheetSiteCodes(body, targets) : null;
   const fingerprints = expectedFingerprints(body);
   const skipMissingFields = /^(1|true|yes)$/i.test(String(body?.skipMissingFields || ""));
   const results = [];
@@ -898,6 +972,7 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
     new Date().toISOString().replace(/[:.]/g, "-")
   );
   if (submit) fs.mkdirSync(runDir, { recursive: true });
+  let globalPropagationRows = null;
 
   for (const target of targets) {
     let downloaded = null;
@@ -905,6 +980,15 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
     let uploaded = false;
     let originalFingerprint = "";
     try {
+      if (approvedSites && !approvedSites.has(target.site.siteCode)) {
+        results.push({
+          status: "skipped",
+          site: target.site,
+          languagePackageHeader: target.languagePackageHeader,
+          reason: "预览状态不是 ready，无需上传或预览失败，已跳过。"
+        });
+        continue;
+      }
       const session = await prepareLanguagePage({
         ...body,
         sites: JSON.stringify([target.site.siteCode])
@@ -915,7 +999,35 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         logs,
         target.languagePackageHeader
       );
-      const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+      let packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+      let automaticallyRebased = false;
+      if (submit && target.site.siteCode !== "hq" && globalPropagationRows) {
+        const maximumAttempts = 5;
+        for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+          if (hasGlobalSourcePropagation(
+            packageInfo,
+            globalPropagationRows,
+            target.languagePackageHeader
+          )) {
+            automaticallyRebased = true;
+            logLine(logs, `${target.site.name} 已检测到本批次 Global 英文原文同步，自动刷新预览基线。`);
+            break;
+          }
+          if (attempt === maximumAttempts) {
+            throw new Error("等待本批次 Global 英文原文同步超时，未上传本站点；请稍后重试。");
+          }
+          fs.rmSync(downloaded.filePath, { force: true });
+          downloaded = null;
+          await session.page.waitForTimeout(2000);
+          downloaded = await downloadCurrentLanguagePackageForPage(
+            session.page,
+            target.site,
+            logs,
+            target.languagePackageHeader
+          );
+          packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+        }
+      }
       originalFingerprint = packageInfo.contentFingerprint;
       let targetDatasheet = parsedDatasheet;
       let plan = planLanguagePackageUpdates(
@@ -938,29 +1050,39 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         plan.skippedMissingFields = skippedMissingFields;
       }
       const changed = plan.changedCellCount + plan.newFields.length;
+      const plannedGlobalProbe = target.site.siteCode === "hq"
+        ? buildGlobalPropagationProbe(parsedDatasheet, plan)
+        : null;
+      if (!submit && plannedGlobalProbe) globalPropagationRows = plannedGlobalProbe;
+      const comparisonFingerprint = target.site.siteCode !== "hq" && globalPropagationRows
+        ? workbookContentFingerprintForGlobalRebase(packageInfo, globalPropagationRows)
+        : packageInfo.contentFingerprint;
       if (!submit || !changed) {
         results.push({
           status: changed ? "ready" : "no-change",
           site: target.site,
-          fingerprint: packageInfo.contentFingerprint,
+          fingerprint: comparisonFingerprint,
           plan: summarizeDatasheetPlan(plan)
         });
         continue;
       }
-      if (fingerprints[target.site.siteCode] !== packageInfo.contentFingerprint) {
+      if (fingerprints[target.site.siteCode] !== comparisonFingerprint) {
         throw new Error("站点语言包已在预览后变化，请重新预览。");
       }
 
       const extension = path.extname(downloaded.fileName).toLowerCase() || ".xlsx";
       const originalPath = path.join(runDir, `${target.site.siteCode}-before${extension}`);
       const modifiedPath = path.join(runDir, `${target.site.siteCode}-after${extension}`);
+      const syncSource = target.site.siteCode === "hq"
+        && target.languagePackageHeader === ENGLISH_SOURCE_HEADER;
       fs.copyFileSync(downloaded.filePath, originalPath);
       const generated = writeUpdatedLanguagePackageNative(
         downloaded.filePath,
         packageInfo,
         targetDatasheet,
         plan,
-        modifiedPath
+        modifiedPath,
+        { syncSource }
       );
       await uploadLanguagePackageForPage(session.page, {
         ...generated,
@@ -980,7 +1102,8 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         targetDatasheet,
         target.languagePackageHeader
       );
-      if (verifiedPlan.changedCellCount || verifiedPlan.missing.length) {
+      if (verifiedPlan.changedCellCount || verifiedPlan.missing.length
+        || (syncSource && verifiedPlan.sourceChangedCellCount)) {
         throw new Error("上传后回读仍有未更新字段。");
       }
       results.push({
@@ -988,8 +1111,13 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         site: target.site,
         fingerprint: packageInfo.contentFingerprint,
         verifiedFingerprint: verifiedInfo.contentFingerprint,
-        plan: summarizeDatasheetPlan(plan)
+        plan: summarizeDatasheetPlan(plan),
+        sourceSynced: syncSource,
+        automaticallyRebased
       });
+      if (target.site.siteCode === "hq") {
+        globalPropagationRows = plannedGlobalProbe;
+      }
     } catch (error) {
       let rollback = null;
       if (submit && uploaded && downloaded?.filePath) {
@@ -1171,5 +1299,10 @@ module.exports = {
   chooseLanguageRowCandidate,
   languageRowScore,
   languageHeaderCode,
-  assertLanguagePackageMatchesHeader
+  assertLanguagePackageMatchesHeader,
+  chooseLanguageTemplateCandidate,
+  globalFirst,
+  approvedDatasheetSiteCodes,
+  buildGlobalPropagationProbe,
+  hasGlobalSourcePropagation
 };

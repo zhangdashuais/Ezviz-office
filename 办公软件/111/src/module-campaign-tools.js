@@ -27,6 +27,8 @@
     bannerSubmit: "bannerSubmitBtn",
     dtcOnline: "dtcOnlineInput",
     dtcOffline: "dtcOfflineInput",
+    dtcAssetRootPath: "dtcAssetRootPathInput",
+    dtcInspectAssets: "dtcInspectAssetsBtn",
     dtcBuildPlan: "dtcBuildPlanBtn",
     dtcSubmit: "dtcSubmitBtn",
     popupName: "popupNameInput",
@@ -461,37 +463,44 @@
     return formData;
   }
 
-  function dtcFormData() {
+  function dtcFormData(requireTimes = true) {
     const formData = new FormData();
     appendShopLogin(formData);
-    const onlineAt = normalizeDateTime((el.dtcOnline && el.dtcOnline.value) || el.bannerOnline.value || el.popupStart.value);
-    const offlineAt = normalizeDateTime((el.dtcOffline && el.dtcOffline.value) || el.bannerOffline.value || el.popupEnd.value);
+    const assetRootPath = (el.dtcAssetRootPath && el.dtcAssetRootPath.value || "").trim();
+    const onlineAt = normalizeDateTime(el.dtcOnline && el.dtcOnline.value);
+    const offlineAt = normalizeDateTime(el.dtcOffline && el.dtcOffline.value);
+    if (!assetRootPath) throw new Error("请填写 DTC 本地素材根路径。");
+    if (requireTimes && !onlineAt) throw new Error("请填写 DTC 统一上线时间。");
+    if (requireTimes && !offlineAt) throw new Error("请填写 DTC 统一下线时间。");
     formData.append("includeBanner", "1");
     formData.append("includePopup", "1");
-    formData.append("headline", el.bannerHeadline.value.trim());
-    formData.append("link", el.bannerLink.value.trim());
-    formData.append("slogan", el.bannerSlogan.value.trim());
-    formData.append("introduction", el.bannerIntro.value.trim());
-    formData.append("color", el.bannerColor.value);
-    formData.append("position", el.bannerPosition.value || "1");
+    formData.append("assetRootPath", assetRootPath);
     formData.append("onlineAtUtc", onlineAt);
     formData.append("offlineAtUtc", offlineAt);
-    formData.append("noMoreButton", el.bannerNoMoreButton.checked ? "1" : "0");
-    formData.append("openNewTab", el.bannerOpenNewTab.checked ? "1" : "0");
-    formData.append("publishAfterUpload", el.bannerPublish.checked ? "1" : "0");
-    formData.append("name", el.popupName.value.trim());
-    formData.append("brief", el.popupBrief.value.trim());
-    formData.append("whereToShow", el.popupWhere.value);
-    formData.append("frequency", el.popupFrequency.value);
     formData.append("startAt", onlineAt);
     formData.append("endAt", offlineAt);
-    formData.append("webUrl", el.popupWebUrl.value.trim());
-    formData.append("mobileUrl", el.popupMobileUrl.value.trim());
-    formData.append("enableAfterSubmit", el.popupEnable.checked ? "1" : "0");
-    appendFile(formData, "bannerPcImage", el.bannerPcImage);
-    appendFile(formData, "bannerMobileImage", el.bannerMobileImage);
-    appendFile(formData, "popupImage", el.popupImage);
     return formData;
+  }
+
+  async function inspectDtcAssets() {
+    el.dtcInspectAssets.disabled = true;
+    setStatus("正在读取 DTC 本地素材并检查国家目录、文件命名和大小...");
+    revealOutput();
+    try {
+      const payload = await postForm("/api/campaign/dtc-assets", dtcFormData(false));
+      writeOutput(payload.inspection);
+      const skipped = payload.inspection.skippedCount || 0;
+      setStatus(skipped
+        ? `DTC 素材检查完成：可执行 ${payload.inspection.readyCount || 0} 个国家，跳过 ${skipped} 个，请查看原因。`
+        : "DTC 素材检查通过：5 个国家均可执行。", skipped ? "warn" : "ok");
+      revealOutput();
+    } catch (error) {
+      setStatus("DTC 素材读取失败：" + (error.message || error), "warn");
+      writeOutput("DTC 素材读取失败：\n" + (error.message || error));
+      revealOutput();
+    } finally {
+      el.dtcInspectAssets.disabled = false;
+    }
   }
 
   function wtbFormData() {
@@ -610,13 +619,17 @@
   async function submitDtc() {
     el.dtcSubmit.disabled = true;
     setStatus("正在执行 DTC 德法西意荷 Banner + Popup 后台配置。真实浏览器会打开，请不要关闭...");
-    writeOutput("DTC 后台配置执行中：固定 DE/FR/ES/IT/NL，Banner Model 自动按语种写入，Banner 与 Popup 使用同一组上下线时间。");
+    writeOutput("DTC 后台配置执行中：固定 DE/FR/ES/IT/NL；自动写入空白标题、Model、Hot Sale 站点链接和 UTM；Banner 隐藏 More、新窗口打开并直接发布，Popup 创建后直接启用。");
     revealOutput();
     try {
       const payload = await postForm("/api/campaign/dtc-submit", dtcFormData());
       writeOutput(payload);
-      const failed = ((payload.result || {}).results || []).filter((item) => item.status !== "completed").length;
-      setStatus(failed ? "DTC 执行完成，但失败 " + failed + " 个站点，请看结果。" : "DTC Banner + Popup 后台配置完成。", failed ? "warn" : "ok");
+      const results = ((payload.result || {}).results || []);
+      const failed = results.filter((item) => item.status === "failed").length;
+      const skipped = results.filter((item) => item.status === "skipped").length;
+      setStatus(failed || skipped
+        ? `DTC 执行完成：失败 ${failed} 个，素材问题跳过 ${skipped} 个，请看结果。`
+        : "DTC Banner + Popup 后台配置完成。", failed || skipped ? "warn" : "ok");
       revealOutput();
     } catch (error) {
       setStatus("DTC 后台配置失败：" + (error.message || error), "warn");
@@ -834,6 +847,7 @@
   });
   el.bannerBuildPlan.addEventListener("click", buildBannerPlan);
   el.bannerSubmit.addEventListener("click", submitBanner);
+  el.dtcInspectAssets.addEventListener("click", inspectDtcAssets);
   el.dtcBuildPlan.addEventListener("click", buildDtcPlan);
   el.dtcSubmit.addEventListener("click", submitDtc);
   el.popupBuildPlan.addEventListener("click", buildPopupPlan);

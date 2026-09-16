@@ -112,11 +112,18 @@ function findLanguagePackageSections(workbook, langCode) {
         }
       }
       if (keyColumn >= 0 && sourceColumn >= 0 && targetColumn >= 0) {
+        let lastDataRow = range.e.r;
+        while (lastDataRow > row) {
+          const key = normalize(cellValue(sheet, lastDataRow, keyColumn));
+          const source = normalize(cellValue(sheet, lastDataRow, sourceColumn));
+          if (key || source) break;
+          lastDataRow -= 1;
+        }
         sections.push({
           sheetName,
           headerRow: row,
           firstDataRow: row + 1,
-          lastDataRow: range.e.r,
+          lastDataRow,
           keyColumn,
           sourceColumn,
           targetColumn,
@@ -145,6 +152,45 @@ function workbookContentFingerprint(workbook) {
         return [address, cell.t || "", cell.v ?? "", cell.f || ""];
       });
     return [sheetName, sheet["!ref"] || "", cells];
+  });
+  return hashBuffer(Buffer.from(JSON.stringify(content), "utf8"));
+}
+
+function workbookContentFingerprintForGlobalRebase(packageInfo, propagationProbe) {
+  const existingKeys = new Set(propagationProbe?.existingKeys || []);
+  const newKeys = new Set(propagationProbe?.newKeys || []);
+  const omittedCells = new Map();
+  const omittedRows = new Map();
+  packageInfo.sections.forEach((section) => {
+    const sheet = packageInfo.workbook.Sheets[section.sheetName];
+    for (let row = section.firstDataRow; row <= section.lastDataRow; row += 1) {
+      const key = normalize(cellValue(sheet, row, section.keyColumn));
+      if (existingKeys.has(key)) {
+        const cells = omittedCells.get(section.sheetName) || new Set();
+        cells.add(XLSX.utils.encode_cell({ r: row, c: section.sourceColumn }));
+        omittedCells.set(section.sheetName, cells);
+      }
+      if (newKeys.has(key)) {
+        const rows = omittedRows.get(section.sheetName) || new Set();
+        rows.add(row);
+        omittedRows.set(section.sheetName, rows);
+      }
+    }
+  });
+  const content = packageInfo.workbook.SheetNames.map((sheetName) => {
+    const sheet = packageInfo.workbook.Sheets[sheetName] || {};
+    const ignoredCells = omittedCells.get(sheetName) || new Set();
+    const ignoredRows = omittedRows.get(sheetName) || new Set();
+    const cells = Object.keys(sheet)
+      .filter((address) => !address.startsWith("!"))
+      .filter((address) => !ignoredCells.has(address))
+      .filter((address) => !ignoredRows.has(XLSX.utils.decode_cell(address).r))
+      .sort()
+      .map((address) => {
+        const cell = sheet[address] || {};
+        return [address, cell.t || "", cell.v ?? "", cell.f || ""];
+      });
+    return [sheetName, newKeys.size ? "" : (sheet["!ref"] || ""), cells];
   });
   return hashBuffer(Buffer.from(JSON.stringify(content), "utf8"));
 }
@@ -191,6 +237,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
         sheetName: section.sheetName,
         row,
         rowNumber: row + 1,
+        sourceColumn: section.sourceColumn,
         targetColumn: section.targetColumn,
         source: normalize(cellValue(sheet, row, section.sourceColumn)),
         current: String(cellValue(sheet, row, section.targetColumn) ?? "")
@@ -203,6 +250,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
   const missing = [];
   const newFields = [];
   const sourceMismatches = [];
+  const sourceUpdates = [];
   const inputWarnings = [];
   const skippedBlank = [];
   const unchanged = [];
@@ -287,6 +335,10 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
       });
     }
     candidates.forEach((candidate) => {
+      if (normalizeSourceForComparison(candidate.source)
+        !== normalizeSourceForComparison(entry.source)) {
+        sourceUpdates.push({ ...candidate, key: entry.key, source: entry.source });
+      }
       const item = { ...candidate, key: entry.key, translation };
       if (normalizeTranslationForComparison(candidate.current)
         === normalizeTranslationForComparison(translation)) unchanged.push(item);
@@ -307,6 +359,8 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
     missing,
     newFields,
     sourceMismatches,
+    sourceChangedCellCount: sourceUpdates.length,
+    sourceUpdates,
     inputWarnings,
     skippedBlank,
     updates
@@ -437,16 +491,26 @@ function writeUpdatedLanguagePackageNative(
   packageInfo,
   parsedDatasheet,
   plan,
-  outputPath
+  outputPath,
+  options = {}
 ) {
   assertSafePlan(plan);
+  const syncSource = options.syncSource === true;
   const instructions = {
-    updates: plan.updates.map((update) => ({
-      sheetName: update.sheetName,
-      rowNumber: update.row + 1,
-      columnNumber: update.targetColumn + 1,
-      value: update.translation
-    })),
+    updates: [
+      ...plan.updates.map((update) => ({
+        sheetName: update.sheetName,
+        rowNumber: update.row + 1,
+        columnNumber: update.targetColumn + 1,
+        value: update.translation
+      })),
+      ...(syncSource ? plan.sourceUpdates.map((update) => ({
+        sheetName: update.sheetName,
+        rowNumber: update.row + 1,
+        columnNumber: update.sourceColumn + 1,
+        value: update.source
+      })) : [])
+    ],
     appends: [selectAppendSection(packageInfo, plan)].flatMap((section) =>
       plan.newFields.map((field, index) => ({
         sheetName: section.sheetName,
@@ -487,7 +551,8 @@ function writeUpdatedLanguagePackageNative(
     parsedDatasheet,
     plan.translationHeader
   );
-  if (verificationPlan.changedCellCount || verificationPlan.missing.length) {
+  if (verificationPlan.changedCellCount || verificationPlan.missing.length
+    || (syncSource && verificationPlan.sourceChangedCellCount)) {
     throw new Error("语言包经 Excel 保存后回读不一致。");
   }
   return {
@@ -495,7 +560,7 @@ function writeUpdatedLanguagePackageNative(
     fileName: path.basename(outputPath),
     size: fs.statSync(outputPath).size,
     sha256: verified.fingerprint,
-    verifiedCellCount: plan.updates.length + instructions.appends.length,
+    verifiedCellCount: instructions.updates.length + instructions.appends.length,
     appendedFieldCount: instructions.appends.length
   };
 }
@@ -508,6 +573,7 @@ module.exports = {
   normalizeSourceForComparison,
   normalizeTranslationForComparison,
   workbookContentFingerprint,
+  workbookContentFingerprintForGlobalRebase,
   readLanguagePackage,
   planLanguagePackageUpdates,
   assertSafePlan,
