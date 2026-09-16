@@ -769,10 +769,21 @@
           <h3>Banner 数据</h3>
           <div class="sub-card">
             <h4>DTC 德法西意荷专用</h4>
-            <p class="desc">固定站点：德国、法国、西班牙、意大利、荷兰。只需填写本地素材根路径和统一上线/下线时间。Banner 标题固定为空白占位，Model 自动写入：DE Angebote / FR Promotion / ES Venta Especial / IT Offerte top / NL Mega deal；链接固定为各站点 <code>/store/topic/hot-sale</code> 并自动添加 UTM。默认隐藏 More、新窗口打开、直接发布，同时创建并启用 Popup。</p>
+            <p class="desc">固定站点：德国、法国、西班牙、意大利、荷兰。只需填写本地素材根路径和统一上线/下线时间，并选择投放类型。Banner 标题固定为空白占位，Model 自动写入：DE Angebote / FR Promotion / ES Venta Especial / IT Offerte top / NL Mega deal；链接固定为各站点 <code>/store/topic/hot-sale</code> 并自动添加 UTM。Banner 默认隐藏 More、新窗口打开并直接发布；Popup 创建后直接启用。</p>
             <div class="form-grid">
               <label>DTC 本地素材根路径</label>
               <input id="dtcAssetRootPathInput" type="text" placeholder="例如 D:\DTC\2026-09；内含 de/fr/es/it/nl 国家目录" required>
+              <label>DTC 投放类型</label>
+              <select id="dtcPlacementModeSelect">
+                <option value="both" selected>Banner + Popup</option>
+                <option value="banner">仅 Banner</option>
+                <option value="popup">仅 Popup</option>
+              </select>
+              <label>DTC Banner 字体颜色</label>
+              <select id="dtcBannerColorSelect">
+                <option value="White" selected>White</option>
+                <option value="Black">Black</option>
+              </select>
               <label>DTC 统一上线时间</label>
               <input id="dtcOnlineInput" type="datetime-local" required>
               <label>DTC 统一下线时间</label>

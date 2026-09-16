@@ -43,12 +43,15 @@ test("DTC plan fixes sites, shared times, and localized banner model", () => {
     headline: "must be ignored",
     link: "https://example.com/must-be-ignored",
     onlineAtUtc: "2026-09-01 00:00:00",
-    offlineAtUtc: "2026-09-10 23:59:59"
+    offlineAtUtc: "2026-09-10 23:59:59",
+    bannerColor: "Black"
   }, {});
 
   assert.deepEqual(bannerBodies.map((body) => JSON.parse(body.sites)[0]), DTC_SITE_CODES);
   assert.deepEqual(popupBodies.map((body) => JSON.parse(body.sites)[0]), DTC_SITE_CODES);
   assert.ok(bannerBodies.every((body) => body.headline === DTC_HEADLINE));
+  assert.ok(bannerBodies.every((body) => body.color === "Black"));
+  assert.ok(bannerBodies.every((body) => body.useUiBannerFlow === true));
   assert.deepEqual(bannerBodies.map((body) => body.link), DTC_SITE_CODES.map((site) => DTC_LINK_BY_SITE[site]));
   assert.ok(bannerBodies.every((body) => body.noMoreButton && body.openNewTab && body.publishAfterUpload));
   assert.deepEqual(popupBodies.map((body) => body.name), DTC_SITE_CODES.map((site) => DTC_MODEL_BY_SITE[site]));
@@ -57,6 +60,56 @@ test("DTC plan fixes sites, shared times, and localized banner model", () => {
   assert.deepEqual(plan.banner.items.map((item) => item.fields.model), DTC_SITE_CODES.map((site) => DTC_MODEL_BY_SITE[site]));
   assert.ok(plan.popup.items.every((item) => item.fields.startAt === "2026-09-01 00:00:00"));
   assert.ok(plan.popup.items.every((item) => item.fields.endAt === "2026-09-10 23:59:59"));
+});
+
+test("DTC submit can run banners without touching popup", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dtc-banner-only-"));
+  DTC_SITE_CODES.forEach((siteCode) => makeSiteAssets(root, siteCode));
+  let bannerCount = 0;
+  let popupCount = 0;
+  const dtc = createDtcCampaign({
+    buildBannerPlan: () => ({ items: [] }),
+    buildPopupPlan: () => ({ items: [] }),
+    banner: { submit: async () => { bannerCount += 1; return {}; } },
+    popup: { submit: async () => { popupCount += 1; return {}; } },
+    logLine: () => {}
+  });
+
+  await dtc.submit({
+    assetRootPath: root,
+    onlineAtUtc: "2026-09-18 06:23:00",
+    offlineAtUtc: "2026-09-29 05:23:00",
+    includeBanner: true,
+    includePopup: false
+  }, {}, []);
+
+  assert.equal(bannerCount, DTC_SITE_CODES.length);
+  assert.equal(popupCount, 0);
+});
+
+test("DTC submit can run popup without touching banners", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dtc-popup-only-"));
+  DTC_SITE_CODES.forEach((siteCode) => makeSiteAssets(root, siteCode));
+  let bannerCount = 0;
+  let popupCount = 0;
+  const dtc = createDtcCampaign({
+    buildBannerPlan: () => ({ items: [] }),
+    buildPopupPlan: () => ({ items: [] }),
+    banner: { submit: async () => { bannerCount += 1; return {}; } },
+    popup: { submit: async () => { popupCount += 1; return {}; } },
+    logLine: () => {}
+  });
+
+  await dtc.submit({
+    assetRootPath: root,
+    onlineAtUtc: "2026-09-18 06:23:00",
+    offlineAtUtc: "2026-09-29 05:23:00",
+    includeBanner: false,
+    includePopup: true
+  }, {}, []);
+
+  assert.equal(bannerCount, 0);
+  assert.equal(popupCount, DTC_SITE_CODES.length);
 });
 
 test("DTC local assets are grouped by country and oversized countries are skipped", () => {

@@ -61,7 +61,7 @@ const popupUrl = resolveShopNavigationUrl("popup", { preferAutomationUrl: true }
 
 TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife.com/tdk/index`。Popup 自动化目前使用 `new-shop.ezvizlife.com/popup/index`，与旧侧栏路由 `/config/popup` 并存。Banner 不使用新版 Custom Page 入口；Homepage 管理固定直接访问 `https://shop.ezvizlife.com/pages/index`。
 
-DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/下线时间。它不读取普通 Banner/Popup 表单：标题固定为空白占位，Model 使用五国固定文案，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 并分别添加 Banner/Popup UTM；Banner 默认隐藏 More、新窗口打开、直接发布，Popup 默认全站每日一次并直接启用。根目录下按 `de/fr/es/it/nl`（亦支持国家英文名、本地名和中文名）分类；文件名或子目录名用 `banner-pc`、`banner-mobile`、`popup` 标识用途。`POST /api/campaign/dtc-assets` 只读预检目录；单文件超过 10 MB、必需素材缺失或同一用途匹配多个文件时，该国家会被跳过并返回原因，不影响其他国家继续执行。
+DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/下线时间，并可在界面选择“Banner + Popup”“仅 Banner”或“仅 Popup”；选择 Banner 时还可指定 White / Black 字体颜色。它不读取普通 Banner/Popup 表单：标题固定为空白占位，Model 使用五国固定文案，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 并分别添加 Banner/Popup UTM；Banner 通过后台当前 WebUploader 上传，默认隐藏 More、新窗口打开、直接发布，Popup 默认全站每日一次并直接启用。接口可用 `includeBanner=false` 或 `includePopup=false` 只执行另一类资源，并用 `bannerColor=White|Black` 选择颜色。根目录下按 `de/fr/es/it/nl`（亦支持国家英文名、本地名和中文名）分类；文件名或子目录名用 `banner-pc`、`banner-mobile`、`popup` 标识用途。`POST /api/campaign/dtc-assets` 只读预检目录；单文件超过 10 MB、必需素材缺失或同一用途匹配多个文件时，该国家会被跳过并返回原因，不影响其他国家继续执行。
 
 ## 添加产品特殊入口
 

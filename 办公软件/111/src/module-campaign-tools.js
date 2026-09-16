@@ -28,6 +28,8 @@
     dtcOnline: "dtcOnlineInput",
     dtcOffline: "dtcOfflineInput",
     dtcAssetRootPath: "dtcAssetRootPathInput",
+    dtcPlacementMode: "dtcPlacementModeSelect",
+    dtcBannerColor: "dtcBannerColorSelect",
     dtcInspectAssets: "dtcInspectAssetsBtn",
     dtcBuildPlan: "dtcBuildPlanBtn",
     dtcSubmit: "dtcSubmitBtn",
@@ -466,20 +468,38 @@
   function dtcFormData(requireTimes = true) {
     const formData = new FormData();
     appendShopLogin(formData);
+    const placementMode = el.dtcPlacementMode.value;
+    const includeBanner = placementMode !== "popup";
+    const includePopup = placementMode !== "banner";
     const assetRootPath = (el.dtcAssetRootPath && el.dtcAssetRootPath.value || "").trim();
     const onlineAt = normalizeDateTime(el.dtcOnline && el.dtcOnline.value);
     const offlineAt = normalizeDateTime(el.dtcOffline && el.dtcOffline.value);
     if (!assetRootPath) throw new Error("请填写 DTC 本地素材根路径。");
     if (requireTimes && !onlineAt) throw new Error("请填写 DTC 统一上线时间。");
     if (requireTimes && !offlineAt) throw new Error("请填写 DTC 统一下线时间。");
-    formData.append("includeBanner", "1");
-    formData.append("includePopup", "1");
+    formData.append("includeBanner", includeBanner ? "1" : "0");
+    formData.append("includePopup", includePopup ? "1" : "0");
+    formData.append("bannerColor", el.dtcBannerColor.value);
     formData.append("assetRootPath", assetRootPath);
     formData.append("onlineAtUtc", onlineAt);
     formData.append("offlineAtUtc", offlineAt);
     formData.append("startAt", onlineAt);
     formData.append("endAt", offlineAt);
     return formData;
+  }
+
+  function dtcPlacementLabel() {
+    return {
+      both: "Banner + Popup",
+      banner: "仅 Banner",
+      popup: "仅 Popup"
+    }[el.dtcPlacementMode.value] || "Banner + Popup";
+  }
+
+  function syncDtcControls() {
+    const label = dtcPlacementLabel();
+    el.dtcBannerColor.disabled = el.dtcPlacementMode.value === "popup";
+    el.dtcSubmit.textContent = "执行 DTC " + label;
   }
 
   async function inspectDtcAssets() {
@@ -601,7 +621,7 @@
 
   async function buildDtcPlan() {
     el.dtcBuildPlan.disabled = true;
-    setStatus("正在生成 DTC 德法西意荷 Banner + Popup 清单，不会提交后台...");
+    setStatus(`正在生成 DTC 德法西意荷 ${dtcPlacementLabel()} 清单，不会提交后台...`);
     revealOutput();
     try {
       const payload = await postForm("/api/campaign/dtc-plan", dtcFormData());
@@ -618,8 +638,9 @@
 
   async function submitDtc() {
     el.dtcSubmit.disabled = true;
-    setStatus("正在执行 DTC 德法西意荷 Banner + Popup 后台配置。真实浏览器会打开，请不要关闭...");
-    writeOutput("DTC 后台配置执行中：固定 DE/FR/ES/IT/NL；自动写入空白标题、Model、Hot Sale 站点链接和 UTM；Banner 隐藏 More、新窗口打开并直接发布，Popup 创建后直接启用。");
+    const placementLabel = dtcPlacementLabel();
+    setStatus(`正在执行 DTC 德法西意荷 ${placementLabel} 后台配置。真实浏览器会打开，请不要关闭...`);
+    writeOutput(`DTC ${placementLabel} 后台配置执行中：固定 DE/FR/ES/IT/NL；自动写入空白标题、Model、Hot Sale 站点链接和 UTM；Banner 隐藏 More、新窗口打开并直接发布，Popup 创建后直接启用。`);
     revealOutput();
     try {
       const payload = await postForm("/api/campaign/dtc-submit", dtcFormData());
@@ -629,7 +650,7 @@
       const skipped = results.filter((item) => item.status === "skipped").length;
       setStatus(failed || skipped
         ? `DTC 执行完成：失败 ${failed} 个，素材问题跳过 ${skipped} 个，请看结果。`
-        : "DTC Banner + Popup 后台配置完成。", failed || skipped ? "warn" : "ok");
+        : `DTC ${placementLabel} 后台配置完成。`, failed || skipped ? "warn" : "ok");
       revealOutput();
     } catch (error) {
       setStatus("DTC 后台配置失败：" + (error.message || error), "warn");
@@ -850,6 +871,8 @@
   el.dtcInspectAssets.addEventListener("click", inspectDtcAssets);
   el.dtcBuildPlan.addEventListener("click", buildDtcPlan);
   el.dtcSubmit.addEventListener("click", submitDtc);
+  el.dtcPlacementMode.addEventListener("change", syncDtcControls);
+  syncDtcControls();
   el.popupBuildPlan.addEventListener("click", buildPopupPlan);
   el.popupSubmit.addEventListener("click", submitPopup);
   el.wtbBuildPlan.addEventListener("click", buildWtbPlan);

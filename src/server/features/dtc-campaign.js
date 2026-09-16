@@ -136,6 +136,7 @@ function multerFilesFromInspection(site) {
 
 function createDtcCampaign({ buildBannerPlan, buildPopupPlan, banner, popup, logLine }) {
   const boolOn = (value) => value !== false && value !== "0" && value !== "false";
+  const bannerColor = (value) => String(value || "").trim().toLowerCase() === "black" ? "Black" : "White";
   const siteBody = (body, siteCode) => ({ ...(body || {}), sites: JSON.stringify([siteCode]) });
   const bannerBody = (body, siteCode) => ({
     ...siteBody(body, siteCode),
@@ -144,10 +145,11 @@ function createDtcCampaign({ buildBannerPlan, buildPopupPlan, banner, popup, log
     slogan: "",
     model: DTC_MODEL_BY_SITE[siteCode],
     introduction: "",
-    color: "White",
+    color: bannerColor(body.bannerColor),
     noMoreButton: true,
     openNewTab: true,
     publishAfterUpload: true,
+    useUiBannerFlow: true,
     onlineAtUtc: body.onlineAtUtc || body.onlineAt || body.startAt,
     offlineAtUtc: body.offlineAtUtc || body.offlineAt || body.endAt
   });
@@ -195,8 +197,8 @@ function createDtcCampaign({ buildBannerPlan, buildPopupPlan, banner, popup, log
 
   function buildPlan(body, files) {
     validateInput(body);
-    const includeBanner = true;
-    const includePopup = true;
+    const includeBanner = boolOn(body?.includeBanner);
+    const includePopup = boolOn(body?.includePopup);
     const inputs = siteInputs(body, files);
     const readyInputs = inputs.filter((site) => site.status === "ready");
     const bannerPlans = includeBanner ? readyInputs.map((site) => buildBannerPlan(bannerBody(body, site.siteCode), bannerFiles(site.files))) : [];
@@ -214,6 +216,8 @@ function createDtcCampaign({ buildBannerPlan, buildPopupPlan, banner, popup, log
 
   async function submit(body, files, logs = []) {
     validateInput(body);
+    const includeBanner = boolOn(body?.includeBanner);
+    const includePopup = boolOn(body?.includePopup);
     const results = [];
     const inputs = siteInputs(body, files);
     for (const input of inputs) {
@@ -226,7 +230,7 @@ function createDtcCampaign({ buildBannerPlan, buildPopupPlan, banner, popup, log
         results.push(item);
         continue;
       }
-      {
+      if (includeBanner) {
         try {
           item.banner = await banner.submit(bannerBody(body, siteCode), bannerFiles(input.files), logs);
         } catch (error) {
@@ -234,7 +238,7 @@ function createDtcCampaign({ buildBannerPlan, buildPopupPlan, banner, popup, log
           logLine(logs, `DTC ${siteCode} Banner 失败：${item.bannerError}`);
         }
       }
-      {
+      if (includePopup) {
         try {
           item.popup = await popup.submit(popupBody(body, siteCode), popupFiles(input.files), logs);
         } catch (error) {

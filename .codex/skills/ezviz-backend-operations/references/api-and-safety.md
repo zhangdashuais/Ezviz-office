@@ -22,8 +22,8 @@
 | POST | `/api/campaign/popup-plan` | 只生成清单 |
 | POST | `/api/campaign/popup-submit` | 写后台，可能启用 |
 | POST | `/api/campaign/dtc-assets` | 只读检查 DTC 本地素材目录，不上传、不写后台 |
-| POST | `/api/campaign/dtc-plan` | 只生成 DTC 德法西意荷 Banner + Popup 清单 |
-| POST | `/api/campaign/dtc-submit` | 写后台，固定提交 DTC 德法西意荷 Banner + Popup |
+| POST | `/api/campaign/dtc-plan` | 只生成 DTC 德法西意荷选定投放类型的清单 |
+| POST | `/api/campaign/dtc-submit` | 写后台，固定处理 DTC 德法西意荷；可用 `includeBanner` / `includePopup` 单独执行，并用 `bannerColor` 选择 Banner 字体颜色 |
 | POST | `/api/campaign/popup-delete-existing` | 单站点恰好存在一条 Popup 时删除并回读确认 |
 | POST | `/api/campaign/first-link` | 读取首个 Banner/Popup 链接 |
 | POST | `/api/campaign/audit` | 同步巡查 |
@@ -50,7 +50,7 @@ utm_campaign=web_{siteCode}_popup
 
 外部链接不自动添加 UTM。坏链只报告，不自动替换。
 
-DTC 专用入口固定站点为 `de/fr/es/it/nl`，不读取页面勾选站点和普通 Banner/Popup 表单。请求只需 `assetRootPath`、`onlineAtUtc`、`offlineAtUtc`；三项均为必填。Banner 标题固定为 `&nbsp;`，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 后再添加 Banner UTM，`model` 映射为：`de=Angebote`、`fr=Promotion`、`es=Venta Especial`、`it=Offerte top`、`nl=Mega deal`；固定隐藏 More、新窗口打开并直接发布。Popup Name 使用对应 Model，Brief 为空，Web/Mobile 链接使用同一 Hot Sale 地址并添加 Popup UTM，展示范围为全站、频率为每日一次，创建后直接启用。素材根目录按国家代码、英文名、本地名或中文名分类，素材名或子目录名需包含 `banner-pc`、`banner-mobile`、`popup`。Mobile 缺失时回退 PC 图。单文件默认上限 10 MB，缺失、重复匹配或超限会跳过对应国家并返回原因，其他国家继续。先运行 `/api/campaign/dtc-assets` 或 `/api/campaign/dtc-plan`，确认清单后再运行 `/api/campaign/dtc-submit`。
+DTC 专用入口固定站点为 `de/fr/es/it/nl`，不读取页面勾选站点和普通 Banner/Popup 表单。请求只需 `assetRootPath`、`onlineAtUtc`、`offlineAtUtc`；三项均为必填。`includeBanner=false` 或 `includePopup=false` 可只执行另一类资源，默认两类都执行；`bannerColor` 支持 `White`（默认）或 `Black`。Banner 使用后台当前 WebUploader 上传，标题固定为 `&nbsp;`，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 后再添加 Banner UTM，`model` 映射为：`de=Angebote`、`fr=Promotion`、`es=Venta Especial`、`it=Offerte top`、`nl=Mega deal`；固定隐藏 More、新窗口打开并直接发布。Popup Name 使用对应 Model，Brief 为空，Web/Mobile 链接使用同一 Hot Sale 地址并添加 Popup UTM，展示范围为全站、频率为每日一次，创建后直接启用。素材根目录按国家代码、英文名、本地名或中文名分类，素材名或子目录名需包含 `banner-pc`、`banner-mobile`、`popup`。Mobile 缺失时回退 PC 图。单文件默认上限 10 MB，缺失、重复匹配或超限会跳过对应国家并返回原因，其他国家继续。先运行 `/api/campaign/dtc-assets` 或 `/api/campaign/dtc-plan`，确认清单后再运行 `/api/campaign/dtc-submit`。
 
 ## TDK
 
