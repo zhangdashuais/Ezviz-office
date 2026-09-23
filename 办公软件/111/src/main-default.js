@@ -552,12 +552,15 @@
 
         allScripts.forEach((node) => node.remove());
 
+        const rawStyleContent = cssBlocks.join("\n\n");
+        if (!window.EzvizInlineOutput?.normalizeNumberedClasses) {
+          throw new Error("Inline class normalization module is not loaded.");
+        }
+        const normalized = window.EzvizInlineOutput.normalizeNumberedClasses(doc.body.innerHTML.trim(), rawStyleContent);
         const includeHead = !!includeHeadCheckbox?.checked;
         const stylesheetLink = '<link rel="stylesheet" href="__EZVIZ_REMOTE_CSS__">';
-        const bodyInner = `<div class="page page-webflow">${includeHead ? "" : stylesheetLink + "\n"}${doc.body.innerHTML.trim()}`;
-
-        const rawStyleContent = cssBlocks.join("\n\n");
-        const cssStats = sanitizeGeneratedCss(rawStyleContent);
+        const bodyInner = `<div class="page page-webflow">${includeHead ? "" : stylesheetLink + "\n"}${normalized.html}`;
+        const cssStats = sanitizeGeneratedCss(normalized.css);
         if (!window.EzvizCssScope?.scopeCss) {
           throw new Error("CSS scope module is not loaded.");
         }

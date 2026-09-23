@@ -1,9 +1,12 @@
 const fs = require("fs");
+const crypto = require("crypto");
 const dns = require("dns").promises;
 const net = require("net");
 const path = require("path");
 
 const MAX_REMOTE_IMAGE_BYTES = 25 * 1024 * 1024;
+const WEBFLOW_UPLOAD_BUNDLE_URL = "http://h5-v2.ezviz-mall.com:8800/static/js/module/home.3bbb70eae65b09cf092c.js";
+let webflowUploadSecret;
 const IMAGE_MIME_TO_EXT = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -21,6 +24,25 @@ function normalizeUploadedUrl(payload) {
     : payload.full_url;
 }
 
+async function getWebflowUploadSecret() {
+  if (process.env.FS_UPLOAD_SECRET) return process.env.FS_UPLOAD_SECRET;
+  if (webflowUploadSecret) return webflowUploadSecret;
+
+  const response = await fetch(WEBFLOW_UPLOAD_BUNDLE_URL, { signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new Error(`无法读取 Webflow 上传配置：HTTP ${response.status}`);
+  const source = await response.text();
+  const match = source.match(/const r=n\(456\),i="mall",a="([^"]+)";function s\(e\)/);
+  if (!match) throw new Error("无法读取 Webflow 上传配置。");
+  webflowUploadSecret = match[1];
+  return webflowUploadSecret;
+}
+
+function createWebflowUploadToken(fileName, secret, now = Date.now()) {
+  const time = String(Math.floor(now / 1000)).slice(-5);
+  const input = `mall${secret}${time}${fileName}`;
+  return crypto.createHash("md5").update(input, "utf8").digest("hex") + time + fileName;
+}
+
 async function uploadBufferToFs(target, buffer, file) {
   const ext = String(file.originalname || file.filename || "").split(".").pop().toLowerCase();
   const mime = file.mimetype || ({
@@ -29,17 +51,14 @@ async function uploadBufferToFs(target, buffer, file) {
     png: "image/png",
     webp: "image/webp"
   }[ext] || "application/octet-stream");
-  const isStaticAsset = ext === "css" || ext === "js";
-  const dataCandidates = isStaticAsset
-    ? [{ app: "mall", flag: "static", is_org_name: "0", _debug: "1" }]
-    : [
-        { app: "mall", flag: "static", is_org_name: "0", _debug: "1" },
-        { app: "mall", flag: "op_image", quality: "90", _debug: "1" },
-        { app: "mall", flag: "op_image", quality: "100", adapt: "1" },
-        { app: "mall", mall: "1", flag: "1", cover: "1", quality: "100", adapt: "1" },
-        { app: "mall", quality: "100", adapt: "1" },
-        {}
-      ];
+  const secret = await getWebflowUploadSecret();
+  const dataCandidates = [{
+    app: "mall",
+    appid: "mall",
+    flag: "static",
+    is_org_name: "0",
+    token: createWebflowUploadToken(file.originalname, secret)
+  }];
 
   let lastText = "";
   for (const data of dataCandidates) {
@@ -188,6 +207,7 @@ module.exports = {
   registerAssetUploadRoutes,
   uploadToFs,
   uploadUrlToFs,
+  createWebflowUploadToken,
   validateRemoteImageUrl,
   isPrivateAddress
 };

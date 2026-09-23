@@ -1,6 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { isPrivateAddress, validateRemoteImageUrl } = require("./asset-upload-routes");
+const { createWebflowUploadToken, isPrivateAddress, validateRemoteImageUrl } = require("./asset-upload-routes");
+
+test("Webflow upload token keeps the filename outside the digest", () => {
+  const token = createWebflowUploadToken("asset.png", "secret", 1_700_000_000_000);
+  assert.match(token, /^[a-f0-9]{32}\d{5}asset\.png$/);
+});
 
 test("remote album image URL validation blocks unsafe network targets", () => {
   assert.equal(validateRemoteImageUrl("https://cdn.example.com/image?id=1").hostname, "cdn.example.com");
