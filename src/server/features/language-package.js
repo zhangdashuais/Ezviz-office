@@ -173,6 +173,31 @@ function approvedDatasheetSiteCodes(body, targets) {
   return new Set(codes);
 }
 
+async function waitForLanguagePackageReadback({
+  download,
+  inspect,
+  isComplete,
+  cleanup,
+  pause,
+  onRetry,
+  maxAttempts = 6
+}) {
+  let downloaded = null;
+  let inspection = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    downloaded = await download();
+    inspection = inspect(downloaded);
+    if (isComplete(inspection)) return { downloaded, inspection, attempts: attempt };
+    if (attempt < maxAttempts) {
+      cleanup(downloaded);
+      downloaded = null;
+      onRetry?.(attempt);
+      await pause();
+    }
+  }
+  return { downloaded, inspection, attempts: maxAttempts };
+}
+
 function createLanguagePackageFeature(deps) {
   const {
     fs,
@@ -1090,18 +1115,37 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         langCode: downloaded.langCode
       }, logs);
       uploaded = true;
-      verification = await downloadCurrentLanguagePackageForPage(
-        session.page,
-        target.site,
-        logs,
-        target.languagePackageHeader
-      );
-      const verifiedInfo = readLanguagePackage(verification.filePath, verification.langCode);
-      const verifiedPlan = planLanguagePackageUpdates(
-        verifiedInfo,
-        targetDatasheet,
-        target.languagePackageHeader
-      );
+      const readback = await waitForLanguagePackageReadback({
+        download: () => downloadCurrentLanguagePackageForPage(
+          session.page,
+          target.site,
+          logs,
+          target.languagePackageHeader
+        ),
+        inspect: (file) => {
+          const info = readLanguagePackage(file.filePath, file.langCode);
+          return {
+            info,
+            plan: planLanguagePackageUpdates(
+              info,
+              targetDatasheet,
+              target.languagePackageHeader
+            )
+          };
+        },
+        isComplete: ({ plan: currentPlan }) => !currentPlan.changedCellCount
+          && !currentPlan.missing.length
+          && !(syncSource && currentPlan.sourceChangedCellCount),
+        cleanup: (file) => fs.rmSync(file.filePath, { force: true }),
+        pause: () => session.page.waitForTimeout(3000),
+        onRetry: (attempt) => logLine(
+          logs,
+          `上传后第 ${attempt} 次回读仍是旧语言包，等待后台同步后重试（不会重复上传）。`
+        )
+      });
+      verification = readback.downloaded;
+      const verifiedInfo = readback.inspection.info;
+      const verifiedPlan = readback.inspection.plan;
       if (verifiedPlan.changedCellCount || verifiedPlan.missing.length
         || (syncSource && verifiedPlan.sourceChangedCellCount)) {
         throw new Error("上传后回读仍有未更新字段。");
@@ -1304,5 +1348,6 @@ module.exports = {
   globalFirst,
   approvedDatasheetSiteCodes,
   buildGlobalPropagationProbe,
-  hasGlobalSourcePropagation
+  hasGlobalSourcePropagation,
+  waitForLanguagePackageReadback
 };

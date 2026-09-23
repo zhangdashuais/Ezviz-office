@@ -289,8 +289,6 @@ function createBrowserAuth(deps) {
     if (!currentIsBackend) {
       await page.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(1800);
-    } else if (!page.url().startsWith(LEGACY_SHOP_ROOT_URL)) {
-      await jumpToLegacyShopRoot(page, logs);
     }
     const hasPassword = await page.locator('input[type="password"]').first().isVisible().catch(() => false);
     if (/usauth\.ezvizlife\.com|signin|login/i.test(page.url()) || hasPassword) return null;
@@ -338,7 +336,7 @@ function createBrowserAuth(deps) {
       : await currentShopBackendAccount(page, logs);
     if (currentAccount && shopAccountVerifier.matches(currentAccount, username, identityOptions)) {
       logLine(logs, "检测到商城后台已登录，复用当前账号：" + currentAccount);
-      return jumpToLegacyShopRoot(page, logs);
+      return page;
     }
     if (currentAccount) {
       logLine(logs, "当前后台账号与目标站点不匹配，需要切换账号。当前账号：" + currentAccount);
@@ -355,8 +353,13 @@ function createBrowserAuth(deps) {
       await page.context().clearCookies();
     }
 
-    logLine(logs, "打开商城登录入口：" + SHOP_LOGIN_URL);
-    await page.goto(SHOP_LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    const loginUrl = /\/la(?:\/|$)/i.test(payload.credentialDomain || "")
+      ? "https://saauth.ezvizlife.com/signIn?from=ezviz_mall_global_gateway&r="
+        + Date.now() + "&returnUrl="
+        + encodeURIComponent("https://new-sa-shop.ezvizlife.com/templates/list")
+      : SHOP_LOGIN_URL;
+    logLine(logs, "打开商城登录入口：" + loginUrl);
+    await page.goto(loginUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(2500);
 
     let submittedCredentials = false;
@@ -432,6 +435,13 @@ function createBrowserAuth(deps) {
     await backendPage.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await backendPage.waitForTimeout(5000);
 
+    if (!isShopBackendUrl(backendPage.url()) && /\/la(?:\/|$)/i.test(payload.credentialDomain || "")) {
+      const regionalDashboardUrl = "https://new-sa-shop.ezvizlife.com/templates/list";
+      logLine(logs, "旧版商城入口不可用，改用拉美新版后台：" + regionalDashboardUrl);
+      await backendPage.goto(regionalDashboardUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+      await backendPage.waitForTimeout(5000);
+    }
+
     const backendHasPassword = await backendPage.locator('input[type="password"]').first().isVisible().catch(() => false);
     if (/usauth\.ezvizlife\.com|signin|login/i.test(backendPage.url()) || backendHasPassword) {
       throw new Error("商城后台登录态未生效，未能进入 " + SHOP_DASHBOARD_URL);
@@ -461,7 +471,7 @@ function createBrowserAuth(deps) {
 
     logLine(logs, "已进入商城后台首页：" + backendPage.url());
     if (page !== backendPage && !page.isClosed()) await page.close().catch(() => {});
-    return jumpToLegacyShopRoot(backendPage, logs);
+    return backendPage;
   }
 
   return {

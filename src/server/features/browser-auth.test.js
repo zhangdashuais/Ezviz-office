@@ -125,7 +125,7 @@ test("shop account verifier ignores a previously poisoned concrete-login alias",
   assert.equal(verifier.matches("nl114514", "jp114514"), false);
 });
 
-test("shop login reuse jumps back to the legacy shop root before returning", async () => {
+test("shop login reuse keeps the authenticated backend page", async () => {
   const visited = [];
   const page = {
     currentUrl: "https://shop.ezvizlife.com/templates/index",
@@ -170,11 +170,11 @@ test("shop login reuse jumps back to the legacy shop root before returning", asy
   const result = await auth.ensureShopLoggedIn(page, { username: "website-tr@example.com", password: "ok" }, []);
 
   assert.equal(result, page);
-  assert.deepEqual(visited, ["https://shop.ezvizlife.com/"]);
-  assert.equal(page.url(), "https://shop.ezvizlife.com/");
+  assert.deepEqual(visited, []);
+  assert.equal(page.url(), "https://shop.ezvizlife.com/templates/index");
 });
 
-test("shop account check jumps from new shop to legacy root before reading username", async () => {
+test("shop account check keeps an authenticated new-shop session", async () => {
   const visited = [];
   const page = {
     currentUrl: "https://new-shop.ezvizlife.com/templates/list?pageNum=1&pageSize=20",
@@ -218,9 +218,9 @@ test("shop account check jumps from new shop to legacy root before reading usern
     normalizeBool: Boolean
   });
 
-  const result = await auth.ensureShopLoggedIn(page, { username: "website@example.com", password: "ok" }, []);
+  const result = await auth.ensureShopLoggedIn(page, { username: "new-shop-display", password: "ok" }, []);
 
   assert.equal(result, page);
-  assert.deepEqual(visited, ["https://shop.ezvizlife.com/"]);
-  assert.equal(page.url(), "https://shop.ezvizlife.com/");
+  assert.deepEqual(visited, []);
+  assert.equal(page.url(), "https://new-shop.ezvizlife.com/templates/list?pageNum=1&pageSize=20");
 });

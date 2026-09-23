@@ -7,8 +7,28 @@ const {
   globalFirst,
   buildGlobalPropagationProbe,
   hasGlobalSourcePropagation,
-  approvedDatasheetSiteCodes
+  approvedDatasheetSiteCodes,
+  waitForLanguagePackageReadback
 } = require("./language-package");
+
+test("Datasheet upload readback retries stale packages without uploading again", async () => {
+  let downloads = 0;
+  const cleaned = [];
+  const retries = [];
+  const result = await waitForLanguagePackageReadback({
+    download: async () => ({ filePath: `readback-${++downloads}.xls` }),
+    inspect: ({ filePath }) => ({ complete: filePath === "readback-3.xls" }),
+    isComplete: ({ complete }) => complete,
+    cleanup: ({ filePath }) => cleaned.push(filePath),
+    pause: async () => {},
+    onRetry: (attempt) => retries.push(attempt)
+  });
+
+  assert.equal(result.attempts, 3);
+  assert.equal(result.downloaded.filePath, "readback-3.xls");
+  assert.deepEqual(cleaned, ["readback-1.xls", "readback-2.xls"]);
+  assert.deepEqual(retries, [1, 2]);
+});
 
 test("Datasheet submit approves ready sites without blocking on skipped sites", () => {
   const targets = ["hq", "cn", "fr"].map((siteCode) => ({ site: { siteCode } }));
@@ -106,4 +126,13 @@ test("Belgium selects its editable Dutch package for the Dutch Datasheet column"
   ], "be", "13_Nederlands (Dutch-荷兰语)");
 
   assert.match(selected.rowText, /^België/);
+});
+
+test("Czech Datasheet selection recognizes the localized Cesko language row", () => {
+  const selected = chooseLanguageRowCandidate([
+    { rowText: "English-ENSTORE Delete Edit Download", langCode: "" },
+    { rowText: "Česko-CZSTORE Delete Edit Download", langCode: "" }
+  ], "cz", "9_Český (Czech-捷克语)");
+
+  assert.match(selected.rowText, /^Česko/);
 });

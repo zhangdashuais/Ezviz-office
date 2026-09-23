@@ -33,13 +33,13 @@ function fileKind(relativePath) {
 function productNameFromPath(relativePath) {
   const normalizedPath = String(relativePath || "").replace(/\\/g, "/");
   const segments = normalizedPath.split("/").filter(Boolean);
-  if (segments.length > 2) return normalize(segments[segments.length - 2]);
   const base = path.basename(normalizedPath, path.extname(normalizedPath));
-  return normalize(base
-    .replace(/\b(?:product[\s_-]*)?datasheet\b/ig, "")
+  const fromFileName = normalize(base
+    .replace(/(?:^|[\s_-])(?:product[\s_-]*)?datasheet(?=$|[\s_-])/ig, " ")
     .replace(/\b(?:product[\s_-]*)?specifications?\b/ig, "")
     .replace(/(?:^|[\s_-])spec(?:[\s_-]|$)/ig, " ")
     .replace(/[\s_-]+$/g, ""));
+  return fromFileName || normalize(segments.length > 2 ? segments[segments.length - 2] : "");
 }
 
 function uploadSequence(value) {

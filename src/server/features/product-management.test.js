@@ -60,7 +60,7 @@ test("product name matching treats superscript plus as plus", () => {
   ]);
 });
 
-test("product editor opens legacy goods index even when current new shop path matches", async () => {
+test("product editor keeps the current new-shop goods index", async () => {
   const visited = [];
   const feature = createProductManagement({ logLine() {}, normalizeBool: Boolean });
   const page = {
@@ -92,7 +92,7 @@ test("product editor opens legacy goods index even when current new shop path ma
 
   await feature.openByName(page, "H8c", []);
 
-  assert.deepEqual(visited, [LEGACY_GOODS_INDEX_URL]);
+  assert.deepEqual(visited, []);
 });
 
 test("product editor forwards exact-only matching to the page search", async () => {

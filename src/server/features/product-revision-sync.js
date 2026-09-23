@@ -80,6 +80,7 @@ const SITE_SPECIFICATION_FIELD_TITLES = {
 const WIFI6_HALOW_PATTERN = /Wi-Fi\s*6\s*:\s*IEEE(?:\s|&nbsp;)+802\s*\.\s*11b\s*\/\s*g\s*\/\s*a\s*\/\s*n\s*\/\s*ac\s*\/\s*ax(?:\s|&nbsp;)+Wi-Fi(?:\s|&nbsp;)+HaLow\s*:\s*IEEE(?:\s|&nbsp;)+802\s*\.\s*11ah/gi;
 const WIFI6_HALOW_REPLACEMENT = "Wi-Fi : IEEE 802.11b/g/a/n/ac Wi-Fi HaLow: IEEE 802.11ah";
 const WIFI6_AX_PATTERN = /802\s*\.\s*11ax\b/gi;
+const LEGACY_INT_GOODS_URL = "https://shop.ezvizlife.com/goods/int-goods-list";
 
 function specificationTitleForSite(siteCode, fallback = "Specifications") {
   return SITE_SPECIFICATION_TITLES[normalize(siteCode).toLowerCase()]
@@ -987,7 +988,7 @@ function createProductRevisionSyncFeature(deps) {
   }
 
   async function postProductUpdate(page, payload) {
-    const requestUrl = "https://shop.ezvizlife.com/goods/do-edit-goods";
+    const requestUrl = new URL("/goods/do-edit-goods", page.url()).href;
     const response = await page.request.post(requestUrl, {
       data: { data: payload },
       headers: { "x-requested-with": "XMLHttpRequest" },
@@ -1383,7 +1384,8 @@ function createProductRevisionSyncFeature(deps) {
     const downloaded = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
       session.page,
       target.site,
-      logs
+      logs,
+      translationHeader
     );
     try {
       const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
@@ -1403,6 +1405,48 @@ function createProductRevisionSyncFeature(deps) {
       removeTemporaryFile(downloaded.filePath);
       throw error;
     }
+  }
+
+  async function verifyLanguagePackageUpload(page, site, entries, logs) {
+    const headers = [...new Set(entries.map((entry) => entry.translationHeader))];
+    if (headers.length !== 1) {
+      throw new Error(`${site.name} 同一批次匹配到多个语言包译文列，已停止回读。`);
+    }
+    return retryProductReadback(
+      async () => {
+        const downloaded = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
+          page,
+          site,
+          logs,
+          headers[0]
+        );
+        try {
+          const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+          return entries.map((entry) => {
+            const plan = planLanguagePackageUpdates(
+              packageInfo,
+              entry.parsed,
+              entry.translationHeader
+            );
+            assertSafePlan(plan);
+            return { ...entry, plan };
+          });
+        } finally {
+          removeTemporaryFile(downloaded.filePath);
+        }
+      },
+      (plans) => ({
+        passed: plans.every((entry) => entry.plan.changedCellCount === 0),
+        plans
+      }),
+      {
+        wait: (delayMs) => page.waitForTimeout(delayMs),
+        onRetry: (attempt) => logLine(
+          logs,
+          `上传后第 ${attempt} 次回读仍是旧语言包，等待后台同步后重试（不会重复上传）。`
+        )
+      }
+    );
   }
 
   async function preview(body, excelFile, languageDatasheetFile, logs, options = {}) {
@@ -1464,7 +1508,7 @@ function createProductRevisionSyncFeature(deps) {
             };
             logLine(logs, `${target.site.name} 已存在 ${activeProductName}，跳过国际站复制，只预览产品名称 / Specification / Product Description / 语言包更新。`);
           } else {
-            await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+            await session.page.goto(LEGACY_INT_GOODS_URL, {
               waitUntil: "domcontentloaded",
               timeout: 60000
             });
@@ -1531,7 +1575,7 @@ function createProductRevisionSyncFeature(deps) {
         } else {
           detailChanged = specificationLanguageOnly
             ? false
-            : current.detail.overview !== source.snapshot.detail.overview;
+            : current.detail.overview !== targetSource.snapshot.detail.overview;
           specificationChanged = current.detail.specifications !== desired.specifications
             || specificationFieldNameChanged;
           descriptionChanged = current.productDescription !== effectiveProductDescriptionForScope(
@@ -1664,10 +1708,25 @@ function createProductRevisionSyncFeature(deps) {
       const warnings = [];
       try {
         const session = await prepareSiteSession(target.site, body, logs);
+        const targetDatasheets = parsedDatasheets.map((entry) => ({
+          ...entry,
+          translationHeader: resolveDatasheetLanguage(
+            entry.parsed,
+            target,
+            SITE_LANGUAGE_NEEDLES
+          )
+        }));
+        const targetHeaders = [...new Set(
+          targetDatasheets.map((entry) => entry.translationHeader)
+        )];
+        if (targetHeaders.length !== 1) {
+          throw new Error(`${target.site.name} 同一批次匹配到多个语言包译文列，已停止上传。`);
+        }
         downloaded = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
           session.page,
           target.site,
-          logs
+          logs,
+          targetHeaders[0]
         );
         let packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
         const expected = normalize(expectedFingerprints?.[target.site.siteCode]);
@@ -1677,18 +1736,17 @@ function createProductRevisionSyncFeature(deps) {
 
         let changedCellCount = 0;
         const verificationInputs = [];
-        for (const entry of parsedDatasheets) {
+        for (const entry of targetDatasheets) {
           try {
-            const translationHeader = resolveDatasheetLanguage(
+            const plan = planLanguagePackageUpdates(
+              packageInfo,
               entry.parsed,
-              target,
-              SITE_LANGUAGE_NEEDLES
+              entry.translationHeader
             );
-            const plan = planLanguagePackageUpdates(packageInfo, entry.parsed, translationHeader);
             assertSafePlan(plan);
             warnings.push(...languagePackageInputWarnings(plan, entry.productName));
             changedCellCount += plan.changedCellCount;
-            verificationInputs.push({ ...entry, translationHeader });
+            verificationInputs.push(entry);
             logLine(
               logs,
               `${target.site.name} 合并 ${entry.productName}：第 5 列覆盖 ${plan.changedCellCount} 个单元格。`
@@ -1716,28 +1774,21 @@ function createProductRevisionSyncFeature(deps) {
             { ...generated, langCode: downloaded.langCode },
             logs
           );
-          const verification = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
+          const readback = await verifyLanguagePackageUpload(
             session.page,
             target.site,
+            verificationInputs,
             logs
           );
-          try {
-            const verifiedPackage = readLanguagePackage(verification.filePath, verification.langCode);
-            for (const entry of verificationInputs) {
-              const plan = planLanguagePackageUpdates(
-                verifiedPackage,
-                entry.parsed,
-                entry.translationHeader
+          for (const entry of readback.verification.plans) {
+            if (entry.plan.changedCellCount) {
+              const readbackWarnings = languagePackageReadbackWarnings(
+                entry.plan,
+                entry.productName
               );
-              assertSafePlan(plan);
-              if (plan.changedCellCount) {
-                const readbackWarnings = languagePackageReadbackWarnings(plan, entry.productName);
-                warnings.push(...readbackWarnings);
-                logLine(logs, `${entry.productName} 语言包回读警告：${readbackWarnings.map((item) => item.message).join("；")}`);
-              }
+              warnings.push(...readbackWarnings);
+              logLine(logs, `${entry.productName} 语言包回读警告：${readbackWarnings.map((item) => item.message).join("；")}`);
             }
-          } finally {
-            removeTemporaryFile(verification.filePath);
           }
         }
         logLine(logs, warnings.length
@@ -1854,7 +1905,7 @@ function createProductRevisionSyncFeature(deps) {
             };
             logLine(logs, `${target.site.name} 已存在 ${activeProductName}，跳过国际站复制，直接更新产品名称 / Specification / Product Description / 语言包。`);
           } else {
-            await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+            await session.page.goto(LEGACY_INT_GOODS_URL, {
               waitUntil: "domcontentloaded",
               timeout: 60000
             });
@@ -1874,15 +1925,15 @@ function createProductRevisionSyncFeature(deps) {
                 `${target.site.name} 国际产品复制源在预览后发生变化，请重新预览。`
               );
             }
-            await session.page.goto("https://shop.ezvizlife.com/goods/int-goods-list", {
+            await session.page.goto(LEGACY_INT_GOODS_URL, {
               waitUntil: "domcontentloaded",
               timeout: 60000
             });
             await session.page.waitForTimeout(1200);
             copy = await copyInternationalProduct(session.page, request.productName, logs);
             components.copy = "passed";
-            before = await readProductSnapshot(session.page, request.productName, logs);
-            activeProductName = request.productName;
+            activeProductName = copy.productName || request.productName;
+            before = await readProductSnapshot(session.page, activeProductName, logs);
             const copiedImage = extractSpecificationImage(before.detail.specifications);
             if (!copiedImage.src) {
               logLine(logs, "复制后的目标产品 Specification 没有可用图片地址，目标规格将保持无图片状态。");
@@ -2064,33 +2115,24 @@ function createProductRevisionSyncFeature(deps) {
             },
             logs
           );
-          const verification = await languagePackageFeature
-            .downloadCurrentLanguagePackageForPage(
-              session.page,
-              target.site,
-              logs
+          const readback = await verifyLanguagePackageUpload(
+            session.page,
+            target.site,
+            [{
+              productName: request.productName,
+              parsed: parsedDatasheet,
+              translationHeader: languagePackage.translationHeader
+            }],
+            logs
+          );
+          const verificationPlan = readback.verification.plans[0].plan;
+          if (verificationPlan.changedCellCount) {
+            const readbackWarnings = languagePackageReadbackWarnings(
+              verificationPlan,
+              request.productName
             );
-          try {
-            const verifiedPackage = readLanguagePackage(
-              verification.filePath,
-              verification.langCode
-            );
-            const verificationPlan = planLanguagePackageUpdates(
-              verifiedPackage,
-              parsedDatasheet,
-              languagePackage.translationHeader
-            );
-            assertSafePlan(verificationPlan);
-            if (verificationPlan.changedCellCount) {
-              const readbackWarnings = languagePackageReadbackWarnings(
-                verificationPlan,
-                request.productName
-              );
-              warnings.push(...readbackWarnings);
-              logLine(logs, `${target.site.name} 语言包回读警告：${readbackWarnings.map((item) => item.message).join("；")}`);
-            }
-          } finally {
-            removeTemporaryFile(verification.filePath);
+            warnings.push(...readbackWarnings);
+            logLine(logs, `${target.site.name} 语言包回读警告：${readbackWarnings.map((item) => item.message).join("；")}`);
           }
           components.languagePackage = warnings.length ? "warning" : "passed";
           logLine(
@@ -2196,6 +2238,7 @@ module.exports = {
   SITE_LANGUAGE_NEEDLES,
   SITE_SPECIFICATION_TITLES,
   SITE_SPECIFICATION_FIELD_TITLES,
+  LEGACY_INT_GOODS_URL,
   specificationTitleForSite,
   specificationFieldTitleForSite,
   SPECIFICATION_DETAIL_FIELD_NAMES,

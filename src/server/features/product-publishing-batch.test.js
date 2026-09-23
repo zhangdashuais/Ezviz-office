@@ -13,6 +13,8 @@ test("recognizes Datasheet and Specifications files in a selected folder", () =>
   assert.equal(fileKind("Products/CP8/CP8 Specifications.xlsx"), "specification");
   assert.equal(fileKind("Products/readme.txt"), "");
   assert.equal(productNameFromPath("Products/CP8/CP8 Datasheet.xlsx"), "CP8");
+  assert.equal(productNameFromPath("Products/DL50/DL50FVS Plus(5085)_datasheet.xlsx"), "DL50FVS Plus(5085)");
+  assert.equal(productNameFromPath("Products/DL50/DL50FVS Plus(5085)_spec.xlsx"), "DL50FVS Plus(5085)");
   assert.equal(productNameFromPath("Products/EB3 Datasheet.xlsx"), "EB3");
 });
 

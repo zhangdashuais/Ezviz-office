@@ -316,12 +316,12 @@
   function batchProductName(file) {
     const relativePath = (file.webkitRelativePath || file.name).replace(/\\/g, "/");
     const segments = relativePath.split("/").filter(Boolean);
-    if (segments.length > 2) return segments[segments.length - 2].trim();
-    return file.name.replace(/\.[^.]+$/, "")
-      .replace(/\b(?:product[\s_-]*)?datasheet\b/ig, "")
+    const fromFileName = file.name.replace(/\.[^.]+$/, "")
+      .replace(/(?:^|[\s_-])(?:product[\s_-]*)?datasheet(?=$|[\s_-])/ig, " ")
       .replace(/\b(?:product[\s_-]*)?specifications?\b/ig, "")
       .replace(/(?:^|[\s_-])spec(?:[\s_-]|$)/ig, " ")
       .replace(/[\s_-]+$/g, "").trim();
+    return fromFileName || (segments.length > 2 ? segments[segments.length - 2].trim() : "");
   }
 
   function productNameMatchKey(value) {

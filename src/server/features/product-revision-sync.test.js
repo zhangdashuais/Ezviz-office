@@ -26,8 +26,13 @@ const {
   specificationFieldTitleForSite,
   fillAdsAdditionalProductTitle,
   normalizeJapanPublishingProductName,
-  publishingProductNameForSite
+  publishingProductNameForSite,
+  LEGACY_INT_GOODS_URL
 } = require("./product-revision-sync");
+
+test("international product copy always uses the legacy global page", () => {
+  assert.equal(LEGACY_INT_GOODS_URL, "https://shop.ezvizlife.com/goods/int-goods-list");
+});
 
 test("Japan publishing converts resolution labels in product names but keeps 4K", () => {
   assert.equal(normalizeJapanPublishingProductName("TY1 G1 1080P"), "TY1 G1 2MP");

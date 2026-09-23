@@ -196,7 +196,12 @@ function workbookContentFingerprintForGlobalRebase(packageInfo, propagationProbe
 }
 
 function normalizeSourceForComparison(value) {
-  return normalize(value).toLocaleLowerCase().replace(/\s+/g, "");
+  return normalize(String(value == null ? "" : value)
+    .replace(/&nbsp;|&#160;/gi, " "))
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[.。]+$/g, "")
+    .replace(/\s+/g, "");
 }
 
 function normalizeTranslationForComparison(value) {

@@ -20,9 +20,20 @@ test("产品名称匹配统一普通、全角和角标加号", () => {
     normalizeProductNameForMatch("CP1  Pro  2K+")
   );
   assert.equal(normalizeProductNameForMatch("CP1 Pro 2K＋"), "cp1 pro 2k+");
+  assert.equal(
+    normalizeProductNameForMatch("DL50FVS Plus(5085)"),
+    normalizeProductNameForMatch("DL50FVS Plus (5085)")
+  );
   assert.deepEqual(productNameSearchVariants("CP1 Pro 2K+"), [
     "CP1 Pro 2K+",
     "CP1 Pro 2K\u207a"
   ]);
   assert.deepEqual(parseProductNames("CP1 Pro 2K+\nCP1 Pro 2K\u207a"), ["CP1 Pro 2K+"]);
+});
+
+test("产品名称搜索同时兼容括号前的后台空格", () => {
+  assert.deepEqual(
+    productNameSearchVariants("DL50FVS Plus(5085)"),
+    ["DL50FVS Plus(5085)", "DL50FVS Plus (5085)"]
+  );
 });

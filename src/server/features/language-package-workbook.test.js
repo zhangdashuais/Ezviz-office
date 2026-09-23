@@ -32,6 +32,13 @@ test("source comparison ignores casing and whitespace but not changed words", ()
   );
 });
 
+test("source comparison tolerates HTML spaces, footnote glyphs, and trailing punctuation", () => {
+  assert.equal(
+    normalizeSourceForComparison("Time intervals&nbsp;create video4"),
+    normalizeSourceForComparison("Time intervals create video⁴.")
+  );
+});
+
 test("translation comparison ignores Excel line-ending conversion", () => {
   assert.equal(
     normalizeTranslationForComparison("restez connecté\r\n\r\nà tout moment"),

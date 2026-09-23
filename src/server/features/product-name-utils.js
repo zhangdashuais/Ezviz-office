@@ -2,6 +2,7 @@ function normalizeProductNameForMatch(value) {
   return String(value || "")
     .normalize("NFKC")
     .replace(/[\u207a＋]/g, "+")
+    .replace(/\s*([()])\s*/g, "$1")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -11,7 +12,15 @@ function productNameSearchVariants(value) {
   const raw = String(value || "").trim();
   const plus = raw.normalize("NFKC").replace(/[\u207a＋]/g, "+");
   const superscript = plus.replace(/\+/g, "\u207a");
-  return [...new Set([raw, plus, superscript].filter(Boolean))];
+  const parenthesesSpaced = plus.replace(/\s*\(/g, " (");
+  const parenthesesCompact = plus.replace(/\s*\(/g, "(");
+  return [...new Set([
+    raw,
+    plus,
+    superscript,
+    parenthesesSpaced,
+    parenthesesCompact
+  ].filter(Boolean))];
 }
 
 function parseProductNames(value) {

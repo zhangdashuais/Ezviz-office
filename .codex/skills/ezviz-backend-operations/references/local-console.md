@@ -8,7 +8,7 @@
 
 | 分组 | 页面入口 | 主要能力 | 默认风险 |
 | --- | --- | --- | --- |
-| 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；可选输出 `head`、`body` 标签，正文开头添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
+| 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；自动合并编辑器产生的同族数字后缀类（含组合选择器，保留 `w-*` 系统类）；可选输出 `head`、`body` 标签，正文开头添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
 | 基础工具 | 图片 AI 标志 | 支持拖拽或文件选择多张图片，用 Canvas 在右下角叠加 `AI GENERATED` 标志；输出超过 512 KB 时保持原分辨率并转为 JPG、降低画质，最低画质仍超限时明确报错 | 本地生成；不缩放、不上传、不覆盖原文件；透明区域转 JPG 时填充白底 |
 | 基础工具 | PDF / HTML 文字对比 | 先汇总 HTML 全部可见文字，排除 PDF 从 Specification 标题页到文件末尾的全部内容，再逐条检查此前正文；支持 HTML/PDF 拆分的数值与单位反向匹配，仅列出未匹配片段；可将语言字段建议应用到原 HTML 并在页面显示完整源码 | 本地读取；不覆盖原文件 |
 | 基础工具 | i18n 语言转换 | 英文文案先按单产品语言包原文复用 Key，未命中再按产品名生成；本地 Datasheet 的六项路径可直接编辑，并通过一个“同步所有默认路径”按钮统一保存 | 本地处理 |
@@ -18,7 +18,7 @@
 | 产品资料处理 | 网站翻译表精简 | 自动识别 Datasheet 与 Specification 的语言列；选择目标语言后分别导出仅含英文和目标语言的工作簿，并保留原模板及字体颜色 | 本地生成 |
 | 产品上架与维护 | Specification 翻译上架 | 预览翻译结果或提交后台 | `preview` 只读；`submit` 写后台 |
 | 产品上架与维护 | 语言包上传 | 上传 `.xls/.xlsx` 到 Language Management | 写后台 |
-| 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，逐站按 Key 覆盖或追加译文，预览后原生保存、上传并回读 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
+| 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；允许英文原文内容变化并警告，上传后遇到短暂旧包时只重下验证、不重复上传 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
 | 产品上架与维护 | 已上架产品仅更新 Specification、Product Description 与语言包 | 产品修订请求使用 `updateScope=specification-language`；保留目标站 Overview 和现有规格图，按 Datasheet 更新 Product Description、Specification 文本及语言包；Datasheet 缺少显式 Product Description 时，会用后台当前描述反查 Datasheet 唯一字段行，仍未命中才保留现值 | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | HG2_400_4 语言包定向修订 | 逐站预览 E 列，删除 `15s / 18s / 20s` 后原生保存、上传并回读；空值不上传 | `preview` 只读；`submit` 写后台并可回滚 |
 | 产品上架与维护 | WTB 产品购买链接 | 下拉框单选站点，计划、提交、回读、往返测试和恢复购买链接 | `plan` 只读；其他接口可写后台 |

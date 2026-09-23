@@ -9,6 +9,17 @@ const INT_GOODS_SOURCE_SITE_VALUE = "0";
 const LEGACY_SHOP_HOSTNAME = "shop.ezvizlife.com";
 const LEGACY_GOODS_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
 
+function shopUrlForPage(page, pathname) {
+  try {
+    const current = new URL(page.url());
+    if (current.hostname === LEGACY_SHOP_HOSTNAME
+      || /^new-[a-z]{0,3}-?shop\.ezvizlife\.com$/.test(current.hostname)) {
+      return new URL(pathname, current.origin).href;
+    }
+  } catch {}
+  return new URL(pathname, LEGACY_GOODS_INDEX_URL).href;
+}
+
 function isLegacyShopPath(rawUrl, pathName) {
   try {
     const url = new URL(rawUrl);
@@ -72,15 +83,15 @@ function createProductManagement({ logLine, normalizeBool }) {
       // validate backend state instead of re-reading the mutated in-page Angular model.
       await page.goto(cached.editUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(1200);
-      if (isLegacyShopUrl(page.url()) && !/signin|login/i.test(page.url())) {
+      if (!/signin|login/i.test(page.url())) {
         logLine(logs, "已复用产品编辑地址缓存：" + targetName);
         return { ...cached, cacheHit: true };
       }
       productEditCache.delete(cacheKey);
     }
 
-    if (!isLegacyShopPath(page.url(), "/goods/index")) {
-      await page.goto(LEGACY_GOODS_INDEX_URL, {
+    if (new URL(page.url()).pathname !== "/goods/index") {
+      await page.goto(shopUrlForPage(page, "/goods/index"), {
         waitUntil: "domcontentloaded",
         timeout: 60000
       }).catch(() => {});
@@ -92,6 +103,7 @@ function createProductManagement({ logLine, normalizeBool }) {
         const normalizeProductName = (value) => String(value || "")
           .normalize("NFKC")
           .replace(/\u207a/g, "+")
+          .replace(/\s*([()])\s*/g, "$1")
           .replace(/\s+/g, " ")
           .trim()
           .toLowerCase();
@@ -166,7 +178,7 @@ function createProductManagement({ logLine, normalizeBool }) {
   async function productExistsInCurrentSite(page, productName, logs) {
     const targetName = String(productName || "").trim();
     if (!targetName) throw new Error("请填写产品名称。");
-    await page.goto("https://shop.ezvizlife.com/goods/index", {
+    await page.goto(shopUrlForPage(page, "/goods/index"), {
       waitUntil: "domcontentloaded",
       timeout: 60000
     }).catch(() => {});
@@ -177,6 +189,7 @@ function createProductManagement({ logLine, normalizeBool }) {
         const normalizeProductName = (value) => String(value || "")
           .normalize("NFKC")
           .replace(/\u207a/g, "+")
+          .replace(/\s*([()])\s*/g, "$1")
           .replace(/\s+/g, " ")
           .trim()
           .toLowerCase();
@@ -216,7 +229,7 @@ function createProductManagement({ logLine, normalizeBool }) {
   }
 
   async function openFirstProductEditPage(page, logs) {
-    await page.goto("https://shop.ezvizlife.com/goods/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    await page.goto(shopUrlForPage(page, "/goods/index"), { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(3000);
     const clicked = await page.evaluate(() => {
       const candidates = [...document.querySelectorAll("a, button")].filter((el) => {
@@ -463,7 +476,8 @@ function createProductManagement({ logLine, normalizeBool }) {
 
   async function copyIntGoodsProductDirect(page, productName, logs) {
     const product = await findIntGoodsProduct(page, productName, logs);
-    const response = await page.request.post(INT_GOODS_COPY_URL, {
+    const requestUrl = shopUrlForPage(page, "/goods/save-cite");
+    const response = await page.request.post(requestUrl, {
       form: { cite: "", copy: product.goodsId + "," },
       headers: { "x-requested-with": "XMLHttpRequest" },
       timeout: 60000
@@ -483,7 +497,7 @@ function createProductManagement({ logLine, normalizeBool }) {
       productName: product.productName,
       goodsId: product.goodsId,
       category: product.category,
-      request: { method: "POST", url: INT_GOODS_COPY_URL, status: response.status() },
+      request: { method: "POST", url: requestUrl, status: response.status() },
       result: {
         status: result.status,
         msg: result.msg || "",
@@ -660,6 +674,7 @@ module.exports = {
   LEGACY_GOODS_INDEX_URL,
   isLegacyShopPath,
   isLegacyShopUrl,
+  shopUrlForPage,
   orderedIntGoodsCategories,
   normalizeProductNameForMatch,
   productNameSearchVariants,
