@@ -59,20 +59,29 @@ test('Popup submission stops before creating when the existing Period has not ex
   assert.equal(calls.some((url) => url.endsWith('/shop-config/delete')), false);
 });
 
-test('Popup submission deletes an expired Period, verifies deletion, then creates', async () => {
+test('Popup submission deletes an expired Period, then submits through the page form', async () => {
   let rows = [{ configNo: 'expired', content: { popupName: 'Expired', period: '2020-01-01 00:00:00 to 2020-01-31 23:59:59' } }];
   const order = [];
+  const locator = {
+    first() { return this; },
+    filter() { return this; },
+    waitFor: async () => {},
+    evaluate: async () => {},
+    fill: async () => {},
+    setInputFiles: async () => {},
+    click: async () => { order.push('ui-submit'); }
+  };
   const page = {
     setDefaultTimeout: () => {}, goto: async () => {}, waitForTimeout: async () => {}, url: () => 'https://new-shop.ezvizlife.com/popup/edit',
+    locator: () => locator,
+    getByText: () => locator,
+    evaluate: async () => {},
     request: {
       post: async (url) => {
         const operation = url.split('/').pop();
         order.push(operation);
         if (operation === 'delete') rows = [];
-        const data = operation === 'list' ? { list: rows }
-          : operation === 'create' ? { configNo: 'new-popup' }
-            : operation === 'get-fs-token' ? { token: 'token', appid: 'appid' }
-              : {};
+        const data = operation === 'list' ? { list: rows } : {};
         return { ok: () => true, text: async () => JSON.stringify({ code: 0, data }) };
       }
     }
@@ -85,16 +94,12 @@ test('Popup submission deletes an expired Period, verifies deletion, then create
     credentialDomainForSite: () => 'www.ezviz.com/jp',
     buildPopupPlan: () => ({ items: [{ fields: { name: 'New', brief: '', whereToShow: 'all', startAt: '', endAt: '', frequency: '', enableAfterSubmit: false }, webUrl: '', mobileUrl: '' }] })
   });
-  const originalFetch = global.fetch;
-  global.fetch = async () => ({ ok: true, text: async () => JSON.stringify({ status: true, uri: 'image.jpg' }) });
-  try {
-    const result = await popup.submit({}, { image: [{ path: 'popup.jpg', originalname: 'popup.jpg' }] }, []);
-    assert.equal(result.slotCleanup.action, 'deleted-expired');
-    assert.ok(order.indexOf('delete') < order.indexOf('create'));
-    assert.ok(order.filter((item) => item === 'list').length >= 2);
-  } finally {
-    global.fetch = originalFetch;
-  }
+  const result = await popup.submit({}, { image: [{ path: 'popup.jpg', originalname: 'popup.jpg' }] }, []);
+  assert.equal(result.mode, 'ui-form');
+  assert.equal(result.slotCleanup.action, 'deleted-expired');
+  assert.ok(order.indexOf('delete') < order.indexOf('ui-submit'));
+  assert.equal(order.includes('create'), false);
+  assert.ok(order.filter((item) => item === 'list').length >= 2);
 });
 
 test('Popup deletion requires one row and verifies it is gone', async () => {

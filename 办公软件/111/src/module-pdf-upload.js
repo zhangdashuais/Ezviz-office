@@ -40,12 +40,12 @@
 
       const succeeded = (payload.results || []).filter((item) => item.ok);
       const failed = (payload.results || []).filter((item) => !item.ok);
-      outputEl.value = succeeded.map((item) => item.fileName + "\n" + item.url).join("\n\n");
+      outputEl.value = payload.html || "";
       copyBtn.disabled = succeeded.length === 0;
       setStatus(
         failed.length
-          ? `已生成 ${succeeded.length} 个地址，${failed.length} 个文件失败：${failed.map((item) => item.fileName).join("、")}`
-          : `上传完成，共生成 ${succeeded.length} 个地址。`,
+          ? `已生成 ${succeeded.length} 个 LI 标签，${failed.length} 个文件失败：${failed.map((item) => item.fileName).join("、")}`
+          : `上传完成，共生成 ${succeeded.length} 个 LI 标签。`,
         failed.length ? "warn" : "ok"
       );
     } catch (error) {
@@ -61,11 +61,11 @@
 
     try {
       await navigator.clipboard.writeText(text);
-      setStatus("地址已复制。", "ok");
+      setStatus("LI 标签已复制。", "ok");
     } catch (_) {
       outputEl.select();
       document.execCommand("copy");
-      setStatus("地址已复制。", "ok");
+      setStatus("LI 标签已复制。", "ok");
     }
   });
 })();

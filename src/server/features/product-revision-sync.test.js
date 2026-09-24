@@ -34,6 +34,18 @@ test("international product copy always uses the legacy global page", () => {
   assert.equal(LEGACY_INT_GOODS_URL, "https://shop.ezvizlife.com/goods/int-goods-list");
 });
 
+test("international copy fingerprint ignores volatile list fields but keeps the product identity", () => {
+  const preview = internationalListSource("TY1 Pro 3K", {
+    goodsId: "59863", brief: "old brief", imageUrl: "https://example.com/old.jpg"
+  });
+  const refreshedList = internationalListSource("TY1 Pro 3K", {
+    goodsId: "59863", brief: "new brief", imageUrl: "https://example.com/new.jpg"
+  });
+  const differentProduct = internationalListSource("TY1 Pro 3K", { goodsId: "99999" });
+  assert.equal(preview.fingerprint, refreshedList.fingerprint);
+  assert.notEqual(preview.fingerprint, differentProduct.fingerprint);
+});
+
 test("Japan publishing converts resolution labels in product names but keeps 4K", () => {
   assert.equal(normalizeJapanPublishingProductName("TY1 G1 1080P"), "TY1 G1 2MP");
   assert.equal(normalizeJapanPublishingProductName("H6c 2K"), "H6c 3MP");

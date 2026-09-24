@@ -171,7 +171,7 @@
       <div id="tab-pdf-upload" class="tab-content">
         <div class="card">
           <h3>DOC上传</h3>
-          <p class="desc">一次上传多个 PDF 并生成资料平台可用的文件地址。单个文件失败不会中断其他文件。</p>
+          <p class="desc">一次上传多个 PDF，并按资料页面格式为每个成功文件生成一个 LI 标签。单个文件失败不会中断其他文件。</p>
 
           <div class="row">
             <label>PDF 文件（可多选）</label>
@@ -179,12 +179,12 @@
             <label>PDF 文件夹</label>
             <input id="pdfFolderInput" type="file" accept=".pdf,application/pdf" webkitdirectory directory multiple>
             <button id="pdfUploadBtn">开始上传</button>
-            <button id="pdfCopyBtn" disabled>复制地址</button>
+            <button id="pdfCopyBtn" disabled>复制 LI 标签</button>
           </div>
         </div>
 
         <div id="pdfUploadStatus" class="status">请选择一个或多个 PDF 文件。</div>
-        <textarea id="pdfUploadOutput" placeholder="上传成功后的文件地址会显示在这里..."></textarea>
+        <textarea id="pdfUploadOutput" placeholder="上传成功后生成的 LI 标签会显示在这里..."></textarea>
       </div>
 
       <div id="tab-text-comparison" class="tab-content">
@@ -1055,7 +1055,7 @@
   <script src="src/module-inline.js"></script>
   <script src="src/module-asset-upload.js?v=20260924-1"></script>
   <script src="src/module-ai-badge.js?v=20260911-2"></script>
-  <script src="src/module-pdf-upload.js?v=20260908-1"></script>
+  <script src="src/module-pdf-upload.js?v=20260924-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1068,8 +1068,8 @@
   <script src="src/module-text.js?v=20260826-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js?v=20260911-1"></script>
-  <script src="src/product-publishing-input-rules.js?v=20260908-2"></script>
-  <script src="src/module-product-revision-sync.js?v=20260908-2"></script>
+  <script src="src/product-publishing-input-rules.js?v=20260923-2"></script>
+  <script src="src/module-product-revision-sync.js?v=20260923-3"></script>
   <script src="src/module-product-direct-revision.js?v=20260825-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>

@@ -306,31 +306,15 @@
   }
 
   function batchFileKind(file) {
-    const name = file.name.toLowerCase();
-    if (!/\.xlsx?$/.test(name)) return "";
-    if (/specifications?|(?:^|[\s_-])spec(?:[\s_.-]|$)/i.test(name)) return "specification";
-    if (/datasheet/i.test(name)) return "datasheet";
-    return "";
+    return window.productPublishingInputRules.publishingWorkbookInfo(file.name).kind;
   }
 
   function batchProductName(file) {
-    const relativePath = (file.webkitRelativePath || file.name).replace(/\\/g, "/");
-    const segments = relativePath.split("/").filter(Boolean);
-    const fromFileName = file.name.replace(/\.[^.]+$/, "")
-      .replace(/(?:^|[\s_-])(?:product[\s_-]*)?datasheet(?=$|[\s_-])/ig, " ")
-      .replace(/\b(?:product[\s_-]*)?specifications?\b/ig, "")
-      .replace(/(?:^|[\s_-])spec(?:[\s_-]|$)/ig, " ")
-      .replace(/[\s_-]+$/g, "").trim();
-    return fromFileName || (segments.length > 2 ? segments[segments.length - 2].trim() : "");
+    return window.productPublishingInputRules.publishingWorkbookInfo(file.name).productName;
   }
 
   function productNameMatchKey(value) {
-    return String(value || "")
-      .normalize("NFKC")
-      .replace(/[\u207a＋]/g, "+")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
+    return window.productPublishingInputRules.publishingProductMatchKey(value);
   }
 
   async function splitEuropeDriveWorkbook(file, productName) {
@@ -388,6 +372,7 @@
       const group = groups.get(key) || { productName, files: {} };
       if (group.files[kind]) throw new Error(`${productName} 存在多份 ${kind} 文件。`);
       group.files[kind] = file;
+      if (kind === "datasheet") group.productName = productName;
       groups.set(key, group);
     }
     batchProducts = [...groups.values()].sort((a, b) => a.productName.localeCompare(b.productName));
@@ -412,6 +397,7 @@
       throw new Error("多个产品的 Excel 没有共同语言列，请统一语言列后重试。");
     }
     renderTargets();
+    selectAllExecutableTargets();
   }
 
   function selectedTargets() {

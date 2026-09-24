@@ -534,9 +534,7 @@ function internationalListSource(productName, copySource) {
   };
   const fingerprint = hashValue(JSON.stringify({
     productName: normalize(productName),
-    goodsId: snapshot.goodsId,
-    brief: snapshot.productDescription,
-    imageUrl: image.src
+    goodsId: snapshot.goodsId
   }));
   return { snapshot, image, fingerprint };
 }

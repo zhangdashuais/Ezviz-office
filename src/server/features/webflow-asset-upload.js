@@ -65,6 +65,12 @@ function createWebflowUploadToken(fileName, secret, now = Date.now()) {
   return crypto.createHash("md5").update(input, "utf8").digest("hex") + time + fileName;
 }
 
+function createServiceUploadToken(fileName, secret, now = Date.now()) {
+  const time = String(Math.floor(now / 1000)).slice(-5);
+  const input = `service${secret}${time}${fileName}`;
+  return crypto.createHash("md5").update(input, "utf8").digest("hex") + time + fileName;
+}
+
 function inferAssetMimeType(file) {
   const ext = String(file.originalname || file.filename || "").split(".").pop().toLowerCase();
   return file.mimetype || ({
@@ -119,6 +125,7 @@ async function uploadWebflowAssetBuffer(buffer, file, rawTarget = WEBFLOW_UPLOAD
 
 module.exports = {
   WEBFLOW_UPLOAD_API,
+  createServiceUploadToken,
   createWebflowUploadToken,
   getWebflowUploadSecret,
   normalizeWebflowAssetUrl,

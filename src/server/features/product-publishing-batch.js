@@ -1,7 +1,24 @@
-const path = require("path");
-const { normalizeProductNameForMatch } = require("./product-name-utils");
+const {
+  publishingWorkbookInfo,
+  publishingProductMatchKey
+} = require("../../../办公软件/111/src/product-publishing-input-rules");
 
 const MAX_BATCH_PRODUCTS = 20;
+
+function isClosedBrowserError(error) {
+  return /target page, context or browser has been closed|target.*(?:page|context|browser).*closed/i
+    .test(String(error?.message || error));
+}
+
+async function retryAfterBrowserClosed(run, logLine, logs, label) {
+  try {
+    return await run();
+  } catch (error) {
+    if (!isClosedBrowserError(error)) throw error;
+    logLine(logs, `${label} 的商城浏览器已关闭，重新登录后重试一次。`);
+    return run();
+  }
+}
 
 function normalize(value) {
   return String(value == null ? "" : value).replace(/\s+/g, " ").trim();
@@ -23,23 +40,11 @@ function parseManifest(value) {
 }
 
 function fileKind(relativePath) {
-  const name = path.basename(String(relativePath || "")).toLowerCase();
-  if (!/\.xlsx?$/.test(name)) return "";
-  if (/specifications?|(?:^|[\s_-])spec(?:[\s_.-]|$)/i.test(name)) return "specification";
-  if (/datasheet/i.test(name)) return "datasheet";
-  return "";
+  return publishingWorkbookInfo(relativePath).kind;
 }
 
 function productNameFromPath(relativePath) {
-  const normalizedPath = String(relativePath || "").replace(/\\/g, "/");
-  const segments = normalizedPath.split("/").filter(Boolean);
-  const base = path.basename(normalizedPath, path.extname(normalizedPath));
-  const fromFileName = normalize(base
-    .replace(/(?:^|[\s_-])(?:product[\s_-]*)?datasheet(?=$|[\s_-])/ig, " ")
-    .replace(/\b(?:product[\s_-]*)?specifications?\b/ig, "")
-    .replace(/(?:^|[\s_-])spec(?:[\s_-]|$)/ig, " ")
-    .replace(/[\s_-]+$/g, ""));
-  return fromFileName || normalize(segments.length > 2 ? segments[segments.length - 2] : "");
+  return normalize(publishingWorkbookInfo(relativePath).productName);
 }
 
 function uploadSequence(value) {
@@ -63,13 +68,14 @@ function groupProductFiles(files, manifestValue) {
     if (!file) throw new Error(`文件夹清单中的文件没有上传成功：${relativePath}`);
     const productName = productNameFromPath(relativePath);
     if (!productName) throw new Error(`无法从文件名识别产品名称：${relativePath}`);
-    const key = normalizeProductNameForMatch(productName);
+    const key = publishingProductMatchKey(productName);
     const group = groups.get(key) || { productName, files: {}, relativePaths: {} };
     if (group.files[kind]) {
       throw new Error(`${productName} 存在多份 ${kind === "datasheet" ? "Datasheet" : "Specifications"} 文件。`);
     }
     group.files[kind] = file;
     group.relativePaths[kind] = relativePath;
+    if (kind === "datasheet") group.productName = productName;
     groups.set(key, group);
   });
   const products = [...groups.values()];
@@ -149,14 +155,19 @@ function createProductPublishingBatchFeature(deps) {
     logLine(logs, "先合并本批次全部产品译文，并按站点一次上传语言包。");
     let languagePackageBatch = { results: [], warnings: [] };
     try {
-      languagePackageBatch = await revisionFeature.submitPublishingLanguagePackageBatch(
-        { ...(body || {}), productName: products[0].productName },
-        products.map((product) => ({
-          productName: product.productName,
-          file: product.files.datasheet
-        })),
-        expectedLanguagePackageFingerprints,
-        logs
+      languagePackageBatch = await retryAfterBrowserClosed(
+        () => revisionFeature.submitPublishingLanguagePackageBatch(
+          { ...(body || {}), productName: products[0].productName },
+          products.map((product) => ({
+            productName: product.productName,
+            file: product.files.datasheet
+          })),
+          expectedLanguagePackageFingerprints,
+          logs
+        ),
+        logLine,
+        logs,
+        "批量语言包处理"
       ) || { results: [], warnings: [] };
     } catch (error) {
       const message = `语言包处理失败，产品上架继续执行：${error?.message || String(error)}`;
@@ -172,23 +183,28 @@ function createProductPublishingBatchFeature(deps) {
       }
       try {
         logLine(logs, `执行上架产品：${product.productName}`);
-        const result = await revisionFeature.submitPublishingWithoutLanguagePackage({
-          ...(body || {}),
-          productName: product.productName,
-          expectedSourceFingerprint: previewResult.source?.fingerprint || "",
-          expectedCopySourceFingerprints: JSON.stringify(Object.fromEntries(
-            (previewResult.results || [])
-              .filter((item) => item.copySource?.sourceFingerprint)
-              .map((item) => [item.site.siteCode, item.copySource.sourceFingerprint])
-          )),
-          expectedWorkbookFingerprint: previewResult.workbook?.fingerprint || "",
-          expectedLanguageDatasheetFingerprint: previewResult.languageDatasheet?.fingerprint || "",
-          expectedLanguagePackageFingerprints: JSON.stringify(Object.fromEntries(
-            (previewResult.results || [])
-              .filter((item) => item.languagePackage?.sourceFingerprint)
-              .map((item) => [item.site.siteCode, item.languagePackage.sourceFingerprint])
-          ))
-        }, product.files.specification, product.files.datasheet, logs);
+        const result = await retryAfterBrowserClosed(
+          () => revisionFeature.submitPublishingWithoutLanguagePackage({
+            ...(body || {}),
+            productName: product.productName,
+            expectedSourceFingerprint: previewResult.source?.fingerprint || "",
+            expectedCopySourceFingerprints: JSON.stringify(Object.fromEntries(
+              (previewResult.results || [])
+                .filter((item) => item.copySource?.sourceFingerprint)
+                .map((item) => [item.site.siteCode, item.copySource.sourceFingerprint])
+            )),
+            expectedWorkbookFingerprint: previewResult.workbook?.fingerprint || "",
+            expectedLanguageDatasheetFingerprint: previewResult.languageDatasheet?.fingerprint || "",
+            expectedLanguagePackageFingerprints: JSON.stringify(Object.fromEntries(
+              (previewResult.results || [])
+                .filter((item) => item.languagePackage?.sourceFingerprint)
+                .map((item) => [item.site.siteCode, item.languagePackage.sourceFingerprint])
+            ))
+          }, product.files.specification, product.files.datasheet, logs),
+          logLine,
+          logs,
+          `${product.productName} 上架`
+        );
         results.push({
           status: result.failedCount ? "partial" : "completed",
           productName: product.productName,
@@ -214,6 +230,7 @@ function createProductPublishingBatchFeature(deps) {
 
 module.exports = {
   MAX_BATCH_PRODUCTS,
+  isClosedBrowserError,
   fileKind,
   productNameFromPath,
   uploadSequence,

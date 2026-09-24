@@ -31,6 +31,7 @@
 | GET | `/api/campaign/audit-job/:jobId` | 读取巡查进度 |
 
 Popup 为单资源位。提交前先读取列表：无记录时直接新增；唯一记录的 `Period` 已过期时删除并回读确认后新增；未过期、日期无法解析或出现多条记录时停止并汇报。
+Popup 新建固定使用 Playwright 操作真实后台页面：填写表单、通过文件控件上传图片、点击 Submit，并在列表页点击 Enable；不调用创建、启用或图片上传接口模拟提交。
 
 内部 EZVIZ Banner UTM：
 
@@ -112,6 +113,7 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/language-package/hg2-400-4-submit` | 按预览指纹逐站修改、上传并重新下载回读；失败时回滚原包 |
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |
 | POST | `/api/assets/upload-image` | 上传图片 |
+| POST | `/api/doc-upload` | 使用文件服务 `service/attach` 动态 token 批量上传 PDF，并为成功文件返回多个独立的 `<li><a target="_blank" ...></a></li>` 标签；链接文字为文件名去掉 `.pdf`，不包含外层 `<ul>` |
 
 产品修订分为两种：同一产品跨国家修订继续使用 Specifications 与 Datasheet 同步；多个不同产品的相同部分修订可同时选择多个站点，对 Detail 或 Specification 执行同一条精确删除/替换，或只把 Specification 的 Custom Page Name 输入框修成站点固定文案。后者按国家 × 产品逐项预览、保存和回读，单项失败不影响其他任务，一次最多 50 个产品。产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
 

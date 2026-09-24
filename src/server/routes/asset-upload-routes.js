@@ -4,7 +4,10 @@ const net = require("net");
 const path = require("path");
 const {
   WEBFLOW_UPLOAD_API,
+  createServiceUploadToken,
   createWebflowUploadToken,
+  getWebflowUploadSecret,
+  normalizeWebflowAssetUrl,
   uploadWebflowAssetBuffer,
   validateWebflowUploadTarget
 } = require("../features/webflow-asset-upload");
@@ -30,9 +33,34 @@ function isPdfDocument(file) {
     || String(file?.mimetype || "").toLowerCase() === "application/pdf";
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function buildDocumentListHtml(results) {
+  return (results || [])
+    .filter((item) => item?.ok && item.url)
+    .map((item) => {
+      const label = String(item.fileName || "").replace(/\.pdf$/i, "");
+      return [
+        "<li>",
+        `    <a target="_blank" href="${escapeHtml(item.url)}">${escapeHtml(label)}</a>`,
+        "</li>"
+      ].join("\n");
+    })
+    .join("\n");
+}
+
 async function uploadDocumentToFs(file) {
+  const originalname = String(file.originalname || "document.pdf");
+  const secret = await getWebflowUploadSecret();
   const form = new FormData();
   form.append("app", "service");
+  form.append("appid", "service");
   form.append("flag", "attach");
   form.append("quality", "100");
   form.append("ext", "pdf,zip,rar,exe,bin,dav,apk");
@@ -40,9 +68,10 @@ async function uploadDocumentToFs(file) {
   form.append("path_rule", "custom");
   form.append("path", "");
   form.append("purge", "1");
+  form.append("token", createServiceUploadToken(originalname, secret));
   form.append("file", new Blob([fs.readFileSync(file.path)], {
     type: file.mimetype || "application/pdf"
-  }), file.originalname);
+  }), originalname);
 
   const response = await fetch(FS_UPLOAD_URL, { method: "POST", body: form });
   const text = await response.text();
@@ -57,7 +86,7 @@ async function uploadDocumentToFs(file) {
     throw new Error(payload.message || payload.msg || "HTTP " + response.status);
   }
 
-  const url = normalizeUploadedUrl(payload);
+  const url = normalizeWebflowAssetUrl(payload);
   if (!url) throw new Error("上传成功，但未返回文件地址。");
   return { url, payload };
 }
@@ -190,7 +219,11 @@ function registerAssetUploadRoutes(app, { upload }) {
         results.push({ fileName: file.originalname, ok: false, error: error?.message || String(error) });
       }
     }
-    res.json({ ok: results.some((item) => item.ok), results });
+    res.json({
+      ok: results.some((item) => item.ok),
+      results,
+      html: buildDocumentListHtml(results)
+    });
   });
 }
 
@@ -200,6 +233,8 @@ module.exports = {
   uploadUrlToFs,
   uploadDocumentToFs,
   isPdfDocument,
+  buildDocumentListHtml,
+  createServiceUploadToken,
   createWebflowUploadToken,
   validateRemoteImageUrl,
   isPrivateAddress

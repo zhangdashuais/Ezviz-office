@@ -1,5 +1,5 @@
 function createPopupManagement(deps) {
-  const { fs, path, logLine, normalizeBool, FS_UPLOAD_URL, NEW_SHOP_API_BASE, NEW_SHOP_POPUP_EDIT_URL,
+  const { logLine, NEW_SHOP_API_BASE, NEW_SHOP_POPUP_EDIT_URL,
     readCampaignConfig, requireSingleCampaignSite, getShopContext, getOpenPage,
     ensureShopLoggedIn, credentialDomainForSite, buildPopupPlan } = deps;
 
@@ -44,24 +44,6 @@ function createPopupManagement(deps) {
     }, String(value));
   }
 
-  function normalizePopupConfigType(value) {
-    const text = String(value || "").trim().toLowerCase();
-    if (!text) return "all";
-    if (["index", "home", "home page", "homepage"].includes(text)) return "index";
-    if (["all", "all page", "allpage"].includes(text)) return "all";
-    if (["custom", "custom page", "custompage"].includes(text)) return "custom";
-    return text;
-  }
-
-  function normalizePopupFrequency(value) {
-    const text = String(value || "").trim().toLowerCase();
-    if (!text) return 2;
-    if (text === "1" || text.includes("only") || text.includes("once only")) return 1;
-    if (text === "2" || text.includes("day")) return 2;
-    const numeric = Number(text);
-    return Number.isFinite(numeric) && numeric > 0 ? numeric : 2;
-  }
-
   function newShopApiSucceeded(data) {
     const code = Number(data?.code);
     return data?.success === true || data?.status === true || code === 0 || code === 200;
@@ -85,59 +67,6 @@ function createPopupManagement(deps) {
       throw new Error("new-shop 接口失败 " + apiPath + "：" + (json?.msg || json?.message || text.slice(0, 300)));
     }
     return json;
-  }
-
-  async function uploadPopupImageDirect(page, file, logs) {
-    if (!file?.path || !fs.existsSync(file.path)) throw new Error("缺少 Popup 图片文件。");
-    const tokenResult = await newShopApiPost(page, "/system/get-fs-token", {});
-    const token = tokenResult?.data?.token;
-    const appid = tokenResult?.data?.appid;
-    if (!token || !appid) {
-      throw new Error("没有从 new-shop 取到 Popup 图片上传 token。");
-    }
-
-    const form = new FormData();
-    form.append("flag", "lottery");
-    form.append("app", "mall");
-    form.append("token", token);
-    form.append("appid", appid);
-    form.append("quality", "100");
-    form.append("type", "file");
-    const blob = new Blob([fs.readFileSync(file.path)], { type: file.mimetype || "application/octet-stream" });
-    form.append("file", blob, file.originalname || path.basename(file.path));
-
-    const response = await fetch(FS_UPLOAD_URL, { method: "POST", body: form });
-    const text = await response.text();
-    let data = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error("Popup 图片上传返回不是 JSON：" + text.slice(0, 300));
-    }
-    if (!response.ok || !data?.status || !data?.uri) {
-      throw new Error("Popup 图片上传失败：" + (data?.msg || text.slice(0, 300)));
-    }
-    logLine(logs, "Popup 图片已上传到文件服务：" + data.uri);
-    return data.uri;
-  }
-
-  async function findPopupConfigByName(page, popupName) {
-    const result = await newShopApiPost(page, "/shop-config/list", {
-      page: 1,
-      pageSize: 50,
-      moduleType: "popup"
-    });
-    const rows = Array.isArray(result?.data?.list)
-      ? result.data.list
-      : Array.isArray(result?.data?.records)
-        ? result.data.records
-        : Array.isArray(result?.data)
-          ? result.data
-          : [];
-    return rows.find((row) => {
-      const content = row?.content || {};
-      return content.popupName === popupName || row.popupName === popupName || row.name === popupName;
-    }) || null;
   }
 
   function popupRowsFromListResult(result) {
@@ -296,80 +225,6 @@ function createPopupManagement(deps) {
     return { action: "deleted-expired", previous: previousInfo };
   }
 
-  async function submitPopupDirectToBackend(body, files, logs) {
-    const config = readCampaignConfig();
-    const site = requireSingleCampaignSite(config, body);
-    const plan = buildPopupPlan({ ...body, sites: JSON.stringify([site.siteCode]) }, files);
-    const item = plan.items[0];
-    const fields = item.fields;
-    const image = files?.image?.[0];
-    if (!image) throw new Error("实际提交 Popup 需要上传图片。");
-
-    const context = await getShopContext();
-    let page = await getOpenPage(context);
-    page.setDefaultTimeout(25000);
-
-    page = await ensureShopLoggedIn(page, { ...body, credentialDomain: credentialDomainForSite(site), credentialGroup: "Website" }, logs);
-    logLine(logs, "打开 Popup 新建页建立后台登录态：" + NEW_SHOP_POPUP_EDIT_URL);
-    await page.goto(NEW_SHOP_POPUP_EDIT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(3000);
-
-    const slotCleanup = await clearExpiredPopupSlot(page, logs);
-    const popupImage = await uploadPopupImageDirect(page, image, logs);
-    const webUrl = item.localizedWebUrlSuggestion || item.webUrl;
-    const mobileUrl = item.localizedMobileUrlSuggestion || item.mobileUrl;
-    const createPayload = {
-      moduleType: "popup",
-      configType: normalizePopupConfigType(fields.whereToShow),
-      content: {
-        popupName: fields.name,
-        popupBrief: fields.brief,
-        startTime: normalizePopupDateTime(fields.startAt),
-        endTime: normalizePopupDateTime(fields.endAt),
-        popupFrequency: normalizePopupFrequency(fields.frequency),
-        popupWebUrl: webUrl,
-        popupMobileUrl: mobileUrl,
-        popupType: "image",
-        popupImage
-      }
-    };
-
-    logLine(logs, "直接提交 Popup 配置：" + fields.name);
-    const createResult = await newShopApiPost(page, "/shop-config/create", createPayload);
-    let configNo = createResult?.data?.configNo || createResult?.data?.config_no || createResult?.data?.config_no_id || "";
-    let createdRow = null;
-    if (!configNo) {
-      createdRow = await findPopupConfigByName(page, fields.name);
-      configNo = createdRow?.configNo || createdRow?.config_no || "";
-    }
-    logLine(logs, "Popup 配置已创建" + (configNo ? "，编号：" + configNo : "，但接口未返回编号"));
-
-    if (fields.enableAfterSubmit) {
-      if (!configNo) throw new Error("Popup 已创建，但未能反查到 configNo，无法启用。");
-      await newShopApiPost(page, "/shop-config/switch", {
-        configNo,
-        isValid: true,
-        moduleType: "popup"
-      });
-      logLine(logs, "Popup 已通过接口启用：" + configNo);
-    }
-
-    return {
-      mode: "direct-post",
-      site,
-      name: fields.name,
-      configType: createPayload.configType,
-      frequency: createPayload.content.popupFrequency,
-      webUrl,
-      mobileUrl,
-      image: popupImage,
-      configNo,
-      enabled: fields.enableAfterSubmit,
-      slotCleanup,
-      currentUrl: page.url()
-    };
-  }
-
   async function submitPopupViaUi(body, files, logs) {
     const config = readCampaignConfig();
     const site = requireSingleCampaignSite(config, body);
@@ -421,16 +276,23 @@ function createPopupManagement(deps) {
       await page.waitForTimeout(4000);
     }
 
-    return { site, webUrl: item.localizedWebUrlSuggestion || item.webUrl, mobileUrl: item.localizedMobileUrlSuggestion || item.mobileUrl, slotCleanup, currentUrl: page.url() };
+    const savedRow = page.locator("tr").filter({ hasText: fields.name }).first();
+    await savedRow.waitFor({ state: "visible", timeout: 15000 });
+    return {
+      mode: "ui-form",
+      site,
+      name: fields.name,
+      webUrl: item.localizedWebUrlSuggestion || item.webUrl,
+      mobileUrl: item.localizedMobileUrlSuggestion || item.mobileUrl,
+      enabled: fields.enableAfterSubmit,
+      slotCleanup,
+      currentUrl: page.url()
+    };
   }
 
   async function submitPopupToBackend(body, files, logs) {
-    if (normalizeBool(body?.useUiPopupFlow)) {
-      logLine(logs, "使用旧版页面点击方式提交 Popup。");
-      return submitPopupViaUi(body, files, logs);
-    }
-    logLine(logs, "使用快路径提交 Popup：Playwright 登录定位 + 接口上传/创建/启用。");
-    return submitPopupDirectToBackend(body, files, logs);
+    logLine(logs, "使用 Playwright 页面表单提交 Popup：填写字段、上传图片、点击提交并在列表启用。");
+    return submitPopupViaUi(body, files, logs);
   }
 
   return { submit: submitPopupToBackend, deleteExisting: deleteExistingPopup };

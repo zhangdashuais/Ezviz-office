@@ -16,6 +16,33 @@ test("recognizes Datasheet and Specifications files in a selected folder", () =>
   assert.equal(productNameFromPath("Products/DL50/DL50FVS Plus(5085)_datasheet.xlsx"), "DL50FVS Plus(5085)");
   assert.equal(productNameFromPath("Products/DL50/DL50FVS Plus(5085)_spec.xlsx"), "DL50FVS Plus(5085)");
   assert.equal(productNameFromPath("Products/EB3 Datasheet.xlsx"), "EB3");
+  assert.equal(productNameFromPath("Products/ignored-folder/EB3 Spec_VN_revised.xlsx"), "EB3");
+});
+
+test("pairs workbooks by the normalized product name in each filename", () => {
+  const files = [
+    { originalname: "0000__CB90 Dual 3K Kit datasheet.xlsx", path: "a" },
+    { originalname: "0001__CB90 Dual 3K Kit spec.xlsx", path: "b" }
+  ];
+  const products = groupProductFiles(files, [
+    { uploadName: files[0].originalname, relativePath: "Folder A/CB90 Dual 3K Kit datasheet.xlsx" },
+    { uploadName: files[1].originalname, relativePath: "Folder B/CB90 Dual 3K Kit spec.xlsx" }
+  ]);
+  assert.equal(products.length, 1);
+  assert.equal(products[0].productName, "CB90 Dual 3K Kit");
+});
+
+test("pairs regional suffixes and reordered product words", () => {
+  const files = [
+    { originalname: "0000__CB90 Dual 3K Kit datasheet_VN_revised.xlsx", path: "a" },
+    { originalname: "0001__CB90 Dual Kit 3K Spec_VN_revised.xlsx", path: "b" }
+  ];
+  const products = groupProductFiles(files, [
+    { uploadName: files[0].originalname, relativePath: files[0].originalname.slice(6) },
+    { uploadName: files[1].originalname, relativePath: files[1].originalname.slice(6) }
+  ]);
+  assert.equal(products.length, 1);
+  assert.equal(products[0].productName, "CB90 Dual 3K Kit");
 });
 
 test("groups exactly one Datasheet and Specifications workbook per product", () => {
@@ -204,4 +231,33 @@ test("batch submit continues product publishing when language package processing
   assert.deepEqual(calls, ["CP8"]);
   assert.equal(result.completedCount, 1);
   assert.match(result.warnings[0].message, /继续执行/);
+});
+
+test("batch submit retries once when the shop browser closes", async () => {
+  let attempts = 0;
+  const feature = createProductPublishingBatchFeature({
+    logLine() {},
+    revisionFeature: {
+      async submitPublishingLanguagePackageBatch() {},
+      async submitPublishingWithoutLanguagePackage() {
+        attempts += 1;
+        if (attempts === 1) throw new Error("Target page, context or browser has been closed");
+        return { failedCount: 0 };
+      }
+    }
+  });
+  const files = [
+    { originalname: "0000__CP8_Datasheet.xlsx", path: "a" },
+    { originalname: "0001__CP8_Specifications.xlsx", path: "b" }
+  ];
+  const batchManifest = JSON.stringify([
+    { uploadName: files[0].originalname, relativePath: "CP8/CP8 Datasheet.xlsx" },
+    { uploadName: files[1].originalname, relativePath: "CP8/CP8 Specifications.xlsx" }
+  ]);
+  const result = await feature.submit({
+    batchManifest,
+    expectedBatchPreviews: JSON.stringify({ CP8: { workbook: {}, languageDatasheet: {}, results: [] } })
+  }, files, []);
+  assert.equal(attempts, 2);
+  assert.equal(result.completedCount, 1);
 });

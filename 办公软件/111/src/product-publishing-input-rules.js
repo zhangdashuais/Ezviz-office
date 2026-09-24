@@ -16,5 +16,32 @@
       .replace(/[\s_-]+$/g, "").trim();
   }
 
-  return { hasCombinedPublishingSheets, productNameFromCombinedWorkbook };
+  function publishingWorkbookInfo(fileName) {
+    const name = String(fileName || "").split(/[\\/]/).pop() || "";
+    if (!/\.xlsx?$/i.test(name)) return { kind: "", productName: "" };
+    const base = name.replace(/\.[^.]+$/, "");
+    const marker = /datasheet/i.exec(base) || /spec(?:ification)?s?/i.exec(base);
+    if (!marker) return { kind: "", productName: "" };
+    return {
+      kind: /^datasheet$/i.test(marker[0]) ? "datasheet" : "specification",
+      productName: base.slice(0, marker.index).replace(/[\s_-]+$/g, "").trim()
+    };
+  }
+
+  function publishingProductMatchKey(productName) {
+    return (String(productName || "")
+      .normalize("NFKC")
+      .replace(/[\u207a＋]/g, "+")
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+|\+/gu) || [])
+      .sort()
+      .join(" ");
+  }
+
+  return {
+    hasCombinedPublishingSheets,
+    productNameFromCombinedWorkbook,
+    publishingWorkbookInfo,
+    publishingProductMatchKey
+  };
 });
