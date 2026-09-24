@@ -14,6 +14,7 @@
       <div class="nav-label">基础工具</div>
       <div class="nav-items-wrapper">
         <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
+        <div class="nav-item" data-target="tab-asset-upload">图片 / SVG 上传</div>
         <div class="nav-item" data-target="tab-ai-badge">图片 AI 标志</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
       </div>
@@ -22,7 +23,7 @@
     <div class="nav-group">
       <div class="nav-label">产品资料</div>
       <div class="nav-items-wrapper">
-        <div class="nav-item" data-target="tab-pdf-upload">PDF 上传转地址</div>
+        <div class="nav-item" data-target="tab-pdf-upload">DOC上传</div>
         <div class="nav-item" data-target="tab-text-comparison">PDF / HTML 文字对比</div>
         <div class="nav-item" data-target="tab-spec-upload">Spec 参数解析</div>
         <div class="nav-item" data-target="tab-spec-excel-build">Datasheet 生成 Spec 表</div>
@@ -145,15 +146,32 @@
         </div>
       </div>
 
+      <div id="tab-asset-upload" class="tab-content">
+        <div class="card">
+          <h3>图片 / SVG 上传</h3>
+          <div class="form-grid">
+            <label for="assetUploadFiles">选择文件</label>
+            <input id="assetUploadFiles" type="file" accept="image/*,.svg" multiple>
+            <label for="assetUploadFolder">选择文件夹</label>
+            <input id="assetUploadFolder" type="file" accept="image/*,.svg" webkitdirectory directory multiple>
+          </div>
+          <div class="row" style="margin-top: 16px; margin-bottom: 0;">
+            <button id="assetUploadRunBtn" type="button">上传并生成地址</button>
+            <button id="assetUploadCopyBtn" type="button" disabled>复制地址</button>
+            <button id="assetUploadClearBtn" type="button" disabled>清空结果</button>
+          </div>
+        </div>
+        <div id="assetUploadStatus" class="status">请选择 PNG、JPG、WEBP、GIF 或 SVG 文件。</div>
+        <div class="card">
+          <h3>上传结果</h3>
+          <textarea id="assetUploadOutput" readonly placeholder="生成的 CDN 地址会显示在这里..."></textarea>
+        </div>
+      </div>
+
       <div id="tab-pdf-upload" class="tab-content">
         <div class="card">
-          <h3>PDF 上传转地址</h3>
-          <p class="desc">支持一次选择多个 PDF，或选择包含 PDF 的整个文件夹；文件夹中的非 PDF 文件会自动忽略。上传后返回可复制的文件地址。</p>
-
-          <div class="row">
-            <label>上传接口</label>
-            <input id="pdfUploadApiInput" type="text" value="https://fs.ezvizlife.com/upload.php" style="flex: 1;">
-          </div>
+          <h3>DOC上传</h3>
+          <p class="desc">一次上传多个 PDF 并生成资料平台可用的文件地址。单个文件失败不会中断其他文件。</p>
 
           <div class="row">
             <label>PDF 文件（可多选）</label>
@@ -166,7 +184,7 @@
         </div>
 
         <div id="pdfUploadStatus" class="status">请选择一个或多个 PDF 文件。</div>
-        <textarea id="pdfUploadOutput" placeholder="上传成功后的地址会显示在这里..."></textarea>
+        <textarea id="pdfUploadOutput" placeholder="上传成功后的文件地址会显示在这里..."></textarea>
       </div>
 
       <div id="tab-text-comparison" class="tab-content">
@@ -1035,6 +1053,7 @@
   <script src="src/inline-output.js?v=20260917-1"></script>
   <script src="src/module-task-progress.js?v=20260814-2"></script>
   <script src="src/module-inline.js"></script>
+  <script src="src/module-asset-upload.js?v=20260924-1"></script>
   <script src="src/module-ai-badge.js?v=20260911-2"></script>
   <script src="src/module-pdf-upload.js?v=20260908-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>

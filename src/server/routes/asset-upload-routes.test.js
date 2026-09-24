@@ -1,10 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createWebflowUploadToken, isPrivateAddress, validateRemoteImageUrl } = require("./asset-upload-routes");
+const { createWebflowUploadToken, isPdfDocument, isPrivateAddress, validateRemoteImageUrl } = require("./asset-upload-routes");
 
 test("Webflow upload token keeps the filename outside the digest", () => {
   const token = createWebflowUploadToken("asset.png", "secret", 1_700_000_000_000);
   assert.match(token, /^[a-f0-9]{32}\d{5}asset\.png$/);
+});
+
+test("DOC upload accepts PDF extensions and rejects other document types", () => {
+  assert.equal(isPdfDocument({ originalname: "Datasheet.PDF", mimetype: "application/octet-stream" }), true);
+  assert.equal(isPdfDocument({ originalname: "document.docx", mimetype: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), false);
 });
 
 test("remote album image URL validation blocks unsafe network targets", () => {

@@ -1,5 +1,4 @@
 (function () {
-  const apiInput = document.getElementById("pdfUploadApiInput");
   const fileInput = document.getElementById("pdfFileInput");
   const folderInput = document.getElementById("pdfFolderInput");
   const uploadBtn = document.getElementById("pdfUploadBtn");
@@ -7,7 +6,7 @@
   const statusEl = document.getElementById("pdfUploadStatus");
   const outputEl = document.getElementById("pdfUploadOutput");
 
-  if (!apiInput || !fileInput || !folderInput || !uploadBtn || !copyBtn || !statusEl || !outputEl) {
+  if (!fileInput || !folderInput || !uploadBtn || !copyBtn || !statusEl || !outputEl) {
     return;
   }
 
@@ -16,102 +15,12 @@
     statusEl.className = "status" + (type ? " " + type : "");
   }
 
-  function buildFormData(file) {
-    const formData = new FormData();
-    formData.append("app", "service");
-    formData.append("flag", "attach");
-    formData.append("quality", "100");
-    formData.append("ext", "pdf,zip,rar,exe,bin,dav,apk");
-    formData.append("size", "102400");
-    formData.append("path_rule", "custom");
-    formData.append("path", "");
-    formData.append("purge", "1");
-    formData.append("file", file, file.name);
-    return formData;
-  }
-
-  function normalizeResponseUrl(payload) {
-    if (payload && payload.uri) {
-      const uri = String(payload.uri).replace(/^\/+/, "");
-      return "https://mfs.ezvizlife.com/" + uri.replace(/^mfs\.ezvizlife\.com\/?/i, "");
-    }
-
-    if (payload && payload.full_url) {
-      return String(payload.full_url)
-        .replace(/^https?:\/\/s3\.amazonaws\.com\/mfs\.ezvizlife\.com\/?/i, "https://mfs.ezvizlife.com/")
-        .replace(/^https?:\/\/mfs\.ezvizlife\.com\/?/i, "https://mfs.ezvizlife.com/");
-    }
-
-    return "";
-  }
-
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function getPdfTitle(fileName, url) {
-    const source = fileName || url.split("/").pop() || "";
-    const withoutQuery = source.split(/[?#]/)[0];
-    const withoutExt = withoutQuery.replace(/\.pdf$/i, "");
-
-    try {
-      return decodeURIComponent(withoutExt.replace(/\+/g, " "));
-    } catch (_) {
-      return withoutExt.replace(/\+/g, " ");
-    }
-  }
-
-  function buildPdfLinkHtml(result) {
-    const title = getPdfTitle(result.fileName, result.url);
-    return [
-      "            <li>",
-      '                <a target="_blank" href="' + escapeHtml(result.url) + '">' + escapeHtml(title) + "</a>",
-      "            </li>"
-    ].join("\n");
-  }
-
-  async function uploadPdf(file, uploadApi) {
-    const response = await fetch(uploadApi, {
-      method: "POST",
-      body: buildFormData(file)
-    });
-
-    const text = await response.text();
-    let payload;
-    try {
-      payload = JSON.parse(text);
-    } catch (_) {
-      throw new Error("上传接口返回的不是 JSON: " + text.slice(0, 200));
-    }
-
-    if (!response.ok || payload.status === false) {
-      throw new Error(payload.message || payload.msg || "HTTP " + response.status);
-    }
-
-    const url = normalizeResponseUrl(payload);
-    if (!url) {
-      throw new Error("上传成功，但没有返回 full_url 或 uri。");
-    }
-
-    return {
-      fileName: file.name,
-      url,
-      payload
-    };
-  }
-
   uploadBtn.addEventListener("click", async () => {
     const candidates = [...(fileInput.files || []), ...(folderInput.files || [])];
     const files = [...new Map(candidates
       .filter((file) => /\.pdf$/i.test(file.name) || file.type === "application/pdf")
       .map((file) => [`${file.webkitRelativePath || file.name}:${file.size}:${file.lastModified}`, file]))
       .values()];
-    const uploadApi = apiInput.value.trim() || "https://fs.ezvizlife.com/upload.php";
-
     if (!files.length) {
       setStatus("请先选择一个或多个 PDF，或选择包含 PDF 的文件夹。", "warn");
       return;
@@ -122,30 +31,28 @@
     outputEl.value = "";
     setStatus(`正在上传 ${files.length} 个 PDF...`);
 
-    const links = [];
-    const errors = [];
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file, file.name));
+      const response = await fetch("/api/doc-upload", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "DOC 上传失败。");
 
-    for (const file of files) {
-      try {
-        const result = await uploadPdf(file, uploadApi);
-        links.push(buildPdfLinkHtml(result));
-        setStatus("已上传: " + result.fileName);
-      } catch (error) {
-        errors.push(file.name + ": " + (error && error.message ? error.message : String(error)));
-      }
+      const succeeded = (payload.results || []).filter((item) => item.ok);
+      const failed = (payload.results || []).filter((item) => !item.ok);
+      outputEl.value = succeeded.map((item) => item.fileName + "\n" + item.url).join("\n\n");
+      copyBtn.disabled = succeeded.length === 0;
+      setStatus(
+        failed.length
+          ? `已生成 ${succeeded.length} 个地址，${failed.length} 个文件失败：${failed.map((item) => item.fileName).join("、")}`
+          : `上传完成，共生成 ${succeeded.length} 个地址。`,
+        failed.length ? "warn" : "ok"
+      );
+    } catch (error) {
+      setStatus(error?.message || "DOC 上传失败。", "warn");
+    } finally {
+      uploadBtn.disabled = false;
     }
-
-    outputEl.value = links.join("\n");
-    copyBtn.disabled = links.length === 0;
-    const lines = links;
-
-    if (errors.length) {
-      setStatus("处理完成，但有文件失败:\n" + errors.join("\n"), "warn");
-    } else {
-      setStatus("上传完成，共生成 " + lines.length + " 个地址。", "ok");
-    }
-
-    uploadBtn.disabled = false;
   });
 
   copyBtn.addEventListener("click", async () => {

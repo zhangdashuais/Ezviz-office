@@ -1,92 +1,65 @@
 const fs = require("fs");
-const crypto = require("crypto");
 const dns = require("dns").promises;
 const net = require("net");
 const path = require("path");
+const {
+  WEBFLOW_UPLOAD_API,
+  createWebflowUploadToken,
+  uploadWebflowAssetBuffer,
+  validateWebflowUploadTarget
+} = require("../features/webflow-asset-upload");
 
 const MAX_REMOTE_IMAGE_BYTES = 25 * 1024 * 1024;
-const WEBFLOW_UPLOAD_BUNDLE_URL = "http://h5-v2.ezviz-mall.com:8800/static/js/module/home.3bbb70eae65b09cf092c.js";
-let webflowUploadSecret;
 const IMAGE_MIME_TO_EXT = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp"
 };
-
-function normalizeUploadedUrl(payload) {
-  const uri = String(payload.uri || "").replace(/^\/+/, "");
-  return uri
-    ? (/^https?:\/\//i.test(uri)
-      ? uri
-      : /^mfs\.ezvizlife\.com\//i.test(uri)
-        ? "https://" + uri
-        : "https://mfs.ezvizlife.com/" + uri)
-    : payload.full_url;
-}
-
-async function getWebflowUploadSecret() {
-  if (process.env.FS_UPLOAD_SECRET) return process.env.FS_UPLOAD_SECRET;
-  if (webflowUploadSecret) return webflowUploadSecret;
-
-  const response = await fetch(WEBFLOW_UPLOAD_BUNDLE_URL, { signal: AbortSignal.timeout(15000) });
-  if (!response.ok) throw new Error(`无法读取 Webflow 上传配置：HTTP ${response.status}`);
-  const source = await response.text();
-  const match = source.match(/const r=n\(456\),i="mall",a="([^"]+)";function s\(e\)/);
-  if (!match) throw new Error("无法读取 Webflow 上传配置。");
-  webflowUploadSecret = match[1];
-  return webflowUploadSecret;
-}
-
-function createWebflowUploadToken(fileName, secret, now = Date.now()) {
-  const time = String(Math.floor(now / 1000)).slice(-5);
-  const input = `mall${secret}${time}${fileName}`;
-  return crypto.createHash("md5").update(input, "utf8").digest("hex") + time + fileName;
-}
+const FS_UPLOAD_URL = "https://fs.ezvizlife.com/upload.php";
 
 async function uploadBufferToFs(target, buffer, file) {
-  const ext = String(file.originalname || file.filename || "").split(".").pop().toLowerCase();
-  const mime = file.mimetype || ({
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp"
-  }[ext] || "application/octet-stream");
-  const secret = await getWebflowUploadSecret();
-  const dataCandidates = [{
-    app: "mall",
-    appid: "mall",
-    flag: "static",
-    is_org_name: "0",
-    token: createWebflowUploadToken(file.originalname, secret)
-  }];
-
-  let lastText = "";
-  for (const data of dataCandidates) {
-    const form = new FormData();
-    Object.entries(data).forEach(([key, value]) => form.append(key, value));
-    form.append("file", new Blob([buffer], { type: mime }), file.originalname);
-
-    const response = await fetch(target, { method: "POST", body: form });
-    const text = await response.text();
-    lastText = text;
-
-    let payload;
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      continue;
-    }
-
-    if (response.ok && (payload.full_url || payload.uri)) {
-      return { url: normalizeUploadedUrl(payload), payload };
-    }
-  }
-
-  throw new Error("Asset upload failed: " + lastText.slice(0, 200));
+  return uploadWebflowAssetBuffer(buffer, file, target);
 }
 
 async function uploadToFs(target, file) {
   return uploadBufferToFs(target, fs.readFileSync(file.path), file);
+}
+
+function isPdfDocument(file) {
+  return /\.pdf$/i.test(String(file?.originalname || ""))
+    || String(file?.mimetype || "").toLowerCase() === "application/pdf";
+}
+
+async function uploadDocumentToFs(file) {
+  const form = new FormData();
+  form.append("app", "service");
+  form.append("flag", "attach");
+  form.append("quality", "100");
+  form.append("ext", "pdf,zip,rar,exe,bin,dav,apk");
+  form.append("size", "102400");
+  form.append("path_rule", "custom");
+  form.append("path", "");
+  form.append("purge", "1");
+  form.append("file", new Blob([fs.readFileSync(file.path)], {
+    type: file.mimetype || "application/pdf"
+  }), file.originalname);
+
+  const response = await fetch(FS_UPLOAD_URL, { method: "POST", body: form });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error("文件服务返回格式异常：" + text.slice(0, 160));
+  }
+
+  if (!response.ok || payload.status === false) {
+    throw new Error(payload.message || payload.msg || "HTTP " + response.status);
+  }
+
+  const url = normalizeUploadedUrl(payload);
+  if (!url) throw new Error("上传成功，但未返回文件地址。");
+  return { url, payload };
 }
 
 function isPrivateAddress(address) {
@@ -189,11 +162,7 @@ function registerAssetUploadRoutes(app, { upload }) {
         throw new Error("No file received for upload.");
       }
 
-      const target = String(req.body?.uploadApi || "https://fs.ezvizlife.com/upload.php").trim();
-      const parsed = new URL(target);
-      if (parsed.protocol !== "https:" || parsed.hostname !== "fs.ezvizlife.com" || parsed.pathname !== "/upload.php") {
-        throw new Error("Upload API is restricted to https://fs.ezvizlife.com/upload.php.");
-      }
+      const target = validateWebflowUploadTarget(req.body?.uploadApi || WEBFLOW_UPLOAD_API);
 
       const result = await uploadToFs(target, req.file);
       res.json({ ok: true, url: result.url, payload: result.payload });
@@ -201,12 +170,36 @@ function registerAssetUploadRoutes(app, { upload }) {
       res.status(400).json({ ok: false, error: error?.message || String(error) });
     }
   });
+
+  app.post("/api/doc-upload", upload.array("files", 50), async (req, res) => {
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) {
+      return res.status(400).json({ ok: false, error: "请至少选择一个 PDF 文件。" });
+    }
+
+    const results = [];
+    for (const file of files) {
+      if (!isPdfDocument(file)) {
+        results.push({ fileName: file.originalname, ok: false, error: "仅支持 PDF 文件。" });
+        continue;
+      }
+      try {
+        const result = await uploadDocumentToFs(file);
+        results.push({ fileName: file.originalname, ok: true, url: result.url });
+      } catch (error) {
+        results.push({ fileName: file.originalname, ok: false, error: error?.message || String(error) });
+      }
+    }
+    res.json({ ok: results.some((item) => item.ok), results });
+  });
 }
 
 module.exports = {
   registerAssetUploadRoutes,
   uploadToFs,
   uploadUrlToFs,
+  uploadDocumentToFs,
+  isPdfDocument,
   createWebflowUploadToken,
   validateRemoteImageUrl,
   isPrivateAddress
