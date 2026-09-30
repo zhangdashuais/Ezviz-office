@@ -105,7 +105,7 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/language-package/upload` | 上传语言包 |
 | GET/POST | `/api/language-package/local-i18n-paths` | 读取或保存本机 i18n Datasheet 默认路径 |
 | POST | `/api/language-package/local-i18n-path-picker` | 打开本机 HTML、Excel、输出目录或最终 `.xlsx` 保存路径选择器 |
-| POST | `/api/language-package/local-i18n-datasheet` | 使用请求路径、已保存默认路径或自动匹配路径生成 Datasheet 并替换 HTML |
+| POST | `/api/language-package/local-i18n-datasheet` | 使用请求路径、已保存默认路径或自动匹配路径生成 Datasheet 并替换 HTML；纯数字节点单独出现时跳过，完整文案中的数字随整句转换 |
 | POST | `/api/language-package/datasheet-inspect` | 识别单产品 Datasheet 的语种列和字段，不访问商城后台 |
 | POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖预览；没有 Edit/Download 行的英文站点可使用明确带匹配 `lang_code` 的 Download Language Template；页面默认跳过站点缺失 Key，不上传 |
 | POST | `/api/language-package/datasheet-submit` | 单任务运行；只提交预览为 `ready` 的站点，`failed` / `no-change` 站点跳过且不阻塞批次。Global 的 `English (Source)` 同时更新原文列和译文列并双列回读。含待更新 Global 的全站任务先提交 Global，再等待英文源同步并仅对已验证源字段自动刷新其余站点基线；其他变化仍按预览指纹拦截。随后原生修改、上传并重新下载回读，失败时回滚原包 |

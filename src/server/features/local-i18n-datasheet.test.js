@@ -74,6 +74,24 @@ test("converts text whose quotation mark is encoded as an HTML entity", () => {
   );
 });
 
+test("skips standalone numbers and keeps numbers inside complete copy", () => {
+  const html = "<strong>30</strong><p>Up to 30 days of battery life</p><span>30 m</span>";
+  const result = extractNewProductRows(
+    html,
+    "TY1 G1 3K",
+    "ty1_g1_3k",
+    { headers: ["English"], rows: new Map() },
+    new Map()
+  );
+  assert.deepEqual(result.newRows, [
+    { key: "TY1_G1_3K_1", source: "Up to 30 days of battery life" }
+  ]);
+  assert.equal(
+    replaceHtmlText(html, result.replacements),
+    "<strong>30</strong><p>{{t(&#39;goods.TY1_G1_3K_1&#39;)}}</p><span>30 m</span>"
+  );
+});
+
 test("accepts absolute custom paths and rejects relative paths", (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "local-i18n-paths-"));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));

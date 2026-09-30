@@ -25,6 +25,8 @@ test('i18n conversion skips protected standalone values', () => {
 
 test('i18n conversion only treats English copy as a new language field', () => {
   assert.equal(containsEnglishText('Clearer details'), true);
+  assert.equal(containsEnglishText('30'), false);
+  assert.equal(containsEnglishText('(30)'), false);
   assert.equal(containsEnglishText('2.8mm'), false);
   assert.equal(containsEnglishText('更清晰的画面'), false);
 });
@@ -97,6 +99,12 @@ test('i18n conversion keeps numbers and units inside complete copy', () => {
   cases.forEach((expected, input) => {
     assert.equal(extractTranslatableText(input, 'H9c Dual'), expected, input);
   });
+});
+
+test('i18n conversion skips standalone numbers and keeps numbers inside full copy', () => {
+  assert.equal(isNonTranslatableText('30', 'H9c Dual'), true);
+  assert.equal(extractTranslatableText('30', 'H9c Dual'), '');
+  assert.equal(extractTranslatableText('Up to 30 days of battery life', 'H9c Dual'), 'Up to 30 days of battery life');
 });
 
 test('i18n fragment conversion preserves the original stylesheet link', () => {
