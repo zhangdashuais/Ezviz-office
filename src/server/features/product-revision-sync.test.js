@@ -213,6 +213,16 @@ test("Detail and Specification direct revisions validate independently", () => {
   assert.equal(specification.detailHtml, "");
 });
 
+test("direct product revision accepts a numeric goods_id and rejects unsafe values", () => {
+  const request = validateDirectRevision({
+    revisionType: "detail", siteCode: "hq", productName: "Y31", goodsId: "487350", detailHtml: "<main>new</main>"
+  });
+  assert.equal(request.goodsId, "487350");
+  assert.throws(() => validateDirectRevision({
+    revisionType: "detail", siteCode: "hq", productName: "Y31", goodsId: "487350&x=1", detailHtml: "<main>new</main>"
+  }), /goods_id/);
+});
+
 test("direct product revision allows Product Description only", () => {
   const request = validateDirectRevision({
     revisionType: "detail",

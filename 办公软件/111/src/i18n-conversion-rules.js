@@ -50,28 +50,7 @@
 
   function extractTranslatableText(value, productName) {
     const text = String(value || '').trim();
-    if (!text || isNonTranslatableText(text, productName)) return '';
-
-    const suffixDetectionText = text
-      .replace(/[)\]}'”’.,;:!?，。；：！？]+$/u, '')
-      .trimEnd();
-    let target = text;
-    const suffixStarts = [];
-    const whitespace = /\s+/gu;
-    let match;
-    while ((match = whitespace.exec(suffixDetectionText))) {
-      suffixStarts.push(match.index + match[0].length);
-    }
-
-    for (const start of suffixStarts) {
-      const suffix = suffixDetectionText.slice(start);
-      if (isNonTranslatableText(suffix, productName)) {
-        target = suffixDetectionText.slice(0, start).trimEnd();
-        break;
-      }
-    }
-
-    return target;
+    return !text || isNonTranslatableText(text, productName) ? '' : text;
   }
 
   function containsEnglishText(value) {
@@ -156,6 +135,14 @@
     return `goods.${short || 'new_product'}_`;
   }
 
+  function preserveStylesheetLinks(sourceHtml, convertedBodyHtml) {
+    const pattern = /<link\b(?=[^>]*\brel\s*=\s*(?:"[^"]*\bstylesheet\b[^"]*"|'[^']*\bstylesheet\b[^']*'))[^>]*>/gi;
+    const links = String(sourceHtml || '').match(pattern) || [];
+    if (!links.length) return String(convertedBodyHtml || '');
+    const body = String(convertedBodyHtml || '').replace(pattern, '').trimStart();
+    return `${links.join('\n')}${body ? `\n${body}` : ''}`;
+  }
+
   return {
     normalize,
     isNonTranslatableText,
@@ -164,6 +151,7 @@
     detectLanguageTableLayout,
     detectProductLanguageTableLayout,
     buildSourceKeyIndex,
-    buildProductPrefix
+    buildProductPrefix,
+    preserveStylesheetLinks
   };
 });

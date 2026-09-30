@@ -7,7 +7,8 @@ const {
   detectLanguageTableLayout,
   detectProductLanguageTableLayout,
   buildSourceKeyIndex,
-  buildProductPrefix
+  buildProductPrefix,
+  preserveStylesheetLinks
 } = require('../../../办公软件/111/src/i18n-conversion-rules');
 
 test('i18n conversion skips protected standalone values', () => {
@@ -82,17 +83,26 @@ test('i18n conversion keeps normal copy translatable', () => {
   assert.equal(extractTranslatableText('Ready!', 'H9c Dual'), 'Ready!');
 });
 
-test('i18n conversion leaves protected final words outside the language field', () => {
+test('i18n conversion keeps numbers and units inside complete copy', () => {
   const cases = new Map([
-    ['Focal Length 2.8mm', 'Focal Length'],
-    ['Minimum distance: 2 mm.', 'Minimum distance:'],
-    ['Encryption AES', 'Encryption'],
-    ['Protocol TLS 1.3', 'Protocol'],
-    ['Operating temperature -20 °C', 'Operating temperature'],
-    ['Meet H9c Dual.', 'Meet'],
+    ['Up to 15m', 'Up to 15m'],
+    ['Focal Length 2.8mm', 'Focal Length 2.8mm'],
+    ['Minimum distance: 2 mm.', 'Minimum distance: 2 mm.'],
+    ['Encryption AES', 'Encryption AES'],
+    ['Protocol TLS 1.3', 'Protocol TLS 1.3'],
+    ['Operating temperature -20 °C', 'Operating temperature -20 °C'],
+    ['Meet H9c Dual.', 'Meet H9c Dual.'],
     ['High-definition image.', 'High-definition image.']
   ]);
   cases.forEach((expected, input) => {
     assert.equal(extractTranslatableText(input, 'H9c Dual'), expected, input);
   });
+});
+
+test('i18n fragment conversion preserves the original stylesheet link', () => {
+  const link = '<link rel="stylesheet" href="https://mfs.ezvizlife.com/mall/static/20260929/qi2d5pw.css">';
+  assert.equal(
+    preserveStylesheetLinks(`${link}\n<section>Product copy</section>`, '<section>{{t(&#39;goods.CB30_1&#39;)}}</section>'),
+    `${link}\n<section>{{t(&#39;goods.CB30_1&#39;)}}</section>`
+  );
 });

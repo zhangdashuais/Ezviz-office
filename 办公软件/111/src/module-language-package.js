@@ -241,7 +241,7 @@
         "HTML 原文件备份：" + (result.htmlBackupFile || "无需备份（没有待替换文案）"),
         "HTML 字段替换：" + result.htmlReplacementCount + " 处",
         "总语言包：" + result.globalFile,
-        "单产品 Excel：" + result.productFile,
+        "单产品 Excel：" + (result.productFile || "未找到，未加入参考"),
         "样式模板：" + result.templateFile,
         "输出目录：" + result.outputDir,
         "本产品字段：" + result.productFieldCount,

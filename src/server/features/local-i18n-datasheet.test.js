@@ -3,11 +3,14 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const XLSX = require("xlsx");
 const {
   extractNewProductRows,
   replaceHtmlText,
   isProductNameOnlyText,
-  normalizePathDefaults
+  normalizePathDefaults,
+  findProductWorkbook,
+  initializeProductData
 } = require("./local-i18n-datasheet");
 
 test("puts new product copy above the separator and reuses old product copy below it", () => {
@@ -80,4 +83,23 @@ test("accepts absolute custom paths and rejects relative paths", (t) => {
   assert.deepEqual(normalizePathDefaults({ htmlFile, outputDir: folder, outputFile }), { htmlFile, outputDir: folder, outputFile });
   assert.throws(() => normalizePathDefaults({ htmlFile: "product.html" }), /绝对路径/);
   assert.throws(() => normalizePathDefaults({ outputFile: path.join(folder, "final.xls") }), /\.xlsx/);
+});
+
+test("missing product workbook keeps i18n conversion without reference rows", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-i18n-product-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, "CB30 Dual Kit"));
+  const templateFile = path.join(root, "template.xlsx");
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["", "English", "French"],
+    ["OLD_PRODUCT_1", "Old product copy", "Ancien texte"]
+  ]), "Datasheet");
+  XLSX.writeFile(workbook, templateFile);
+
+  const productFile = findProductWorkbook("CB30 Dual Kit", root);
+  const productData = initializeProductData(productFile, templateFile);
+  assert.equal(productFile, "");
+  assert.deepEqual(productData.headers, ["English", "French"]);
+  assert.equal(productData.rows.size, 0);
 });

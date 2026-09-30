@@ -6,7 +6,7 @@
 
 机器可读配置位于 `src/server/config/shop-navigation.json`，辅助查询方法位于 `src/server/features/shop-navigation.js`。
 
-本地平台的“一键内联打包”会同步完成 Webflow CSS 作用域处理，并把编辑器产生的同族数字后缀类在 HTML、CSS 和组合选择器中统一为基础类；`w-*` 系统类及没有同族证据的单个编号类保持不变。可选输出 `head`、`body` 标签；默认不输出，便于粘贴到商城后台。输出正文以 `<!-- product detail webflow -->` 标记开头，保留 `body` 时标记位于其下一行。下载 `store.html` 的同时在页面展示最终 CSS，并提供 `webflow.scoped.css` 下载。“图片 AI 标志”的输出超过 512 KB 时会保持原分辨率转为 JPG 并降低画质；最低画质仍超限时明确报错，不会缩放图片。其“DOC上传”使用文件服务 `service/attach` 动态 token 批量上传 PDF，并为每个成功文件生成一个与 `declaration-of-conformity.html` 一致的独立 `<li>` 标签，不包含外层 `<ul>`；“PDF / HTML 文字对比”可上传总语言包还原 `goods.xxx` 字段；生成字段修改建议后，可将建议应用到原始 HTML 的对应语言字段，并在页面显示完整修改版源码，不覆盖用户原文件。若原始 HTML 是片段，输出仍保持片段，不额外补 `DOCTYPE` / `html` 外层标签。
+本地平台的“一键内联打包”会同步完成 Webflow CSS 作用域处理，并把编辑器产生的同族数字后缀类在 HTML、CSS 和组合选择器中统一为基础类；`w-*` 系统类及没有同族证据的单个编号类保持不变。最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: medium; }`，每个 `li` 的 `style` 固定为 `list-style: decimal;`，但保留原有 class。可选输出 `head`、`body` 标签；默认不输出，便于粘贴到商城后台。输出正文以 `<!-- product detail webflow -->` 标记开头，保留 `body` 时标记位于其下一行。下载 `store.html` 的同时在页面展示最终 CSS，并提供 `webflow.scoped.css` 下载。“图片 AI 标志”的输出超过 512 KB 时会保持原分辨率转为 JPG 并降低画质；最低画质仍超限时明确报错，不会缩放图片。其“DOC上传”使用文件服务 `service/attach` 动态 token 批量上传 PDF，并为每个成功文件生成一个与 `declaration-of-conformity.html` 一致的独立 `<li>` 标签，不包含外层 `<ul>`；“PDF / HTML 文字对比”可上传总语言包还原 `goods.xxx` 字段；生成字段修改建议后，可将建议应用到原始 HTML 的对应语言字段，并在页面显示完整修改版源码，不覆盖用户原文件。若原始 HTML 是片段，输出仍保持片段，不额外补 `DOCTYPE` / `html` 外层标签。
 
 ## 菜单结构
 
@@ -79,9 +79,11 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 语言包页另有独立的“按单产品 Datasheet 更新站点语言包”功能。`datasheet-inspect` 识别第三列起的语种说明；`datasheet-preview` 按字段 Key 对比所选站点当前语言包；`datasheet-submit` 只提交预览状态为 `ready` 的站点，`failed` 与 `no-change` 会显示为跳过，不再禁用整批确认按钮，也不会在提交阶段再次登录这些站点。Global 选择 `English (Source)` 时会同时覆盖 `en-US` 原文列和译文列，并在上传后双列回读；其他站点仍只覆盖译文列。没有 Edit/Download 行、但明确提供带 `lang_code` 的 `Download Language Template` 时，英文站点可用该链接读取当前模板，语种不匹配时仍拒绝。页面默认跳过站点不存在的 Key，避免追加缺少后台元数据的行。空译文跳过，实际下载语言代码必须与 Datasheet 语种一致。全站提交中 Global 为 `ready` 时会强制先更新 Global，再等待英文原文同步到其他站点并自动刷新这些站点的预览基线；基线只忽略本批次已验证的英文源字段变化，其他字段变化仍停止提交。同一时间只允许一个 Datasheet 预览或提交任务。旧 `.xls` 仍由本机 Excel 原生保存，尾部格式化空行不会被当成追加模板行；上传后最多回读 6 次、每次间隔 3 秒，重试只重新下载而不重复上传，最终仍不一致时恢复原包。
 
 “本地 i18n Datasheet 生成”从产品 HTML 提取未 i18n 化的英文文案，将当前产品的新字段放在黄色提示行上方；HTML 已引用或按英文原文复用的旧字段放在黄色提示行下方。生成成功后先备份原 HTML，再把硬编码文案写回对应的 `goods.*` 字段；重复执行会复用现有输出并保持字段归类不变。
+“i18n 语言转换”处理 HTML 片段时会保留原始 `<link rel="stylesheet">` 样式库引用，避免浏览器解析时将其移入临时 `head` 后从片段输出中丢失。
 产品名及其从左到右的名称前缀（如 `TY1`、`TY1 G1`、`TY1 G1 3K`）视为型号，不生成语言包字段；包含型号的完整描述句不受此规则影响。
+数字、单位、角度和加密协议仅在整个文本节点单独出现时不转换；出现在完整文案中时保留在整句语言字段内，例如 `Up to 15m` 必须整体转换。
 重复生成会读取输出目录中的既有 Datasheet 和备份，为 HTML 已引用但当前输出缺少的产品字段恢复源文案。
-页面开放 HTML、单产品 Excel、总语言包、样式模板、输出目录和最终保存文件六个可编辑路径。“同步所有默认路径”会一次保存全部字段到忽略 Git 的 `runtime/local-i18n-paths.json`，清空某个字段后同步即可恢复该项自动匹配。最终保存文件必须是绝对 `.xlsx` 路径并优先于输出目录；生成请求中的路径优先于已保存默认值，已保存默认值优先于内置自动匹配。
+页面开放 HTML、单产品 Excel、总语言包、样式模板、输出目录和最终保存文件六个可编辑路径。“同步所有默认路径”会一次保存全部字段到忽略 Git 的 `runtime/local-i18n-paths.json`，清空某个字段后同步即可恢复该项自动匹配。最终保存文件必须是绝对 `.xlsx` 路径并优先于输出目录；生成请求中的路径优先于已保存默认值，已保存默认值优先于内置自动匹配。自动匹配不到单产品 Excel 时仍执行 i18n 语言转换，只是不加载单产品历史字段作为参考；输出的语言列沿用样式模板。
 
 Detail 批量替换默认选择“全选”，可在一次预览中同时处理地址替换和代码块删除，也可切换为单项操作。替换前后值按精确文本处理，可填写完整 URL、相对路径或地址片段，不要求以 `http://` 或 `https://` 开头。页面和六列 Excel 不再包含或处理 Product Album 高清图。
 

@@ -126,9 +126,9 @@ function findHtml(productName) {
   return candidates[0].path;
 }
 
-function findProductWorkbook(productName) {
-  const root = path.join(PRODUCT_ROOT, productName);
-  if (!fs.existsSync(root)) throw new Error(`未找到单产品文件夹：${root}`);
+function findProductWorkbook(productName, productRoot = PRODUCT_ROOT) {
+  const root = path.join(productRoot, productName);
+  if (!fs.existsSync(root)) return "";
   const files = [];
   const walk = (folder) => fs.readdirSync(folder, { withFileTypes: true }).forEach((entry) => {
     const full = path.join(folder, entry.name);
@@ -149,8 +149,7 @@ function findProductWorkbook(productName) {
         + fs.statSync(file).mtimeMs / 1e15
     };
   }).sort((a, b) => b.score - a.score);
-  if (!ranked.length) throw new Error(`未在 ${root} 找到单产品 Excel 文件。`);
-  return ranked[0].file;
+  return ranked[0]?.file || "";
 }
 
 function parseGlobalPackage(file) {
@@ -201,6 +200,11 @@ function parseProductDatasheet(file) {
     });
   }
   return { headers: headers.map((item) => item.header), rows };
+}
+
+function initializeProductData(productFile, templateFile) {
+  const parsed = parseProductDatasheet(productFile || templateFile);
+  return productFile ? parsed : { headers: parsed.headers, rows: new Map() };
 }
 
 function mergeGeneratedOutputHistory(productData, destination, productName, outputFile) {
@@ -392,9 +396,9 @@ function generateLocalI18nDatasheet(input = {}) {
   const cleanName = text(productName);
   if (!cleanName || /[<>:"/\\|?*\x00-\x1F]/.test(cleanName)) throw new Error("请输入有效的产品名称。");
   const defaults = readLocalI18nPathDefaults();
+  const productFile = configuredFile(input.productFile || defaults.productFile, () => findProductWorkbook(cleanName), "单产品语言包", /\.xlsx?$/i);
   const htmlFile = configuredFile(input.htmlFile || defaults.htmlFile, () => findHtml(cleanName), "HTML 文件", /\.html?$/i);
   const globalFile = configuredFile(input.globalFile || defaults.globalFile, latestGlobalPackage, "总语言包", /\.xlsx?$/i);
-  const productFile = configuredFile(input.productFile || defaults.productFile, () => findProductWorkbook(cleanName), "单产品语言包", /\.xlsx?$/i);
   const templateFile = configuredFile(input.templateFile || defaults.templateFile, () => DEFAULT_TEMPLATE_PATH, "样式模板", /\.xlsx?$/i);
   const globalEntries = parseGlobalPackage(globalFile);
   const productKey = token(cleanName);
@@ -410,7 +414,7 @@ function generateLocalI18nDatasheet(input = {}) {
   if (fs.existsSync(destination) && !fs.statSync(destination).isDirectory()) throw new Error(`输出目录不是文件夹：${destination}`);
   fs.mkdirSync(destination, { recursive: true });
   let outputFile = configuredOutputFile ? path.normalize(configuredOutputFile) : path.join(destination, `${cleanName} datasheet.xlsx`);
-  const productData = parseProductDatasheet(productFile);
+  const productData = initializeProductData(productFile, templateFile);
   mergeGeneratedOutputHistory(productData, destination, cleanName, outputFile);
   if (fs.existsSync(outputFile)) {
     const previousOutput = parseProductDatasheet(outputFile);
@@ -476,6 +480,8 @@ function generateLocalI18nDatasheet(input = {}) {
 
 module.exports = {
   generateLocalI18nDatasheet,
+  findProductWorkbook,
+  initializeProductData,
   extractNewProductRows,
   replaceHtmlText,
   isProductNameOnlyText,

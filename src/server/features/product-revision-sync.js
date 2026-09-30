@@ -640,6 +640,7 @@ function resolveProductDescription(parsedDatasheet, target, options = {}) {
 
 function validateDirectRevision(body) {
   const productName = String(body?.productName || "").trim();
+  const goodsId = String(body?.goodsId || "").trim();
   const siteCode = String(body?.siteCode || "").trim();
   const revisionType = body?.revisionType === "specification" ? "specification" : "detail";
   const detailHtml = String(body?.detailHtml ?? "");
@@ -658,6 +659,7 @@ function validateDirectRevision(body) {
   }
   if (!siteCode) throw new Error("请选择国家站点。");
   if (!productName) throw new Error("请填写产品名称。");
+  if (goodsId && !/^\d+$/.test(goodsId)) throw new Error("goods_id 必须是数字。");
   if (!Array.isArray(operations)) throw new Error("修订操作格式不正确。");
   if (revisionType === "detail" && !detailHtml.trim()
     && !operations.length && !productDescriptionProvided && !specificationFieldNameProvided) {
@@ -689,6 +691,7 @@ function validateDirectRevision(body) {
   return {
     siteCode,
     productName,
+    goodsId,
     revisionType,
     detailHtml,
     operations,
@@ -805,7 +808,7 @@ function createProductRevisionSyncFeature(deps) {
     return { page, authenticatedIdentity: authenticatedIdentity.replace(/\s+/g, " ").trim() };
   }
 
-  async function readCurrentProductSnapshot(page, productName, logs, editInfo) {
+  async function readCurrentProductSnapshot(page, productName, logs, editInfo, options = {}) {
     await page.waitForFunction(() => {
       const element = document.querySelector("#replenish");
       const scope = window.angular && element ? window.angular.element(element).scope() : null;
@@ -852,7 +855,7 @@ function createProductRevisionSyncFeature(deps) {
       throw new Error(`${productName} 的 Detail 异步加载后仍未稳定，请稍后重试。`);
     }
     const detail = readDetailFromPcView(snapshot.pcView);
-    if (!detail.specificationsFound) {
+    if (!detail.specificationsFound && options.requireSpecifications !== false) {
       const availableFields = (snapshot.pcView?.customs || [])
         .map((field) => normalize(field?.name))
         .filter(Boolean);
@@ -871,9 +874,22 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
-  async function readProductSnapshot(page, productName, logs) {
-    const editInfo = await openProductEditorByName(page, productName, logs, { exactOnly: true });
-    return readCurrentProductSnapshot(page, productName, logs, editInfo);
+  async function readProductSnapshot(page, productName, logs, goodsId = "", options = {}) {
+    let editInfo;
+    if (goodsId) {
+      const editUrl = `https://shop.ezvizlife.com/goods/add?id=${encodeURIComponent(goodsId)}`;
+      await page.goto(editUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+      await page.waitForTimeout(2500);
+      editInfo = { editUrl: page.url() };
+      logLine(logs, `已按 goods_id 打开产品编辑页：${productName} / ${goodsId}`);
+    } else {
+      editInfo = await openProductEditorByName(page, productName, logs, { exactOnly: true });
+    }
+    const snapshot = await readCurrentProductSnapshot(page, productName, logs, editInfo, options);
+    if (goodsId && snapshot.goodsId !== goodsId) {
+      throw new Error(`产品 goods_id 不一致：期望 ${goodsId}，实际 ${snapshot.goodsId}。`);
+    }
+    return snapshot;
   }
 
   async function buildSavePayload(
@@ -884,7 +900,8 @@ function createProductRevisionSyncFeature(deps) {
     productTitle,
     currentProductTitle,
     specificationFieldName = "",
-    nextSpecificationFieldName = ""
+    nextSpecificationFieldName = "",
+    requireSpecificationField = true
   ) {
     return page.evaluate(({
       overview,
@@ -895,6 +912,7 @@ function createProductRevisionSyncFeature(deps) {
       specificationFieldNames,
       specificationFieldName,
       nextSpecificationFieldName,
+      requireSpecificationField,
       fillAdsAdditionalProductTitleSource
     }) => {
       const normalizeField = (value) => String(value || "")
@@ -946,10 +964,14 @@ function createProductRevisionSyncFeature(deps) {
         );
         if (field) break;
       }
-      if (!field) throw new Error("Detail 中没有找到 Specification/Specifications 字段。");
+      if (!field && requireSpecificationField) {
+        throw new Error("Detail 中没有找到 Specification/Specifications 字段。");
+      }
       scope.vm.pcView.summary = overview;
-      if (nextSpecificationFieldName) field.name = nextSpecificationFieldName;
-      field.value = specifications;
+      if (field) {
+        if (nextSpecificationFieldName) field.name = nextSpecificationFieldName;
+        field.value = specifications;
+      }
       scope.vm.basic.summary = productDescription;
       renameProductFields(scope.vm.basic);
       fillAdsAdditionalProductTitle(scope.vm, productTitle, currentProductTitle !== productTitle);
@@ -981,6 +1003,7 @@ function createProductRevisionSyncFeature(deps) {
       specificationFieldNames: specificationDetailFieldNames(),
       specificationFieldName,
       nextSpecificationFieldName,
+      requireSpecificationField,
       fillAdsAdditionalProductTitleSource: fillAdsAdditionalProductTitle.toString()
     });
   }
@@ -1100,9 +1123,9 @@ function createProductRevisionSyncFeature(deps) {
     ];
   }
 
-  async function verifySavedProduct(page, productName, logs, verify) {
+  async function verifySavedProduct(page, productName, logs, verify, goodsId = "", options = {}) {
     return retryProductReadback(
-      () => readProductSnapshot(page, productName, logs),
+      () => readProductSnapshot(page, productName, logs, goodsId, options),
       verify,
       {
         wait: (delayMs) => page.waitForTimeout(delayMs),
@@ -1123,7 +1146,9 @@ function createProductRevisionSyncFeature(deps) {
     specifications,
     productDescription,
     currentSpecificationFieldName,
-    nextSpecificationFieldName
+    nextSpecificationFieldName,
+    goodsId = "",
+    requireSpecificationField = true
   }) {
     const payload = await buildSavePayload(
       page,
@@ -1133,7 +1158,8 @@ function createProductRevisionSyncFeature(deps) {
       targetProductName,
       productName,
       currentSpecificationFieldName,
-      nextSpecificationFieldName
+      nextSpecificationFieldName,
+      requireSpecificationField
     );
     const save = await postProductUpdate(page, payload);
     const readback = await verifySavedProduct(
@@ -1153,7 +1179,9 @@ function createProductRevisionSyncFeature(deps) {
           specificationName,
           description
         };
-      }
+      },
+      goodsId,
+      { requireSpecifications: requireSpecificationField }
     );
     if (!readback.verification.passed) {
       const { detail, specification, specificationName, description } = readback.verification;
@@ -1172,7 +1200,14 @@ function createProductRevisionSyncFeature(deps) {
     const site = getCampaignSites(readCampaignConfig()).find((item) => item.siteCode === request.siteCode);
     if (!site || site.enabled === false) throw new Error("所选国家站点不存在或未启用。");
     const session = existingSession || await prepareSiteSession(site, body, logs);
-    const before = await readProductSnapshot(session.page, request.productName, logs);
+    const requireSpecificationField = request.revisionType === "specification";
+    const before = await readProductSnapshot(
+      session.page,
+      request.productName,
+      logs,
+      request.goodsId,
+      { requireSpecifications: requireSpecificationField }
+    );
     const specification = request.revisionType === "specification"
       ? applySpecificationOperations(before.detail.specifications, request.operations)
       : { value: before.detail.specifications, results: [] };
@@ -1203,6 +1238,7 @@ function createProductRevisionSyncFeature(deps) {
       specification,
       specificationFieldName,
       productDescription,
+      requireSpecificationField,
       fingerprint
     };
   }
@@ -1243,7 +1279,9 @@ function createProductRevisionSyncFeature(deps) {
       specifications: prepared.specification.value,
       productDescription: prepared.productDescription,
       currentSpecificationFieldName: prepared.before.detail.specificationsFieldName,
-      nextSpecificationFieldName: prepared.specificationFieldName
+      nextSpecificationFieldName: prepared.specificationFieldName,
+      goodsId: prepared.before.goodsId,
+      requireSpecificationField: prepared.requireSpecificationField
     });
     return {
       mode: "product-direct-revision-submit",

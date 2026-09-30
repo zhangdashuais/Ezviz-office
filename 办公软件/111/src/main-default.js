@@ -398,35 +398,16 @@
         };
       }
 
-      function ensureSectionListDecimalStyle(root) {
-        const sections = Array.from(root.querySelectorAll("section"));
-        let updatedCount = 0;
-        let totalListCount = 0;
-
-        sections.forEach((section) => {
-          const lists = Array.from(section.querySelectorAll("ul, ol"));
-          totalListCount += lists.length;
-
-          lists.forEach((listEl) => {
-            const currentStyle = listEl.getAttribute("style") || "";
-            if (/list-style\s*:/i.test(currentStyle)) {
-              return;
-            }
-
-            const normalized = currentStyle.trim();
-            const nextStyle = normalized
-              ? `${normalized.replace(/;\s*$/, "")}; list-style: decimal !important;`
-              : "list-style: decimal !important;";
-
-            listEl.setAttribute("style", nextStyle);
-            updatedCount += 1;
-          });
+      function normalizeListItems(root) {
+        if (!window.EzvizInlineOutput?.requiredListItemStyleValue) {
+          throw new Error("Inline list-item rules are not loaded.");
+        }
+        const style = window.EzvizInlineOutput.requiredListItemStyleValue();
+        const items = Array.from(root.querySelectorAll("li"));
+        items.forEach((item) => {
+          item.setAttribute("style", style);
         });
-
-        return {
-          totalListCount,
-          updatedCount
-        };
+        return items.length;
       }
 
       function sanitizeGeneratedCss(cssText) {
@@ -552,6 +533,7 @@
 
         allScripts.forEach((node) => node.remove());
 
+        const normalizedListItemCount = normalizeListItems(doc.body);
         const rawStyleContent = cssBlocks.join("\n\n");
         if (!window.EzvizInlineOutput?.normalizeNumberedClasses) {
           throw new Error("Inline class normalization module is not loaded.");
@@ -564,7 +546,10 @@
         if (!window.EzvizCssScope?.scopeCss) {
           throw new Error("CSS scope module is not loaded.");
         }
-        const cssContent = window.EzvizCssScope.scopeCss(cssStats.css, ".page.page-webflow");
+        const cssContent = window.EzvizCssScope.scopeCss(
+          window.EzvizInlineOutput.appendRequiredCss(cssStats.css),
+          ".page.page-webflow"
+        );
         const jqueryUrl = "https://ovsmall-statics.ezvizlife.com/ovs_mall/web/js/widget/jquery/3.5.1/jquery.js";
         const scriptBlock = [
           "<script>var jq_1 = $.noConflict(true);window.$ = window.jQuery = jq_1;</script>",
@@ -592,7 +577,8 @@
           cssContent,
           webflowScriptFile,
           warnings,
-          cssStats
+          cssStats,
+          normalizedListItemCount
         };
       }
 
@@ -645,7 +631,7 @@
           }
 
           const indexHtml = fileMap.get(indexEntry) || "";
-          const { resultRaw, cssContent, webflowScriptFile, warnings, cssStats } = buildResult(indexHtml, fileMap, fileBlobMap, indexEntry);
+          const { resultRaw, cssContent, webflowScriptFile, warnings, cssStats, normalizedListItemCount } = buildResult(indexHtml, fileMap, fileBlobMap, indexEntry);
           const normalizedImagePathResult = normalizeDotDotImagePaths(resultRaw);
           const normalizedResultRaw = normalizedImagePathResult.content;
           const normalizedCssPathResult = normalizeDotDotImagePaths(cssContent);
@@ -741,7 +727,8 @@
             `Normalized ../images/ -> images/: HTML ${normalizedImagePathResult.replaceCount}, CSS ${normalizedCssPathResult.replaceCount}`,
             replaceMessage,
             `Removed font-family Arial/sans-serif: ${cssStats.removedArialCount + cssStats.removedSansSerifCount}`,
-            `Removed ul/ol default reset blocks: ${cssStats.removedUlOlRuleCount}`
+            `Removed ul/ol default reset blocks: ${cssStats.removedUlOlRuleCount}`,
+            `Normalized list items: ${normalizedListItemCount}`
           ].join("\n");
 
           const allWarnings = [...warnings, ...imageWarnings];

@@ -1,7 +1,23 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { normalizeNumberedClasses, wrap } = require("../../../办公软件/111/src/inline-output.js");
+const {
+  normalizeNumberedClasses,
+  appendRequiredCss,
+  requiredListItemStyleValue,
+  wrap
+} = require("../../../办公软件/111/src/inline-output.js");
+
+test("always appends the required medium emphasis rule", () => {
+  assert.equal(
+    appendRequiredCss(".title { color: red; }"),
+    ".title { color: red; }\n\nb, strong {\n  font-weight: medium;\n}"
+  );
+});
+
+test("uses the required decimal list-item style", () => {
+  assert.equal(requiredListItemStyleValue(), "list-style: decimal;");
+});
 
 test("wraps inline output with optional head and body tags", () => {
   const fragment = '<div class="page page-webflow">Detail</div>';

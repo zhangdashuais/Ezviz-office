@@ -77,7 +77,7 @@
     
     currentProcessedHtml = isFullHtmlDocument
       ? `${hasDoctype ? '<!DOCTYPE html>\n' : ''}${doc.documentElement.outerHTML}`
-      : doc.body.innerHTML;
+      : window.i18nConversionRules.preserveStylesheetLinks(htmlText, doc.body.innerHTML);
     currentProcessedHtml = currentProcessedHtml.replace(/\{\{t\(['"]([^'"]+)['"]\)\}\}/g, '{{t(&#39;$1&#39;)}}');
     
     textOutput.value = currentProcessedHtml;
