@@ -316,12 +316,29 @@ function resolveWtbSite(config, body, rows) {
   };
 }
 
-async function findAndOpenProductEdit(page, productName, logs) {
-  await page.goto(LEGACY_SHOP_PRODUCT_INDEX_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+async function openLegacyProductIndex(page) {
+  if (page.url() !== LEGACY_SHOP_PRODUCT_INDEX_URL) {
+    await page.goto(LEGACY_SHOP_PRODUCT_INDEX_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+  }
   await page.waitForTimeout(1800);
   if (!isLegacyShopBackendUrl(page.url())) {
     throw new Error("WTB 必须使用老商城后台 shop.ezvizlife.com，当前页面为：" + page.url());
   }
+}
+
+async function readWtbAuthenticatedIdentity(page) {
+  await openLegacyProductIndex(page);
+  return page.evaluate(() =>
+    document.querySelector("#username > a")?.textContent
+    || document.querySelector('[class*="_username_"]')?.textContent
+    || document.querySelector(".clearfix.login-bar")?.innerText
+    || document.querySelector(".login-bar")?.innerText
+    || ""
+  ).catch(() => "");
+}
+
+async function findAndOpenProductEdit(page, productName, logs) {
+  await openLegacyProductIndex(page);
   if (typeof openProductEditorByName === "function") {
     return openProductEditorByName(page, productName, logs);
   }
@@ -1087,11 +1104,7 @@ async function submitWtbToBackend(body, files, logs) {
     credentialGroup: "Website",
     trustSubmittedShopCredentials: true
   }, logs);
-  const authenticatedIdentity = await backendPage.evaluate(() =>
-    document.querySelector(".clearfix.login-bar")?.innerText
-    || document.querySelector(".login-bar")?.innerText
-    || ""
-  ).catch(() => "");
+  const authenticatedIdentity = await readWtbAuthenticatedIdentity(backendPage);
   if (!authenticatedIdentity.trim()) {
     throw new Error("商城后台登录后未能读取当前用户身份，已停止发送 WTB 请求。");
   }
@@ -1248,11 +1261,7 @@ async function testWtbRoundTrip(body, logs) {
     credentialGroup: "Website",
     trustSubmittedShopCredentials: true
   }, logs);
-  const authenticatedIdentity = await backendPage.evaluate(() =>
-    document.querySelector(".clearfix.login-bar")?.innerText
-    || document.querySelector(".login-bar")?.innerText
-    || ""
-  ).catch(() => "");
+  const authenticatedIdentity = await readWtbAuthenticatedIdentity(backendPage);
   if (!authenticatedIdentity.trim()) {
     throw new Error("商城后台登录后未能读取当前用户身份，已停止 WTB 往返测试。");
   }
@@ -1412,6 +1421,7 @@ async function restoreWtbLink(body, logs) {
       openWtbBuyModal,
       inspectWtbRetailerModal,
       clickWtbRetailer,
+      readWtbAuthenticatedIdentity,
       findAndOpenProductEdit,
       isLegacyShopBackendUrl,
       legacyShopProductIndexUrl: LEGACY_SHOP_PRODUCT_INDEX_URL

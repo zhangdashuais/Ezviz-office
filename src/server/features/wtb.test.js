@@ -327,3 +327,27 @@ test("WTB forces the legacy shop backend before opening product editor", async (
   assert.deepEqual(visited, ["https://shop.ezvizlife.com/goods/index"]);
   assert.equal(result.editUrl, "https://shop.ezvizlife.com/goods/add?id=123");
 });
+
+test("WTB reads the authenticated identity from the legacy product index", async () => {
+  const visited = [];
+  const page = {
+    currentUrl: "https://new-eu-shop.ezvizlife.com/templates/list",
+    url() {
+      return this.currentUrl;
+    },
+    async goto(url) {
+      visited.push(url);
+      this.currentUrl = url;
+    },
+    async waitForTimeout() {},
+    async evaluate() {
+      return "fr114514";
+    }
+  };
+  const feature = createPlanFeature();
+
+  const identity = await feature._test.readWtbAuthenticatedIdentity(page);
+
+  assert.equal(identity, "fr114514");
+  assert.deepEqual(visited, ["https://shop.ezvizlife.com/goods/index"]);
+});
