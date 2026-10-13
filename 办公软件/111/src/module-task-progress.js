@@ -8,6 +8,8 @@
     { pattern: /^\/api\/campaign\/wtb-(plan|submit|roundtrip-test|restore)$/, statusId: "wtbStatus", label: "WTB 产品购买链接" },
     { pattern: /^\/api\/tdk\/(plan|submit)$/, statusId: "tdkStatus", label: "TDK 配置" },
     { pattern: /^\/api\/product-revision-sync\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品修订同步" },
+    { pattern: /^\/api\/product-content-sync\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "Details 一键同步" },
+    { pattern: /^\/api\/product-availability\/search$/, statusId: "revisionSyncStatus", label: "产品上线站点搜索" },
     { pattern: /^\/api\/product-publishing\/(preview|submit|batch-preview|batch-submit)$/, statusId: "revisionSyncStatus", label: "产品上架" },
     { pattern: /^\/api\/product-delisting\/(preview|submit)$/, statusId: "revisionSyncStatus", label: "产品下架" },
     { pattern: /^\/api\/detail-address-replacement\/(preview|submit)$/, statusId: "detailAddressStatus", label: "Detail 批量替换" }

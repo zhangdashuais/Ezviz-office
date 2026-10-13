@@ -20,6 +20,8 @@
 | 产品上架与维护 | 语言包上传 | 上传 `.xls/.xlsx` 到 Language Management | 写后台 |
 | 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；允许英文原文内容变化并警告，上传后遇到短暂旧包时只重下验证、不重复上传 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
 | 产品上架与维护 | 已上架产品仅更新 Specification、Product Description 与语言包 | 产品修订请求使用 `updateScope=specification-language`；保留目标站 Overview 和现有规格图，按 Datasheet 更新 Product Description、Specification 文本及语言包；Datasheet 缺少显式 Product Description 时，会用后台当前描述反查 Datasheet 唯一字段行，仍未命中才保留现值 | `preview` 只读；`submit` 写后台并回读 |
+| 产品上架与维护 | Details 一键同步 | 固定以国际站同名产品为源，只需填写产品名并选择目标站点；仅同步 PC Details Overview，目标站不存在产品时跳过，不修改 Specifications、语言包、Product Description 或其他配置 | `preview` 只读；`submit` 写后台并回读 |
+| 产品上架与维护 | 搜索产品已上线站点 | 输入产品名称后只读搜索全部启用的 EZVIZ 国家官网；匹配忽略大小写和所有空格，返回命中站点、产品链接及失败站点 | 只读官网搜索 |
 | 产品上架与维护 | HG2_400_4 语言包定向修订 | 逐站预览 E 列，删除 `15s / 18s / 20s` 后原生保存、上传并回读；空值不上传 | `preview` 只读；`submit` 写后台并可回滚 |
 | 产品上架与维护 | WTB 产品购买链接 | 下拉框单选站点，计划、提交、回读、往返测试和恢复购买链接 | `plan` 只读；其他接口可写后台 |
 | 产品上架与维护 | TDK 配置 | 按国家站校验 Excel 并提交 SEO TDK | `plan` 只读；`submit` 写后台 |

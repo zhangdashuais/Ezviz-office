@@ -21,6 +21,10 @@ const {
   resolveProductDescription,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
+  contentSyncFingerprint,
+  normalizeProductAvailabilityName,
+  buildProductAvailabilityQueries,
+  parseProductSearchResults,
   retryProductReadback,
   specificationTitleForSite,
   specificationFieldTitleForSite,
@@ -211,6 +215,62 @@ test("Detail and Specification direct revisions validate independently", () => {
   });
   assert.equal(specification.revisionType, "specification");
   assert.equal(specification.detailHtml, "");
+});
+
+test("content sync fingerprint only tracks goods id and Details", () => {
+  const first = {
+    goodsId: "123",
+    detail: { overview: "<p>Overview</p>", specifications: "<p>Spec</p>" },
+    productDescription: "Old description"
+  };
+  const unrelatedChange = { ...first, productDescription: "New description" };
+  const detailChange = {
+    ...first,
+    detail: { ...first.detail, overview: "<p>Changed</p>" }
+  };
+  assert.equal(contentSyncFingerprint(first), contentSyncFingerprint(unrelatedChange));
+  assert.equal(contentSyncFingerprint(first), contentSyncFingerprint({
+    ...first,
+    detail: { ...first.detail, specifications: "<p>Changed spec</p>" }
+  }));
+  assert.notEqual(contentSyncFingerprint(first), contentSyncFingerprint(detailChange));
+});
+
+test("product availability matching ignores case and whitespace only", () => {
+  assert.equal(
+    normalizeProductAvailabilityName(" H8C  Pro 2K (new) "),
+    normalizeProductAvailabilityName("h8cpro2k(new)")
+  );
+  assert.notEqual(
+    normalizeProductAvailabilityName("H8c Pro 2K(new)"),
+    normalizeProductAvailabilityName("H8c Pro 2K")
+  );
+  assert.deepEqual(buildProductAvailabilityQueries("H8c Pro 2K(new)"), [
+    "H8c Pro 2K(new)",
+    "H8c Pro 2K"
+  ]);
+  assert.deepEqual(parseProductSearchResults(`
+    <a class="result-item__con-name" href="https://www.ezviz.com/es/product/h8c/1">
+      H8c Pro 2K (new)
+    </a>
+  `), [{ name: "H8c Pro 2K (new)", url: "https://www.ezviz.com/es/product/h8c/1" }]);
+});
+
+test("product availability reads every product variant from tabbed cards", () => {
+  const variants = JSON.stringify([
+    { goods_name: "H8c Pro 3K (New)", learn_more: "https://www.ezviz.com/product/h8c-pro-3knew/1" },
+    { goods_name: "H8c Pro 2K (New)", learn_more: "https://www.ezviz.com/product/h8c-pro-2knew/2" },
+    { goods_name: "H8c Pro 4K (New)", learn_more: "https://www.ezviz.com/product/h8c-pro-4knew/3" }
+  ]).replace(/&/g, "&amp;").replace(/\"/g, "&quot;");
+  assert.deepEqual(parseProductSearchResults(`
+    <li class="J_SiteProduct" data-jsond="${variants}">
+      <a class="J_SiteProductTitle" href="https://www.ezviz.com/product/h8c-pro-2knew/2">H8c Pro 2K (New)</a>
+    </li>
+  `), [
+    { name: "H8c Pro 3K (New)", url: "https://www.ezviz.com/product/h8c-pro-3knew/1" },
+    { name: "H8c Pro 2K (New)", url: "https://www.ezviz.com/product/h8c-pro-2knew/2" },
+    { name: "H8c Pro 4K (New)", url: "https://www.ezviz.com/product/h8c-pro-4knew/3" }
+  ]);
 });
 
 test("direct product revision accepts a numeric goods_id and rejects unsafe values", () => {
@@ -507,8 +567,8 @@ test("parses paired language columns and generates Specification HTML", () => {
   assert.match(html, /src="https:\/\/cdn\.example\/spec\.jpg"/);
   assert.match(html, /alt="Caméra &quot;Pro&quot;"/);
   assert.match(html, /word-break: normal/);
-  assert.match(html, /<td class="tdline3" colspan="1" rowspan="1" width="200">Modèle<\/td>/);
-  assert.doesNotMatch(html, /<th colspan="1" rowspan="1" width="200">Modèle<\/th>/);
+  assert.match(html, /<th colspan="1" rowspan="1" width="200">Modèle<\/th>/);
+  assert.doesNotMatch(html, /<td class="tdline3" colspan="1" rowspan="1" width="200">Modèle<\/td>/);
 });
 
 test("maps the Specification title to the selected target site", () => {

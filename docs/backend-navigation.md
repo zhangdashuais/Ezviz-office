@@ -89,6 +89,10 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications。国际复制源的 Detail 标签会等待异步加载完成后再读取，找到复制源且至少有一个目标站可执行时即可确认提交；目标站已有同名产品时不再阻止任务，而是跳过复制并只更新 Specification、Product Description 和语言包。部分站点失败不会阻塞其他已通过预检的站点。Specification 和 Datasheet 的语言表头都从实际工作簿读取并由页面选择，不依赖固定名称。Datasheet 明确提供 Product Description 时写入目标译文；未提供显式字段时，修订流程会用后台当前 Product Description 在 Datasheet 原文及译文中精确反查，唯一命中则写入该行目标译文；仍未命中时，首次上架保留国际复制源描述，已复制产品的修订同步则保留目标站当前描述。Detail 规格字段精确兼容英文 `Specification/Specifications`、本地化规格标题和日本站 `仕様`。产品上架会先用 Datasheet 译文列锁定同语种后台语言行，再以站点包的稳定字段键覆盖目标列；英文原文允许内容变化并提示，但不改动前置列。`&nbsp;`、脚注上标和末尾句号等无语义格式差异不再误报。总包缺少 Key 但 Datasheet 同时提供 Key、英文原文和目标译文时允许追加；缺少必要值时跳过并警告。生成文件上传后最多回读 6 次，每次只重新下载而不重复上传；语言代码不匹配或同批次匹配到多个译文列时才停止。产品下架使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`；只关闭 `isSearchable` 并把 `whenType` 设为 `0`（No Set Uptime），随后回读验证。
 
+无需 Excel 的产品内容同步使用 `/api/product-content-sync/preview` 和 `/api/product-content-sync/submit`。源固定为国际站 `hq`，按同名产品只把 PC Details 的 Overview 原样同步到所选目标站；目标站不存在产品时跳过，不复制产品，也不修改 Specifications、语言包、Product Description、Specification 字段名或其他配置。提交前同时校验源站与目标站 Overview 指纹，保存后回读 Overview，并确认原 Specifications 仍保持不变。
+
+产品上线站点搜索使用只读接口 `POST /api/product-availability/search`。它访问全部启用站点的官网 `/search?keywords=` 页面，同时读取普通搜索结果和组合产品卡片 `data-jsond` 内全部规格 Tab。按 Unicode NFKC、忽略大小写和所有空格后的完整产品名精确匹配；括号后缀仍参与最终匹配，但会追加一次去后缀搜索以兼容官网检索。单站搜索失败独立记录，不影响其他站点。
+
 ## 后台会话与产品查询复用
 
 同一站点的连续任务优先复用已验证的商城后台页和账号，不再每次返回 `/templates/index` 或重新读取凭据。产品首次查询仍从 `/goods/index` 严格匹配名称，找到后按“账号 + 产品名”缓存编辑地址。后续回读直接重新加载该地址，依然从后台取得最新数据。

@@ -88,6 +88,9 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/product-revision/submit` | 携带预览指纹保存单产品修订并回读验证 |
 | POST | `/api/product-revision/common-preview` | 多站点 × 多产品的相同 Detail/Specification 片段删除或替换预览；也支持只按站点固定文案预览 Specification 的 Custom Page Name |
 | POST | `/api/product-revision/common-submit` | 按逐站点、逐产品预览指纹执行相同片段修订或 Specification 输入框名称修订并分别回读 |
+| POST | `/api/product-content-sync/preview` | 以国际站同名产品为源，只读比较所选站点的 PC Details Overview；产品不存在时跳过 |
+| POST | `/api/product-content-sync/submit` | 按源站和目标站预览指纹同步 Overview 并回读；不修改 Specifications、语言包、Product Description 或其他配置 |
+| POST | `/api/product-availability/search` | 逐个搜索全部启用的 EZVIZ 国家官网，读取普通结果及组合产品卡片全部规格 Tab，按忽略大小写和所有空格的产品名精确匹配并返回产品链接；带括号后缀的名称会追加一次去后缀检索以兼容官网搜索；只读，不登录商城后台 |
 | POST | `/api/detail-address-replacement/preview` | 读取多个产品 PC Details，返回旧地址命中路径和次数 |
 | POST | `/api/detail-address-replacement/submit` | 精确替换命中地址，保存后逐产品回读 |
 | GET | `/api/detail-address-replacement/template` | 下载“临时功能”七列表格模板 |

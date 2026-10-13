@@ -27,7 +27,10 @@ function setup() {
       return { mode: "product-publishing-submit" };
     },
     previewCommonRevision: async () => ({ mode: "product-common-revision-preview" }),
-    submitCommonRevision: async () => ({ mode: "product-common-revision-submit" })
+    submitCommonRevision: async () => ({ mode: "product-common-revision-submit" }),
+    previewContentSync: async () => ({ mode: "product-content-sync-preview" }),
+    submitContentSync: async () => ({ mode: "product-content-sync-submit" }),
+    searchProductAvailability: async () => ({ mode: "product-availability-search" })
   };
   registerProductRevisionSyncRoutes(app, {
     upload,
@@ -84,4 +87,19 @@ test("common partial revision has dedicated routes instead of publishing batch r
   assert.equal(preview.body.result.mode, "product-common-revision-preview");
   assert.equal(submit.body.result.mode, "product-common-revision-submit");
   assert.equal(routes.has("/api/product-revision/batch-preview"), false);
+});
+
+test("product content sync has preview and submit routes without file uploads", async () => {
+  const { routes } = setup();
+  const preview = await invoke(routes.get("/api/product-content-sync/preview"));
+  const submit = await invoke(routes.get("/api/product-content-sync/submit"));
+
+  assert.equal(preview.body.result.mode, "product-content-sync-preview");
+  assert.equal(submit.body.result.mode, "product-content-sync-submit");
+});
+
+test("product availability search has a read-only route", async () => {
+  const { routes } = setup();
+  const response = await invoke(routes.get("/api/product-availability/search"));
+  assert.equal(response.body.result.mode, "product-availability-search");
 });

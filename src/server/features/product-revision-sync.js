@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
+const cheerio = require("cheerio");
 const {
   parseLanguageDatasheet,
   resolveDatasheetLanguage,
@@ -360,7 +361,7 @@ function buildPcSpecificationHtml(language, image, titleOverride) {
           if (colspan > 1) {
             return `<th class="title" colspan="${colspan}" rowspan="${rowspan}">${value}</th>`;
           }
-          return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="200">${value}</td>`;
+          return `<th colspan="${colspan}" rowspan="${rowspan}" width="200">${value}</th>`;
         }
         if (index === 0 && key === 1 && items.length > 2) {
           return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="160">${value}</td>`;
@@ -467,6 +468,51 @@ function productSnapshotStabilitySignature(snapshot) {
     isSearchable: Boolean(snapshot?.basic?.isSearchable),
     whenType: Number(snapshot?.basic?.whenType ?? 0)
   }));
+}
+
+function contentSyncFingerprint(snapshot) {
+  return hashValue(JSON.stringify({
+    goodsId: String(snapshot?.goodsId || ""),
+    overview: String(snapshot?.detail?.overview || "")
+  }));
+}
+
+function normalizeProductAvailabilityName(value) {
+  return String(value || "").normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+}
+
+function buildProductAvailabilityQueries(value) {
+  const productName = normalize(value);
+  return [...new Set([
+    productName,
+    productName.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim()
+  ].filter(Boolean))];
+}
+
+function parseProductSearchResults(html) {
+  const $ = cheerio.load(String(html || ""));
+  const seen = new Set();
+  const results = [];
+  const add = (nameValue, urlValue) => {
+    const name = String(nameValue || "").replace(/\s+/g, " ").trim();
+    const url = String(urlValue || "").trim();
+    const key = `${normalizeProductAvailabilityName(name)}\n${url}`;
+    if (!name || !url || seen.has(key)) return;
+    seen.add(key);
+    results.push({ name, url });
+  };
+  $("li.J_SiteProduct[data-jsond]").each((_index, element) => {
+    try {
+      const variants = JSON.parse($(element).attr("data-jsond") || "[]");
+      for (const variant of Array.isArray(variants) ? variants : []) {
+        add(variant?.goods_name, variant?.learn_more);
+      }
+    } catch {}
+  });
+  $("a.result-item__con-name, a.J_SiteProductTitle").each((_index, element) => {
+    add($(element).text(), $(element).attr("href"));
+  });
+  return results;
 }
 
 async function retryProductReadback(read, verify, options = {}) {
@@ -901,7 +947,8 @@ function createProductRevisionSyncFeature(deps) {
     currentProductTitle,
     specificationFieldName = "",
     nextSpecificationFieldName = "",
-    requireSpecificationField = true
+    requireSpecificationField = true,
+    fillAdsProductTitle = true
   ) {
     return page.evaluate(({
       overview,
@@ -913,6 +960,7 @@ function createProductRevisionSyncFeature(deps) {
       specificationFieldName,
       nextSpecificationFieldName,
       requireSpecificationField,
+      fillAdsProductTitle,
       fillAdsAdditionalProductTitleSource
     }) => {
       const normalizeField = (value) => String(value || "")
@@ -974,8 +1022,8 @@ function createProductRevisionSyncFeature(deps) {
       }
       scope.vm.basic.summary = productDescription;
       renameProductFields(scope.vm.basic);
-      fillAdsAdditionalProductTitle(scope.vm, productTitle, currentProductTitle !== productTitle);
-      [...document.querySelectorAll("input[ng-model], textarea[ng-model]")].forEach((input) => {
+      if (fillAdsProductTitle) fillAdsAdditionalProductTitle(scope.vm, productTitle, currentProductTitle !== productTitle);
+      if (fillAdsProductTitle) [...document.querySelectorAll("input[ng-model], textarea[ng-model]")].forEach((input) => {
         const text = (input.closest(".form-group, .control-group, tr, .row, div")?.innerText || "")
           .replace(/\s+/g, " ")
           .trim();
@@ -991,7 +1039,7 @@ function createProductRevisionSyncFeature(deps) {
       (scope.$root || scope).$applyAsync?.();
       const data = scope.md.toModel(scope.vm);
       renameProductFields(data);
-      fillAdsAdditionalProductTitle(data, productTitle, currentProductTitle !== productTitle);
+      if (fillAdsProductTitle) fillAdsAdditionalProductTitle(data, productTitle, currentProductTitle !== productTitle);
       data.goods_id = scope.goodsId;
       return data;
     }, {
@@ -1004,6 +1052,7 @@ function createProductRevisionSyncFeature(deps) {
       specificationFieldName,
       nextSpecificationFieldName,
       requireSpecificationField,
+      fillAdsProductTitle,
       fillAdsAdditionalProductTitleSource: fillAdsAdditionalProductTitle.toString()
     });
   }
@@ -1148,7 +1197,8 @@ function createProductRevisionSyncFeature(deps) {
     currentSpecificationFieldName,
     nextSpecificationFieldName,
     goodsId = "",
-    requireSpecificationField = true
+    requireSpecificationField = true,
+    fillAdsProductTitle = true
   }) {
     const payload = await buildSavePayload(
       page,
@@ -1159,7 +1209,8 @@ function createProductRevisionSyncFeature(deps) {
       productName,
       currentSpecificationFieldName,
       nextSpecificationFieldName,
-      requireSpecificationField
+      requireSpecificationField,
+      fillAdsProductTitle
     );
     const save = await postProductUpdate(page, payload);
     const readback = await verifySavedProduct(
@@ -1386,6 +1437,229 @@ function createProductRevisionSyncFeature(deps) {
       productCount: productNames.length,
       operationCount: submitTargets.length,
       completedCount: results.filter((item) => item.status === "completed").length,
+      failedCount: results.filter((item) => item.status === "failed").length,
+      results
+    };
+  }
+
+  function contentSyncRequest(body) {
+    const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
+    return validateRevisionRequest({ ...(body || {}), sourceSiteCode: "hq" }, sites);
+  }
+
+  function parseContentSyncFingerprints(value) {
+    if (!value) return {};
+    if (typeof value === "object") return value;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      throw new Error("目标产品预览指纹格式不正确，请重新预览。");
+    }
+  }
+
+  async function previewContentSync(body, logs) {
+    const request = contentSyncRequest(body);
+    const source = await readSource(request, body, logs);
+    const results = [];
+    for (const target of request.targets) {
+      try {
+        const session = await prepareSiteSession(target.site, body, logs);
+        const existing = await productExistsInCurrentSite(session.page, request.productName, logs);
+        if (!existing.exists) {
+          results.push({ status: "skipped", site: target.site, productName: request.productName });
+          continue;
+        }
+        const current = await readProductSnapshot(session.page, request.productName, logs);
+        const detailChanged = current.detail.overview !== source.snapshot.detail.overview;
+        const specificationChanged = false;
+        results.push({
+          status: detailChanged ? "ready" : "no-change",
+          site: target.site,
+          productName: request.productName,
+          goodsId: current.goodsId,
+          fingerprint: contentSyncFingerprint(current),
+          detailChanged,
+          specificationChanged,
+          currentOverviewLength: current.detail.overview.length,
+          desiredOverviewLength: source.snapshot.detail.overview.length,
+          currentSpecificationLength: current.detail.specifications.length
+        });
+      } catch (error) {
+        results.push({
+          status: "failed",
+          site: target.site,
+          productName: request.productName,
+          error: error?.message || String(error)
+        });
+      }
+    }
+    return {
+      mode: "product-content-sync-preview",
+      productName: request.productName,
+      source: {
+        site: request.sourceSite,
+        goodsId: source.snapshot.goodsId,
+        fingerprint: contentSyncFingerprint(source.snapshot),
+        overviewLength: source.snapshot.detail.overview.length,
+        specificationLength: source.snapshot.detail.specifications.length
+      },
+      targetCount: results.length,
+      readyCount: results.filter((item) => item.status === "ready").length,
+      noChangeCount: results.filter((item) => item.status === "no-change").length,
+      skippedCount: results.filter((item) => item.status === "skipped").length,
+      failedCount: results.filter((item) => item.status === "failed").length,
+      results
+    };
+  }
+
+  async function submitContentSync(body, logs) {
+    const request = contentSyncRequest(body);
+    const source = await readSource(request, body, logs);
+    const expectedSourceFingerprint = normalize(body?.expectedSourceFingerprint);
+    if (!expectedSourceFingerprint
+      || expectedSourceFingerprint !== contentSyncFingerprint(source.snapshot)) {
+      throw new Error("国际站产品内容在预览后发生变化，请重新预览。");
+    }
+    const expectedTargets = parseContentSyncFingerprints(body?.expectedTargetFingerprints);
+    const results = [];
+    for (const target of request.targets) {
+      try {
+        const session = await prepareSiteSession(target.site, body, logs);
+        const existing = await productExistsInCurrentSite(session.page, request.productName, logs);
+        if (!existing.exists) {
+          results.push({ status: "skipped", site: target.site, productName: request.productName });
+          continue;
+        }
+        const before = await readProductSnapshot(session.page, request.productName, logs);
+        const expectedFingerprint = normalize(expectedTargets[target.site.siteCode]);
+        if (!expectedFingerprint) {
+          results.push({
+            status: "skipped",
+            site: target.site,
+            productName: request.productName,
+            error: "该站点没有可执行的预览快照，未保存。"
+          });
+          continue;
+        }
+        if (expectedFingerprint !== contentSyncFingerprint(before)) {
+          throw new Error("目标产品内容在预览后发生变化，请重新预览。");
+        }
+        const detailChanged = before.detail.overview !== source.snapshot.detail.overview;
+        if (!detailChanged) {
+          results.push({ status: "no-change", site: target.site, productName: request.productName, goodsId: before.goodsId });
+          continue;
+        }
+        const saved = await saveProductContentAndVerify({
+          page: session.page,
+          productName: request.productName,
+          logs,
+          overview: source.snapshot.detail.overview,
+          specifications: before.detail.specifications,
+          productDescription: before.productDescription,
+          currentSpecificationFieldName: before.detail.specificationsFieldName,
+          nextSpecificationFieldName: before.detail.specificationsFieldName,
+          goodsId: before.goodsId,
+          fillAdsProductTitle: false
+        });
+        results.push({
+          status: "completed",
+          site: target.site,
+          productName: request.productName,
+          goodsId: saved.after.goodsId,
+          detail: saved.readback.verification.detail ? "passed" : "failed",
+          specification: "preserved"
+        });
+      } catch (error) {
+        results.push({
+          status: "failed",
+          site: target.site,
+          productName: request.productName,
+          error: error?.message || String(error)
+        });
+      }
+    }
+    return {
+      mode: "product-content-sync-submit",
+      productName: request.productName,
+      sourceSite: request.sourceSite,
+      targetCount: results.length,
+      completedCount: results.filter((item) => item.status === "completed").length,
+      noChangeCount: results.filter((item) => item.status === "no-change").length,
+      skippedCount: results.filter((item) => item.status === "skipped").length,
+      failedCount: results.filter((item) => item.status === "failed").length,
+      results
+    };
+  }
+
+  async function searchProductAvailability(body, logs) {
+    const productName = normalize(body?.productName);
+    if (!productName) throw new Error("请填写产品名称。");
+    const normalizedTarget = normalizeProductAvailabilityName(productName);
+    const searchTerms = buildProductAvailabilityQueries(productName);
+    const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
+    const results = new Array(sites.length);
+    let nextIndex = 0;
+    const worker = async () => {
+      while (nextIndex < sites.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const site = sites[index];
+        const searchUrls = [];
+        try {
+          const items = [];
+          const seen = new Set();
+          let matches = [];
+          for (const searchTerm of searchTerms) {
+            const searchUrl = new URL(`${String(site.url || "").replace(/\/+$/, "")}/search`);
+            searchUrl.searchParams.set("keywords", searchTerm);
+            searchUrls.push(searchUrl.href);
+            const response = await fetch(searchUrl, {
+              headers: { "user-agent": "Mozilla/5.0 EZVIZ product availability check" },
+              signal: AbortSignal.timeout(20000)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            for (const item of parseProductSearchResults(await response.text())) {
+              const key = `${normalizeProductAvailabilityName(item.name)}\n${item.url}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                items.push(item);
+              }
+            }
+            matches = items.filter((item) =>
+              normalizeProductAvailabilityName(item.name) === normalizedTarget);
+            if (matches.length) break;
+          }
+          results[index] = {
+            status: matches.length ? "matched" : "not-found",
+            site,
+            searchUrl: searchUrls.at(-1),
+            searchUrls,
+            matches,
+            candidates: matches.length ? [] : items.slice(0, 10)
+          };
+        } catch (error) {
+          results[index] = {
+            status: "failed",
+            site,
+            searchUrl: searchUrls.at(-1),
+            searchUrls,
+            matches: [],
+            candidates: [],
+            error: error?.message || String(error)
+          };
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, sites.length) }, worker));
+    logLine(logs, `官网搜索完成：${productName}，命中 ${results.filter((item) => item.status === "matched").length}/${sites.length} 个站点。`);
+    return {
+      mode: "product-availability-search",
+      productName,
+      matchRule: "忽略大小写和所有空格；其他字符必须一致",
+      siteCount: sites.length,
+      matchedCount: results.filter((item) => item.status === "matched").length,
+      notFoundCount: results.filter((item) => item.status === "not-found").length,
       failedCount: results.filter((item) => item.status === "failed").length,
       results
     };
@@ -2266,7 +2540,10 @@ function createProductRevisionSyncFeature(deps) {
     previewDirectRevision,
     submitDirectRevision,
     previewCommonRevision,
-    submitCommonRevision
+    submitCommonRevision,
+    previewContentSync,
+    submitContentSync,
+    searchProductAvailability
   };
 }
 
@@ -2281,6 +2558,10 @@ module.exports = {
   normalizeDetailFieldName,
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
+  contentSyncFingerprint,
+  normalizeProductAvailabilityName,
+  buildProductAvailabilityQueries,
+  parseProductSearchResults,
   retryProductReadback,
   fillAdsAdditionalProductTitle,
   normalizeJapanPublishingProductName,
