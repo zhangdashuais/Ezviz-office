@@ -8,6 +8,7 @@ const {
   resolveDatasheetLanguage,
   readLanguagePackage,
   planLanguagePackageUpdates,
+  languagePackageKeySnapshot,
   assertSafePlan,
   writeUpdatedLanguagePackage
 } = require("./language-package-workbook");
@@ -1149,6 +1150,18 @@ function createProductRevisionSyncFeature(deps) {
       changedCellCount: plan.changedCellCount,
       unchangedCellCount: plan.unchangedCellCount,
       skippedBlankCount: plan.skippedBlankCount,
+      preservedExistingCount: plan.preservedExistingCount,
+      preservedExisting: plan.preservedExisting.map((item) => ({
+        key: item.key,
+        location: `${item.sheetName}!${XLSX.utils.encode_cell({ r: item.row, c: item.targetColumn })}`,
+        datasheetRow: item.datasheetRow,
+        current: item.current,
+        translation: item.translation,
+        source: item.source,
+        datasheetSource: item.datasheetSource,
+        same: item.same,
+        sourceMismatch: item.sourceMismatch === true
+      })),
       missing: plan.missing.slice(0, 50),
       newFields: plan.newFields.slice(0, 50),
       appendedFieldCount: plan.newFields.length,
@@ -1174,7 +1187,7 @@ function createProductRevisionSyncFeature(deps) {
     });
   }
 
-  function languagePackageInputWarnings(plan, productName = "") {
+  function languagePackageInputWarnings(plan, productName = "", publishing = false) {
     return [
       ...(plan.inputWarnings || []).map((item) => ({ ...item, productName })),
       ...plan.sourceMismatches.map((item) => ({
@@ -1183,7 +1196,8 @@ function createProductRevisionSyncFeature(deps) {
         language: plan.translationHeader,
         key: item.key,
         location: item.location,
-        message: `${plan.translationHeader} ${item.location}（${item.key}）原文不一致，已按字段名更新`
+        message: `${plan.translationHeader} ${item.location}（${item.key}）原文不一致，`
+          + (publishing ? "上架时保留后台英文原文，仅填空译文，已有译文不覆盖" : "已按字段名更新")
       }))
     ];
   }
@@ -1701,7 +1715,7 @@ function createProductRevisionSyncFeature(deps) {
 
   const parseExpectedCopySourceFingerprints = parseExpectedLanguagePackageFingerprints;
 
-  async function prepareLanguagePackage(session, target, parsedDatasheet, logs) {
+  async function prepareLanguagePackage(session, target, parsedDatasheet, logs, options = {}) {
     const translationHeader = resolveDatasheetLanguage(
       parsedDatasheet,
       target,
@@ -1718,13 +1732,15 @@ function createProductRevisionSyncFeature(deps) {
       const plan = planLanguagePackageUpdates(
         packageInfo,
         parsedDatasheet,
-        translationHeader
+        translationHeader,
+        { fillBlankOnly: options.publishing === true }
       );
       logLine(
         logs,
         `${target.site.name} 使用 Datasheet 译文列“${translationHeader}”：`
         + `语言包第 3 列字段名匹配 `
-        + `${plan.matchedFieldCount} 个，第 5 列待覆盖 ${plan.changedCellCount} 个。`
+        + `${plan.matchedFieldCount} 个，第 5 列待写入 ${plan.changedCellCount + plan.newFields.length} 个，`
+        + `已有译文保留 ${plan.preservedExistingCount} 个。`
       );
       return { downloaded, packageInfo, plan, translationHeader };
     } catch (error) {
@@ -1733,7 +1749,7 @@ function createProductRevisionSyncFeature(deps) {
     }
   }
 
-  async function verifyLanguagePackageUpload(page, site, entries, logs) {
+  async function verifyLanguagePackageUpload(page, site, entries, logs, expectedSnapshot = null) {
     const headers = [...new Set(entries.map((entry) => entry.translationHeader))];
     if (headers.length !== 1) {
       throw new Error(`${site.name} 同一批次匹配到多个语言包译文列，已停止回读。`);
@@ -1748,6 +1764,9 @@ function createProductRevisionSyncFeature(deps) {
         );
         try {
           const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+          if (expectedSnapshot) {
+            return languagePackageKeySnapshot(packageInfo, Object.keys(expectedSnapshot));
+          }
           return entries.map((entry) => {
             const plan = planLanguagePackageUpdates(
               packageInfo,
@@ -1761,10 +1780,17 @@ function createProductRevisionSyncFeature(deps) {
           removeTemporaryFile(downloaded.filePath);
         }
       },
-      (plans) => ({
-        passed: plans.every((entry) => entry.plan.changedCellCount === 0),
-        plans
-      }),
+      (plans) => expectedSnapshot
+        ? {
+            passed: Object.keys(expectedSnapshot).every((key) =>
+              JSON.stringify(plans[key]) === JSON.stringify(expectedSnapshot[key])),
+            mismatchedKeys: Object.keys(expectedSnapshot).filter((key) =>
+              JSON.stringify(plans[key]) !== JSON.stringify(expectedSnapshot[key]))
+          }
+        : {
+            passed: plans.every((entry) => entry.plan.changedCellCount === 0),
+            plans
+          },
       {
         wait: (delayMs) => page.waitForTimeout(delayMs),
         onRetry: (attempt) => logLine(
@@ -1931,23 +1957,21 @@ function createProductRevisionSyncFeature(deps) {
             );
         }
         if (publishing && !copyRequired) detailChanged = false;
-        if (!specificationOnly) try {
+        if (!specificationOnly) {
           languagePackage = await prepareLanguagePackage(
             session,
             target,
             parsedDatasheet,
-            logs
+            logs,
+            { publishing }
           );
-        } catch (error) {
-          if (!publishing) throw error;
-          const message = `语言包已跳过：${error?.message || String(error)}`;
-          warnings.push({ type: "language-package", productName: request.productName, message });
-          logLine(logs, `${target.site.name} ${message}`);
         }
         const languagePackageSummary = languagePackage
           ? summarizeLanguagePackagePlan(languagePackage.plan)
           : null;
-        const languagePackageChanged = Boolean(languagePackage?.plan.changedCellCount);
+        const languagePackageChanged = Boolean(languagePackage
+          && (languagePackage.plan.changedCellCount
+            || (publishing && languagePackage.plan.newFields.length)));
         results.push({
           status: revisionPreviewStatus({
             publishing,
@@ -2046,6 +2070,7 @@ function createProductRevisionSyncFeature(deps) {
       productName: entry.productName,
       parsed: parseLanguageDatasheet(entry.file.path)
     }));
+    const expectedBatchPreviews = JSON.parse(String(body?.expectedBatchPreviews || "{}"));
     const results = [];
     logLine(logs, `开始合并 ${parsedDatasheets.length} 个产品的语言包译文。`);
 
@@ -2053,9 +2078,17 @@ function createProductRevisionSyncFeature(deps) {
       let downloaded = null;
       let generated = null;
       const warnings = [];
+      const eligibleEntries = parsedDatasheets.filter((entry) =>
+        (expectedBatchPreviews[entry.productName]?.results || []).some((item) =>
+          item.site?.siteCode === target.site.siteCode
+          && ["ready", "no-change"].includes(item.status)));
+      if (!eligibleEntries.length) {
+        logLine(logs, `${target.site.name} 没有通过预览的产品，跳过语言包及产品操作。`);
+        results.push({ status: "skipped", site: target.site, warnings: [] });
+        continue;
+      }
       try {
-        const session = await prepareSiteSession(target.site, body, logs);
-        const targetDatasheets = parsedDatasheets.map((entry) => ({
+        const targetDatasheets = eligibleEntries.map((entry) => ({
           ...entry,
           translationHeader: resolveDatasheetLanguage(
             entry.parsed,
@@ -2063,6 +2096,7 @@ function createProductRevisionSyncFeature(deps) {
             SITE_LANGUAGE_NEEDLES
           )
         }));
+        const session = await prepareSiteSession(target.site, body, logs);
         const targetHeaders = [...new Set(
           targetDatasheets.map((entry) => entry.translationHeader)
         )];
@@ -2082,23 +2116,31 @@ function createProductRevisionSyncFeature(deps) {
         }
 
         let changedCellCount = 0;
+        let preservedExistingCount = 0;
+        const preservedExisting = [];
         const verificationInputs = [];
         for (const entry of targetDatasheets) {
           try {
             const plan = planLanguagePackageUpdates(
               packageInfo,
               entry.parsed,
-              entry.translationHeader
+              entry.translationHeader,
+              { fillBlankOnly: true }
             );
             assertSafePlan(plan);
-            warnings.push(...languagePackageInputWarnings(plan, entry.productName));
-            changedCellCount += plan.changedCellCount;
+            warnings.push(...languagePackageInputWarnings(plan, entry.productName, true));
+            changedCellCount += plan.changedCellCount + plan.newFields.length;
+            preservedExistingCount += plan.preservedExistingCount;
+            preservedExisting.push(...summarizeLanguagePackagePlan(plan).preservedExisting
+              .map((item) => ({ ...item, productName: entry.productName,
+                language: entry.translationHeader })));
             verificationInputs.push(entry);
             logLine(
               logs,
-              `${target.site.name} 合并 ${entry.productName}：第 5 列覆盖 ${plan.changedCellCount} 个单元格。`
+              `${target.site.name} 合并 ${entry.productName}：待写入 ${plan.changedCellCount + plan.newFields.length} 个，`
+              + `已有译文保留 ${plan.preservedExistingCount} 个。`
             );
-            if (!plan.changedCellCount) continue;
+            if (!plan.changedCellCount && !plan.newFields.length) continue;
             const outputPath = path.resolve(
               "runtime",
               "language-package-revision",
@@ -2109,13 +2151,15 @@ function createProductRevisionSyncFeature(deps) {
             generated = nextGenerated;
             packageInfo = readLanguagePackage(generated.filePath, downloaded.langCode);
           } catch (error) {
-            const message = `${entry.productName} 语言数据已跳过：${error?.message || String(error)}`;
-            warnings.push({ type: "language-package", productName: entry.productName, message });
-            logLine(logs, `${target.site.name} ${message}`);
+            throw new Error(`${entry.productName} 语言数据预检失败：${error?.message || String(error)}`);
           }
         }
 
         if (generated) {
+          const keys = [...new Set(verificationInputs.flatMap((entry) => entry.parsed.rows
+            .filter((row) => row.key && normalize(row.translations[entry.translationHeader]))
+            .map((row) => row.key)))];
+          const expectedSnapshot = languagePackageKeySnapshot(packageInfo, keys);
           await languagePackageFeature.uploadLanguagePackageForPage(
             session.page,
             { ...generated, langCode: downloaded.langCode },
@@ -2125,28 +2169,24 @@ function createProductRevisionSyncFeature(deps) {
             session.page,
             target.site,
             verificationInputs,
-            logs
+            logs,
+            expectedSnapshot
           );
-          for (const entry of readback.verification.plans) {
-            if (entry.plan.changedCellCount) {
-              const readbackWarnings = languagePackageReadbackWarnings(
-                entry.plan,
-                entry.productName
-              );
-              warnings.push(...readbackWarnings);
-              logLine(logs, `${entry.productName} 语言包回读警告：${readbackWarnings.map((item) => item.message).join("；")}`);
-            }
+          if (!readback.verification.passed) {
+            throw new Error(`${target.site.name} 语言包上传后回读不一致：`
+              + readback.verification.mismatchedKeys.slice(0, 10).join("、"));
           }
         }
-        logLine(logs, warnings.length
-          ? `${target.site.name} 批量语言包已上传，回读发现 ${warnings.length} 个警告，继续上架。`
-          : `${target.site.name} 批量语言包已一次上传并回读核验通过。`);
-        results.push({ status: "completed", site: target.site, changedCellCount, warnings });
+        logLine(logs, generated
+          ? `${target.site.name} 批量语言包已一次上传并回读核验通过；预检警告 ${warnings.length} 个。`
+          : `${target.site.name} 语言包无空译文需要填写，已有译文保持不变；预检警告 ${warnings.length} 个。`);
+        results.push({ status: "completed", site: target.site, changedCellCount,
+          preservedExistingCount, preservedExisting, warnings });
       } catch (error) {
-        const message = `${target.site.name} 语言包处理失败，产品上架继续：${error?.message || String(error)}`;
+        const message = `${target.site.name} 语言包处理失败，已停止该站点产品上架：${error?.message || String(error)}`;
         logLine(logs, message);
         results.push({
-          status: "warning",
+          status: "failed",
           site: target.site,
           warnings: [{ type: "language-package", message }]
         });
@@ -2226,6 +2266,21 @@ function createProductRevisionSyncFeature(deps) {
       );
       try {
         const session = await prepareSiteSession(target.site, body, logs);
+        if (publishing && !skipLanguagePackage) {
+          languagePackage = await prepareLanguagePackage(
+            session, target, parsedDatasheet, logs, { publishing: true }
+          );
+          const expectedPackageFingerprint = normalize(
+            expectedLanguagePackageFingerprints[target.site.siteCode]
+          );
+          if (!expectedPackageFingerprint
+            || expectedPackageFingerprint !== languagePackage.packageInfo.contentFingerprint) {
+            throw new Error(`${target.site.name} 当前语言包在预览后发生变化，请重新预览。`);
+          }
+          assertSafePlan(languagePackage.plan);
+          warnings.push(...languagePackageInputWarnings(languagePackage.plan, request.productName, true));
+          logLine(logs, `${target.site.name} 上架语言包预检通过，开始产品操作。`);
+        }
         let targetSource = source;
         let copy = null;
         let before = null;
@@ -2349,38 +2404,24 @@ function createProductRevisionSyncFeature(deps) {
             );
         const descriptionChanged = before.productDescription !== expectedProductDescription;
         const productNameChanged = publishing && activeProductName !== targetProductName;
-        if (!skipLanguagePackage && !specificationOnly) {
-          try {
-            languagePackage = await prepareLanguagePackage(
-              session,
-              target,
-              parsedDatasheet,
-              logs
-            );
-            const expectedPackageFingerprint = normalize(
-              expectedLanguagePackageFingerprints[target.site.siteCode]
-            );
-            if (!expectedPackageFingerprint
-              || expectedPackageFingerprint
-                !== languagePackage.packageInfo.contentFingerprint) {
-              throw new Error(
-                `${target.site.name} 当前语言包在预览后发生变化，请重新预览。`
-              );
-            }
-            assertSafePlan(languagePackage.plan);
-            warnings.push(...languagePackageInputWarnings(languagePackage.plan, request.productName));
-          } catch (error) {
-            if (!publishing) throw error;
-            removeTemporaryFile(languagePackage?.downloaded?.filePath);
-            languagePackage = null;
-            const message = `语言包已跳过：${error?.message || String(error)}`;
-            warnings.push({ type: "language-package", productName: request.productName, message });
-            components.languagePackage = "warning";
-            logLine(logs, `${target.site.name} ${message}，产品上架继续执行。`);
+        if (!publishing && !skipLanguagePackage && !specificationOnly) {
+          languagePackage = await prepareLanguagePackage(
+            session, target, parsedDatasheet, logs
+          );
+          const expectedPackageFingerprint = normalize(
+            expectedLanguagePackageFingerprints[target.site.siteCode]
+          );
+          if (!expectedPackageFingerprint
+            || expectedPackageFingerprint !== languagePackage.packageInfo.contentFingerprint) {
+            throw new Error(`${target.site.name} 当前语言包在预览后发生变化，请重新预览。`);
           }
+          assertSafePlan(languagePackage.plan);
+          warnings.push(...languagePackageInputWarnings(languagePackage.plan, request.productName));
         }
         const languagePackageChanged = Boolean(!skipLanguagePackage && !specificationOnly
-          && languagePackage?.plan.changedCellCount > 0);
+          && languagePackage
+          && (languagePackage.plan.changedCellCount
+            || (publishing && languagePackage.plan.newFields.length)));
         if (!copyRequired && !productNameChanged && !detailChanged && !specificationChanged
           && !descriptionChanged && !languagePackageChanged) {
           components.detail = "no-change";
@@ -2400,6 +2441,7 @@ function createProductRevisionSyncFeature(deps) {
             productNameChanged,
             localeHeader: desired.language.header,
             languagePackageHeader: languagePackage?.translationHeader || target.languagePackageHeader,
+            languagePackage: languagePackage ? summarizeLanguagePackagePlan(languagePackage.plan) : null,
             warnings,
             components
           });
@@ -2479,6 +2521,14 @@ function createProductRevisionSyncFeature(deps) {
             },
             logs
           );
+          const expectedSnapshot = publishing
+            ? languagePackageKeySnapshot(
+                readLanguagePackage(generatedPackage.filePath, languagePackage.downloaded.langCode),
+                parsedDatasheet.rows.filter((row) => row.key
+                  && normalize(row.translations[languagePackage.translationHeader]))
+                  .map((row) => row.key)
+              )
+            : null;
           const readback = await verifyLanguagePackageUpload(
             session.page,
             target.site,
@@ -2487,16 +2537,23 @@ function createProductRevisionSyncFeature(deps) {
               parsed: parsedDatasheet,
               translationHeader: languagePackage.translationHeader
             }],
-            logs
+            logs,
+            expectedSnapshot
           );
-          const verificationPlan = readback.verification.plans[0].plan;
-          if (verificationPlan.changedCellCount) {
-            const readbackWarnings = languagePackageReadbackWarnings(
-              verificationPlan,
-              request.productName
-            );
-            warnings.push(...readbackWarnings);
-            logLine(logs, `${target.site.name} 语言包回读警告：${readbackWarnings.map((item) => item.message).join("；")}`);
+          if (publishing && !readback.verification.passed) {
+            throw new Error(`${target.site.name} 语言包上传后回读不一致：`
+              + readback.verification.mismatchedKeys.slice(0, 10).join("、"));
+          }
+          if (!publishing) {
+            const verificationPlan = readback.verification.plans[0].plan;
+            if (verificationPlan.changedCellCount) {
+              const readbackWarnings = languagePackageReadbackWarnings(
+                verificationPlan,
+                request.productName
+              );
+              warnings.push(...readbackWarnings);
+              logLine(logs, `${target.site.name} 语言包回读警告：${readbackWarnings.map((item) => item.message).join("；")}`);
+            }
           }
           components.languagePackage = warnings.length ? "warning" : "passed";
           logLine(

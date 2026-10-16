@@ -15,6 +15,7 @@
   const submitButton = document.getElementById("revisionSyncSubmit");
   const statusElement = document.getElementById("revisionSyncStatus");
   const outputElement = document.getElementById("revisionSyncOutput");
+  const reviewDownloadButton = document.getElementById("revisionSyncReviewDownload");
   const folderInput = document.getElementById("revisionSyncFolder");
   const europeDriveCheckbox = document.getElementById("revisionSyncEuropeDrive");
   const folderLabel = document.getElementById("revisionSyncFolderLabel");
@@ -73,6 +74,7 @@
   let validatedPreview = null;
   let validatedSignature = "";
   let batchProducts = [];
+  let reviewRows = [];
   const maxTargets = 50;
 
   const currentMode = () => operationSelect.value;
@@ -113,7 +115,80 @@
     validatedPreview = null;
     validatedSignature = "";
     submitButton.disabled = true;
+    reviewRows = [];
+    if (reviewDownloadButton) reviewDownloadButton.hidden = true;
   }
+
+  function collectPublishingReviewRows(result) {
+    const rows = [];
+    const add = (site, productName, languagePackage) => {
+      (languagePackage?.preservedExisting || []).forEach((entry) => rows.push({
+        site: `${site?.name || site?.siteCode || ""} (${site?.siteCode || ""})`,
+        productName,
+        language: languagePackage.translationHeader || "",
+        key: entry.key,
+        location: entry.location,
+        datasheetRow: entry.datasheetRow,
+        source: entry.source,
+        datasheetSource: entry.datasheetSource,
+        current: entry.current,
+        translation: entry.translation,
+        status: entry.same && !entry.sourceMismatch ? "一致，保留" : "待人工校对，保留后台译文"
+      }));
+    };
+    if (result.mode === "product-publishing-batch-preview") {
+      (result.results || []).forEach((product) =>
+        (product.result?.results || []).forEach((site) =>
+          add(site.site, product.productName, site.languagePackage)));
+    } else if (result.mode === "product-publishing-batch-submit") {
+      (result.languagePackageResults || []).forEach((site) =>
+        (site.preservedExisting || []).forEach((entry) =>
+          add(site.site, entry.productName, {
+            translationHeader: entry.language || "",
+            preservedExisting: [entry]
+          })));
+    } else if (result.mode?.startsWith("product-publishing-")) {
+      (result.results || []).forEach((site) => add(site.site, result.productName, site.languagePackage));
+    }
+    return rows;
+  }
+
+  function appendPublishingReviewList(result) {
+    reviewRows = collectPublishingReviewRows(result);
+    if (reviewDownloadButton) reviewDownloadButton.hidden = !reviewRows.length;
+    if (!reviewRows.length) return;
+    const pending = reviewRows.filter((row) => row.status.startsWith("待人工校对"));
+    const lines = ["", `已有译文人工校对清单：待校对 ${pending.length} 条，内容一致 ${reviewRows.length - pending.length} 条。`,
+      "已有译文均未被自动覆盖；可下载完整 CSV（包含一致项）。"];
+    pending.forEach((row) => lines.push(
+      `- ${row.site} | ${row.productName} | ${row.language} | ${row.key} | ${row.location} | Datasheet 第 ${row.datasheetRow} 行`,
+      `  后台英文：${JSON.stringify(row.source)}；Datasheet 英文：${JSON.stringify(row.datasheetSource)}`,
+      `  后台译文：${JSON.stringify(row.current)}`,
+      `  候选译文：${JSON.stringify(row.translation)}`
+    ));
+    outputElement.value += `\n${lines.join("\n")}`;
+  }
+
+  reviewDownloadButton?.addEventListener("click", () => {
+    const headers = ["站点", "产品", "语言列", "字段 Key", "后台单元格", "Datasheet 行", "后台英文", "Datasheet 英文", "后台现有译文", "Datasheet 候选译文", "状态"];
+    const csvCell = (value) => {
+      const raw = String(value == null ? "" : value);
+      const safe = /^[\s]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
+    const lines = [headers, ...reviewRows.map((row) => [
+      row.site, row.productName, row.language, row.key, row.location, row.datasheetRow,
+      row.source, row.datasheetSource, row.current, row.translation, row.status
+    ])];
+    const blob = new Blob(["\ufeff", lines.map((row) => row.map(csvCell).join(",")).join("\r\n")],
+      { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `产品上架_已有译文人工校对_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
 
   function targetRows() {
     return [...targetsElement.querySelectorAll("tbody tr")];
@@ -533,10 +608,11 @@
   }
 
   function renderProductResult(data, submitting) {
-    if (isBatchPublishing()) return submitting ? renderBatchSubmit(data) : renderBatchPreview(data);
-    if (isDelisting()) return renderDelisting(data);
-    if (isContentSync()) return renderContentSync(data);
-    return submitting ? renderSubmit(data) : renderPreview(data);
+    if (isBatchPublishing()) submitting ? renderBatchSubmit(data) : renderBatchPreview(data);
+    else if (isDelisting()) renderDelisting(data);
+    else if (isContentSync()) renderContentSync(data);
+    else submitting ? renderSubmit(data) : renderPreview(data);
+    appendPublishingReviewList(data.result);
   }
 
   function renderContentSync(data) {
@@ -664,12 +740,14 @@
       );
       if (item.languagePackage) {
         lines.push(
-          `  · 语言包：${item.languagePackage.changedCellCount
-            ? `将更新 ${item.languagePackage.changedCellCount} 个单元格`
+          `  · 语言包：${item.languagePackage.changedCellCount + item.languagePackage.appendedFieldCount
+            ? `${publishing ? "将填入" : "将更新"} ${item.languagePackage.changedCellCount + item.languagePackage.appendedFieldCount} 个${publishing ? "空译文" : "单元格"}`
             : "相同"} | ${item.languagePackage.translationHeader} | `
           + `匹配字段 ${item.languagePackage.matchedFieldCount}，`
           + `空译文跳过 ${item.languagePackage.skippedBlankCount}`
         );
+        if (publishing) lines.push(`    已有译文保留 ${item.languagePackage.preservedExistingCount || 0} 个：`
+          + (item.languagePackage.preservedExisting || []).slice(0, 20).map((entry) => entry.key).join("、"));
         if (item.languagePackage.missing?.length) {
           lines.push(
             "    缺少字段：" + item.languagePackage.missing
@@ -743,6 +821,10 @@
       } else {
         lines.push(`- 失败 | ${item.site.name} (${item.site.siteCode}) | ${item.error}`);
       }
+      if (publishing && item.languagePackage) lines.push(
+        `  · 已有译文保留 ${item.languagePackage.preservedExistingCount || 0} 个：`
+        + (item.languagePackage.preservedExisting || []).slice(0, 20).map((entry) => entry.key).join("、")
+      );
     });
     showLines(lines, data);
   }
@@ -773,6 +855,11 @@
           if (siteResult.desiredProductDescription) {
             lines.push(`      Product Description：${siteResult.desiredProductDescription}`);
           }
+          if (siteResult.languagePackage) lines.push(
+            `      语言包：填入 ${siteResult.languagePackage.changedCellCount + siteResult.languagePackage.appendedFieldCount} 个；`
+            + `已有译文保留 ${siteResult.languagePackage.preservedExistingCount || 0} 个：`
+            + (siteResult.languagePackage.preservedExisting || []).slice(0, 20).map((entry) => entry.key).join("、")
+          );
           (siteResult.warnings || []).slice(0, 3).forEach((warning) => {
             lines.push(`      警告：${warning.message}`);
           });
@@ -792,8 +879,16 @@
         : []),
       ""
     ];
+    (result.languagePackageResults || []).forEach((item) => lines.push(
+      `语言包 | ${item.site.name} (${item.site.siteCode}) | ${item.status} | `
+      + `填入 ${item.changedCellCount || 0} 个，已有译文保留 ${item.preservedExistingCount || 0} 个：`
+      + (item.preservedExisting || []).slice(0, 20).map((entry) => entry.key).join("、")
+    ));
     result.results.forEach((item) => {
       lines.push(`- ${item.productName} | ${item.status}${item.error ? ` | ${item.error}` : ""}`);
+      if (item.skippedSiteCodes?.length) lines.push(
+        `  - 未执行站点：${item.skippedSiteCodes.join("、")}（语言包或该产品预览未通过）`
+      );
       item.result?.results?.forEach((siteResult) => {
         lines.push(`  - ${siteResult.site.name} (${siteResult.site.siteCode}) | ${siteResult.status}`
           + (siteResult.error ? ` | ${siteResult.error}` : ""));

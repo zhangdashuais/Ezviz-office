@@ -161,6 +161,7 @@ test("batch submit uploads one merged language package before publishing product
     revisionFeature: {
       async submitPublishingLanguagePackageBatch(body, entries, fingerprints) {
         calls.push(["language", body.productName, entries.map((entry) => entry.productName), fingerprints]);
+        return { results: [{ status: "completed", site: { siteCode: "fr" } }] };
       },
       async submitPublishingWithoutLanguagePackage(body) {
         calls.push(["product", body.productName]);
@@ -185,12 +186,14 @@ test("batch submit uploads one merged language package before publishing product
     languageDatasheet: { fingerprint: `${productName}-data` },
     results: [{
       site: { siteCode: "fr" },
+      status: "ready",
       copySource: { sourceFingerprint: `${productName}-source` },
       languagePackage: { sourceFingerprint: "fr-package" }
     }]
   });
   await feature.submit({
     batchManifest,
+    targetsJson: JSON.stringify([{ siteCode: "fr" }]),
     expectedBatchPreviews: JSON.stringify({ CP8: preview("CP8"), HP8: preview("HP8") })
   }, files, []);
   assert.deepEqual(calls, [
@@ -200,7 +203,7 @@ test("batch submit uploads one merged language package before publishing product
   ]);
 });
 
-test("batch submit continues product publishing when language package processing fails", async () => {
+test("batch submit stops product publishing when language package processing fails", async () => {
   const calls = [];
   const feature = createProductPublishingBatchFeature({
     logLine() {},
@@ -224,13 +227,86 @@ test("batch submit continues product publishing when language package processing
   ]);
   const result = await feature.submit({
     batchManifest,
+    targetsJson: JSON.stringify([{ siteCode: "fr" }]),
     expectedBatchPreviews: JSON.stringify({
-      CP8: { workbook: {}, languageDatasheet: {}, results: [] }
+      CP8: { workbook: {}, languageDatasheet: {}, results: [{ site: { siteCode: "fr" }, status: "ready" }] }
     })
   }, files, []);
-  assert.deepEqual(calls, ["CP8"]);
-  assert.equal(result.completedCount, 1);
-  assert.match(result.warnings[0].message, /继续执行/);
+  assert.deepEqual(calls, []);
+  assert.equal(result.failedCount, 1);
+  assert.match(result.warnings[0].message, /停止本批次/);
+});
+
+test("batch submit only publishes to sites whose language packages passed", async () => {
+  const calls = [];
+  const feature = createProductPublishingBatchFeature({
+    logLine() {},
+    revisionFeature: {
+      async submitPublishingLanguagePackageBatch() {
+        return { results: [
+          { status: "completed", site: { siteCode: "fr" } },
+          { status: "failed", site: { siteCode: "de" } }
+        ] };
+      },
+      async submitPublishingWithoutLanguagePackage(body) {
+        calls.push(JSON.parse(body.targetsJson));
+        return { failedCount: 0 };
+      }
+    }
+  });
+  const files = [
+    { originalname: "0000__CP8_Datasheet.xlsx", path: "a" },
+    { originalname: "0001__CP8_Specifications.xlsx", path: "b" }
+  ];
+  const result = await feature.submit({
+    batchManifest: JSON.stringify(files.map((file) => ({
+      uploadName: file.originalname, relativePath: `CP8/${file.originalname.slice(6)}`
+    }))),
+    targetsJson: JSON.stringify([{ siteCode: "fr" }, { siteCode: "de" }]),
+    expectedBatchPreviews: JSON.stringify({ CP8: { workbook: {}, languageDatasheet: {}, results: [
+      { site: { siteCode: "fr" }, status: "ready" },
+      { site: { siteCode: "de" }, status: "ready" }
+    ] } })
+  }, files, []);
+  assert.deepEqual(calls, [[{ siteCode: "fr" }]]);
+  assert.equal(result.languagePackageResults[1].status, "failed");
+  assert.equal(result.results[0].status, "partial");
+  assert.deepEqual(result.results[0].skippedSiteCodes, ["de"]);
+});
+
+test("batch submit skips a product at sites where its own preview failed", async () => {
+  const calls = [];
+  const feature = createProductPublishingBatchFeature({
+    logLine() {},
+    revisionFeature: {
+      async submitPublishingLanguagePackageBatch() {
+        return { results: [
+          { status: "completed", site: { siteCode: "fr" } },
+          { status: "completed", site: { siteCode: "de" } }
+        ] };
+      },
+      async submitPublishingWithoutLanguagePackage(body) {
+        calls.push(JSON.parse(body.targetsJson));
+        return { failedCount: 0 };
+      }
+    }
+  });
+  const files = [
+    { originalname: "0000__CP8_Datasheet.xlsx", path: "a" },
+    { originalname: "0001__CP8_Specifications.xlsx", path: "b" }
+  ];
+  const result = await feature.submit({
+    batchManifest: JSON.stringify(files.map((file) => ({
+      uploadName: file.originalname, relativePath: `CP8/${file.originalname.slice(6)}`
+    }))),
+    targetsJson: JSON.stringify([{ siteCode: "fr" }, { siteCode: "de" }]),
+    expectedBatchPreviews: JSON.stringify({ CP8: { workbook: {}, languageDatasheet: {}, results: [
+      { site: { siteCode: "fr" }, status: "ready" },
+      { site: { siteCode: "de" }, status: "failed" }
+    ] } })
+  }, files, []);
+  assert.deepEqual(calls, [[{ siteCode: "fr" }]]);
+  assert.equal(result.results[0].status, "partial");
 });
 
 test("batch submit retries once when the shop browser closes", async () => {
@@ -238,7 +314,9 @@ test("batch submit retries once when the shop browser closes", async () => {
   const feature = createProductPublishingBatchFeature({
     logLine() {},
     revisionFeature: {
-      async submitPublishingLanguagePackageBatch() {},
+      async submitPublishingLanguagePackageBatch() {
+        return { results: [{ status: "completed", site: { siteCode: "fr" } }] };
+      },
       async submitPublishingWithoutLanguagePackage() {
         attempts += 1;
         if (attempts === 1) throw new Error("Target page, context or browser has been closed");
@@ -256,7 +334,10 @@ test("batch submit retries once when the shop browser closes", async () => {
   ]);
   const result = await feature.submit({
     batchManifest,
-    expectedBatchPreviews: JSON.stringify({ CP8: { workbook: {}, languageDatasheet: {}, results: [] } })
+    targetsJson: JSON.stringify([{ siteCode: "fr" }]),
+    expectedBatchPreviews: JSON.stringify({ CP8: { workbook: {}, languageDatasheet: {}, results: [
+      { site: { siteCode: "fr" }, status: "ready" }
+    ] } })
   }, files, []);
   assert.equal(attempts, 2);
   assert.equal(result.completedCount, 1);

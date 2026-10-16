@@ -101,9 +101,9 @@ WTB 登录后固定跳转 `https://shop.ezvizlife.com/goods/index`，在旧版�
 | POST | `/api/specification/preview` | 预览，不提交 |
 | POST | `/api/specification/submit` | 写产品后台 |
 | POST | `/api/product-publishing/preview` | 在目标站读取国际产品复制源并预览上架，不提交 |
-| POST | `/api/product-publishing/submit` | 在单个目标站复制产品、更新资料并回读 |
+| POST | `/api/product-publishing/submit` | 单站先按预览指纹核对语言包，按 Key 仅填空译文；已有译文保留并列入人工校对清单，预检通过后复制/更新产品并回读 |
 | POST | `/api/product-publishing/batch-preview` | 多产品、逐目标站预览上架；目标站已有同名产品时跳过复制，改为只预览资料/语言包更新，不提交 |
-| POST | `/api/product-publishing/batch-submit` | 多产品、逐目标站执行；未存在则复制上架，已存在则只更新资料/语言包并回读 |
+| POST | `/api/product-publishing/batch-submit` | 逐站合并语言包，仅填空译文并回读；已有译文保留并列入人工校对清单；仅对语言包通过且该产品预览通过的站点继续复制/更新 |
 | POST | `/api/product-empty-link/preview` | 国际站产品空链接只读预览：读取参考产品配置并检查新产品重名 |
 | POST | `/api/product-empty-link/submit` | 按预览指纹通过 Manual Add 原生新增接口创建国际站产品，写入 PC/移动端占位详情、固定关闭 Searchable 并逐条回读 |
 

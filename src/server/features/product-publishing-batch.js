@@ -170,10 +170,14 @@ function createProductPublishingBatchFeature(deps) {
         "批量语言包处理"
       ) || { results: [], warnings: [] };
     } catch (error) {
-      const message = `语言包处理失败，产品上架继续执行：${error?.message || String(error)}`;
+      const message = `语言包处理失败，已停止本批次产品上架：${error?.message || String(error)}`;
       languagePackageBatch = { results: [], warnings: [{ type: "language-package", message }] };
       logLine(logs, message);
     }
+    const passedSites = new Set((languagePackageBatch.results || [])
+      .filter((item) => item.status === "completed")
+      .map((item) => item.site?.siteCode));
+    const selectedTargets = JSON.parse(String(body?.targetsJson || "[]"));
     const results = [];
     for (const product of products) {
       const previewResult = expected[product.productName];
@@ -182,10 +186,17 @@ function createProductPublishingBatchFeature(deps) {
         continue;
       }
       try {
+        const eligibleTargets = selectedTargets.filter((item) => passedSites.has(item.siteCode)
+          && (previewResult.results || []).some((site) => site.site?.siteCode === item.siteCode
+            && ["ready", "no-change"].includes(site.status)));
+        if (!eligibleTargets.length) {
+          throw new Error("所选站点的语言包预检或回读未通过，已停止产品上架。");
+        }
         logLine(logs, `执行上架产品：${product.productName}`);
         const result = await retryAfterBrowserClosed(
           () => revisionFeature.submitPublishingWithoutLanguagePackage({
             ...(body || {}),
+            targetsJson: JSON.stringify(eligibleTargets),
             productName: product.productName,
             expectedSourceFingerprint: previewResult.source?.fingerprint || "",
             expectedCopySourceFingerprints: JSON.stringify(Object.fromEntries(
@@ -206,8 +217,12 @@ function createProductPublishingBatchFeature(deps) {
           `${product.productName} 上架`
         );
         results.push({
-          status: result.failedCount ? "partial" : "completed",
+          status: result.failedCount || eligibleTargets.length < selectedTargets.length
+            ? "partial" : "completed",
           productName: product.productName,
+          skippedSiteCodes: selectedTargets.filter((item) =>
+            !eligibleTargets.some((eligible) => eligible.siteCode === item.siteCode))
+            .map((item) => item.siteCode),
           result
         });
       } catch (error) {
@@ -221,6 +236,7 @@ function createProductPublishingBatchFeature(deps) {
       partialCount: results.filter((item) => item.status === "partial").length,
       failedCount: results.filter((item) => item.status === "failed").length,
       warnings: languagePackageBatch.warnings || [],
+      languagePackageResults: languagePackageBatch.results || [],
       results
     };
   }

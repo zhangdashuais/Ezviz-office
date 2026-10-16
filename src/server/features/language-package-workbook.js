@@ -227,7 +227,7 @@ function readLanguagePackage(input, langCode) {
   };
 }
 
-function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader) {
+function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader, options = {}) {
   if (!parsedDatasheet.headers.includes(translationHeader)) {
     throw new Error(`语言包 Datasheet 译文列不存在：${translationHeader}`);
   }
@@ -259,6 +259,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
   const inputWarnings = [];
   const skippedBlank = [];
   const unchanged = [];
+  const preservedExisting = [];
   const selectedByKey = new Map();
   parsedDatasheet.rows.forEach((entry) => {
     const translation = String(entry.translations[translationHeader] ?? "");
@@ -340,11 +341,26 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
       });
     }
     candidates.forEach((candidate) => {
-      if (normalizeSourceForComparison(candidate.source)
-        !== normalizeSourceForComparison(entry.source)) {
+      const sourceMatches = normalizeSourceForComparison(candidate.source)
+        === normalizeSourceForComparison(entry.source);
+      if (options.fillBlankOnly && !sourceMatches) {
+        const item = { ...candidate, key: entry.key, translation,
+          datasheetSource: entry.source, datasheetRow: entry.rowNumber,
+          sourceMismatch: true };
+        if (normalize(candidate.current)) preservedExisting.push({ ...item, same: false });
+        else updates.push(item);
+        return;
+      }
+      if (!sourceMatches) {
         sourceUpdates.push({ ...candidate, key: entry.key, source: entry.source });
       }
-      const item = { ...candidate, key: entry.key, translation };
+      const item = { ...candidate, key: entry.key, translation,
+        datasheetSource: entry.source, datasheetRow: entry.rowNumber };
+      if (options.fillBlankOnly && normalize(candidate.current)) {
+        preservedExisting.push({ ...item, same: normalizeTranslationForComparison(candidate.current)
+          === normalizeTranslationForComparison(translation) });
+        return;
+      }
       if (normalizeTranslationForComparison(candidate.current)
         === normalizeTranslationForComparison(translation)) unchanged.push(item);
       else updates.push(item);
@@ -356,11 +372,13 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
     safe: missing.length === 0 || newFields.length === missing.length,
     requestedCount: parsedDatasheet.rows.length - skippedBlank.length,
     matchedFieldCount: new Set(
-      updates.concat(unchanged).map((item) => item.key)
+      updates.concat(unchanged, preservedExisting).map((item) => item.key)
     ).size,
     changedCellCount: updates.length,
     unchangedCellCount: unchanged.length,
     skippedBlankCount: skippedBlank.length,
+    preservedExistingCount: preservedExisting.length,
+    preservedExisting,
     missing,
     newFields,
     sourceMismatches,
@@ -380,6 +398,24 @@ function assertSafePlan(plan) {
     parts.push(`原文不一致 ${plan.sourceMismatches.length} 个`);
   }
   throw new Error(`语言包预检未通过：${parts.join("，")}。请查看预览明细。`);
+}
+
+function languagePackageKeySnapshot(packageInfo, keys) {
+  const requested = new Set(keys);
+  const values = Object.fromEntries([...requested].map((key) => [key, []]));
+  for (const section of packageInfo.sections) {
+    const sheet = packageInfo.workbook.Sheets[section.sheetName];
+    for (let row = section.firstDataRow; row <= section.lastDataRow; row += 1) {
+      const key = normalize(cellValue(sheet, row, section.keyColumn));
+      if (!requested.has(key)) continue;
+      values[key].push(JSON.stringify([
+        normalizeSourceForComparison(cellValue(sheet, row, section.sourceColumn)),
+        normalizeTranslationForComparison(cellValue(sheet, row, section.targetColumn))
+      ]));
+    }
+  }
+  Object.values(values).forEach((entries) => entries.sort());
+  return values;
 }
 
 function selectAppendSection(packageInfo, plan) {
@@ -581,6 +617,7 @@ module.exports = {
   workbookContentFingerprintForGlobalRebase,
   readLanguagePackage,
   planLanguagePackageUpdates,
+  languagePackageKeySnapshot,
   assertSafePlan,
   writeUpdatedLanguagePackage,
   writeUpdatedLanguagePackageNative

@@ -9,6 +9,7 @@ const {
   resolveDatasheetLanguage,
   readLanguagePackage,
   planLanguagePackageUpdates,
+  languagePackageKeySnapshot,
   assertSafePlan,
   writeUpdatedLanguagePackage,
   writeUpdatedLanguagePackageNative,
@@ -227,6 +228,91 @@ test("appends new Datasheet fields to the language package end", () => {
     assert.equal(sheet.C6.v, "new_field");
     assert.equal(sheet.D6.v, "New source");
     assert.equal(sheet.E6.v, "Nuevo");
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("publishing fills blank translations but preserves populated keys and mismatched sources", () => {
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["reviewed", "Same source", "Máquina"],
+    ["empty", "Same source", "Nuevo"],
+    ["different_source", "Changed source", "Cambio"],
+    ["different_source_filled", "Changed source", "Cambio 2"],
+    ["new_key", "New source", "Nuevo campo"]
+  ]));
+  const current = readLanguagePackage(workbookBuffer([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "reviewed", "Same source", "Revisado"],
+    ["goods", "G2", "empty", "Same source", ""],
+    ["goods", "G3", "different_source", "Old source", ""],
+    ["goods", "G4", "different_source_filled", "Old source", "Revisado también"]
+  ], "biff8"), "es-ES");
+  const publishing = planLanguagePackageUpdates(current, datasheet, "Spanish", { fillBlankOnly: true });
+  assert.deepEqual(publishing.updates.map((item) => item.key), ["empty", "different_source"]);
+  assert.equal(publishing.updates[1].sourceMismatch, true);
+  assert.deepEqual(publishing.newFields.map((item) => item.key), ["new_key"]);
+  assert.equal(publishing.preservedExistingCount, 2);
+  assert.equal(publishing.preservedExisting[0].current, "Revisado");
+  assert.equal(publishing.preservedExisting[1].sourceMismatch, true);
+  assert.equal(publishing.sourceChangedCellCount, 0);
+  assert.deepEqual(publishing.sourceMismatches.map((item) => item.key), [
+    "different_source", "different_source_filled"
+  ]);
+  const revision = planLanguagePackageUpdates(current, datasheet, "Spanish");
+  assert.ok(revision.updates.some((item) => item.key === "reviewed"));
+  assert.ok(revision.sourceUpdates.some((item) => item.key === "different_source"));
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ezviz-source-mismatch-"));
+  try {
+    const outputPath = path.join(outputDirectory, "filled.xlsx");
+    writeUpdatedLanguagePackage(current, publishing, outputPath);
+    const filled = readLanguagePackage(outputPath, "es-ES");
+    assert.deepEqual(languagePackageKeySnapshot(filled, ["different_source"]).different_source,
+      [JSON.stringify([normalizeSourceForComparison("Old source"), "Cambio"])]);
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+  const originalSnapshot = languagePackageKeySnapshot(current, ["reviewed", "empty"]);
+  const changed = readLanguagePackage(workbookBuffer([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "reviewed", "Same source", "Máquina"],
+    ["goods", "G2", "empty", "Same source", "Nuevo"]
+  ], "biff8"), "es-ES");
+  const changedSnapshot = languagePackageKeySnapshot(changed, ["reviewed", "empty"]);
+  assert.notDeepEqual(changedSnapshot.reviewed, originalSnapshot.reviewed);
+});
+
+test("publishing a later product preserves translations filled by an earlier batch", () => {
+  const initial = readLanguagePackage(workbookBuffer([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "shared", "Shared source", ""],
+    ["goods", "G2", "four_k_only", "4K source", ""]
+  ], "biff8"), "es-ES");
+  const first = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["shared", "Shared source", "Reviewed 3K text"]
+  ]));
+  const later = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["shared", "Shared source", "Machine 4K text"],
+    ["four_k_only", "4K source", "New 4K text"]
+  ]));
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ezviz-fill-only-"));
+  try {
+    const firstPlan = planLanguagePackageUpdates(initial, first, "Spanish", { fillBlankOnly: true });
+    const firstFile = path.join(temporaryDirectory, "first.xlsx");
+    writeUpdatedLanguagePackage(initial, firstPlan, firstFile);
+    const current = readLanguagePackage(firstFile, "es-ES");
+    const laterPlan = planLanguagePackageUpdates(current, later, "Spanish", { fillBlankOnly: true });
+    assert.deepEqual(laterPlan.updates.map((item) => item.key), ["four_k_only"]);
+    assert.deepEqual(laterPlan.preservedExisting.map((item) => item.key), ["shared"]);
+    const secondFile = path.join(temporaryDirectory, "second.xlsx");
+    writeUpdatedLanguagePackage(current, laterPlan, secondFile);
+    const finalPackage = readLanguagePackage(secondFile, "es-ES");
+    const snapshot = languagePackageKeySnapshot(finalPackage, ["shared", "four_k_only"]);
+    assert.match(snapshot.shared[0], /Reviewed 3K text/);
+    assert.match(snapshot.four_k_only[0], /New 4K text/);
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }
