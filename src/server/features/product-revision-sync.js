@@ -10,6 +10,7 @@ const {
   planLanguagePackageUpdates,
   languagePackageKeySnapshot,
   assertSafePlan,
+  assertPlanPreservesSheet,
   writeUpdatedLanguagePackage
 } = require("./language-package-workbook");
 const { parseProductNames } = require("./product-replacement");
@@ -1721,6 +1722,24 @@ function createProductRevisionSyncFeature(deps) {
       target,
       SITE_LANGUAGE_NEEDLES
     );
+    const cacheKey = `${target.site.siteCode}\n${translationHeader}`;
+    const cached = options.sharedLanguagePackages?.get(cacheKey);
+    if (cached) {
+      const plan = planLanguagePackageUpdates(
+        cached.packageInfo,
+        parsedDatasheet,
+        translationHeader,
+        { fillBlankOnly: options.publishing === true }
+      );
+      if (options.publishing) assertPlanPreservesSheet(cached.packageInfo, plan, "Sheet1");
+      logLine(logs, `${target.site.name} 复用本批次已下载的语言包，合并当前产品译文。`);
+      return {
+        downloaded: { langCode: cached.langCode },
+        packageInfo: cached.packageInfo,
+        plan,
+        translationHeader
+      };
+    }
     const downloaded = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
       session.page,
       target.site,
@@ -1735,6 +1754,11 @@ function createProductRevisionSyncFeature(deps) {
         translationHeader,
         { fillBlankOnly: options.publishing === true }
       );
+      if (options.publishing) assertPlanPreservesSheet(packageInfo, plan, "Sheet1");
+      options.sharedLanguagePackages?.set(cacheKey, {
+        packageInfo,
+        langCode: downloaded.langCode
+      });
       logLine(
         logs,
         `${target.site.name} 使用 Datasheet 译文列“${translationHeader}”：`
@@ -1963,7 +1987,7 @@ function createProductRevisionSyncFeature(deps) {
             target,
             parsedDatasheet,
             logs,
-            { publishing }
+            { publishing, sharedLanguagePackages: options.sharedLanguagePackages }
           );
         }
         const languagePackageSummary = languagePackage
@@ -2128,6 +2152,7 @@ function createProductRevisionSyncFeature(deps) {
               { fillBlankOnly: true }
             );
             assertSafePlan(plan);
+            assertPlanPreservesSheet(packageInfo, plan, "Sheet1");
             warnings.push(...languagePackageInputWarnings(plan, entry.productName, true));
             changedCellCount += plan.changedCellCount + plan.newFields.length;
             preservedExistingCount += plan.preservedExistingCount;
@@ -2146,7 +2171,9 @@ function createProductRevisionSyncFeature(deps) {
               "language-package-revision",
               `${Date.now()}-${target.site.siteCode}-batch-${verificationInputs.length}.xlsx`
             );
-            const nextGenerated = writeUpdatedLanguagePackage(packageInfo, plan, outputPath);
+            const nextGenerated = writeUpdatedLanguagePackage(packageInfo, plan, outputPath, {
+              preserveSheets: ["Sheet1"]
+            });
             if (generated) removeTemporaryFile(generated.filePath);
             generated = nextGenerated;
             packageInfo = readLanguagePackage(generated.filePath, downloaded.langCode);
@@ -2337,7 +2364,12 @@ function createProductRevisionSyncFeature(deps) {
               timeout: 60000
             });
             await session.page.waitForTimeout(1200);
-            copy = await copyInternationalProduct(session.page, request.productName, logs);
+            copy = await copyInternationalProduct(
+              session.page,
+              request.productName,
+              logs,
+              copySource
+            );
             components.copy = "passed";
             activeProductName = copy.productName || request.productName;
             before = await readProductSnapshot(session.page, activeProductName, logs);
@@ -2460,7 +2492,8 @@ function createProductRevisionSyncFeature(deps) {
           generatedPackage = writeUpdatedLanguagePackage(
             languagePackage.packageInfo,
             languagePackage.plan,
-            outputPath
+            outputPath,
+            publishing ? { preserveSheets: ["Sheet1"] } : {}
           );
           logLine(
             logs,
@@ -2632,8 +2665,11 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
-  const previewPublishing = (body, excelFile, languageDatasheetFile, logs) =>
-    preview(body, excelFile, languageDatasheetFile, logs, { publishing: true });
+  const previewPublishing = (body, excelFile, languageDatasheetFile, logs, sharedLanguagePackages) =>
+    preview(body, excelFile, languageDatasheetFile, logs, {
+      publishing: true,
+      sharedLanguagePackages
+    });
   const submitPublishing = (body, excelFile, languageDatasheetFile, logs) =>
     submit(body, excelFile, languageDatasheetFile, logs, { publishing: true });
   const submitPublishingWithoutLanguagePackage = (body, excelFile, languageDatasheetFile, logs) =>

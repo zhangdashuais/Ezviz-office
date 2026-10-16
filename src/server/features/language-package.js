@@ -198,6 +198,16 @@ async function waitForLanguagePackageReadback({
   return { downloaded, inspection, attempts: maxAttempts };
 }
 
+function languageDownloadUrl(pageUrl, endpoint, langCode) {
+  const pageOrigin = new URL(pageUrl).origin;
+  const resolved = new URL(endpoint || "/language/down", pageUrl);
+  if (pageOrigin !== "https://shop.ezvizlife.com"
+    || resolved.origin !== pageOrigin
+    || resolved.pathname !== "/language/down"
+    || !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/i.test(langCode)) return "";
+  return `${resolved.origin}${resolved.pathname}?lang_code=${encodeURIComponent(langCode)}`;
+}
+
 function createLanguagePackageFeature(deps) {
   const {
     fs,
@@ -386,9 +396,24 @@ async function prepareLanguagePage(body, logs) {
 
 async function downloadLanguagePackage(page, rowInfo, logs) {
   const href = await rowInfo.downloadAction.getAttribute("href").catch(() => "");
-  const downloadPromise = page.waitForEvent("download", { timeout: 30000 }).catch(() => null);
-  await rowInfo.downloadAction.click();
-  const download = await downloadPromise;
+  const ngClick = await rowInfo.downloadAction.getAttribute("ng-click").catch(() => "");
+  const scopedLangCode = await rowInfo.downloadAction.evaluate((element) => {
+    try {
+      const scope = window.angular?.element(element).scope();
+      return String(scope?.lang?.lang_code || scope?.langCode || "");
+    } catch {
+      return "";
+    }
+  }).catch(() => "");
+  const langCode = String(rowInfo.langCode || scopedLangCode || "").trim();
+  const directEndpoint = await page.evaluate(() => window.MALL_AJAX_URL?.download || "").catch(() => "");
+  const directUrl = languageDownloadUrl(page.url(), directEndpoint, langCode);
+  let download = null;
+  if (!directUrl) {
+    const downloadPromise = page.waitForEvent("download", { timeout: 30000 }).catch(() => null);
+    await rowInfo.downloadAction.click();
+    download = await downloadPromise;
+  }
   const outputDir = path.resolve("runtime", "language-package-roundtrip");
   fs.mkdirSync(outputDir, { recursive: true });
   let fileName;
@@ -399,20 +424,23 @@ async function downloadLanguagePackage(page, rowInfo, logs) {
     filePath = path.join(outputDir, `${Date.now()}-${fileName}`);
     await download.saveAs(filePath);
     sourceUrl = download.url();
-  } else if (href && !/^javascript:/i.test(href)) {
-    const resolvedUrl = new URL(href, page.url()).href;
+  } else if (directUrl || (href && !/^javascript:/i.test(href))) {
+    const resolvedUrl = directUrl || new URL(href, page.url()).href;
     const response = await page.request.get(resolvedUrl, { timeout: 60000 });
     if (!response.ok()) {
       throw new Error(`语言包下载失败（HTTP ${response.status()}）。`);
     }
-    const disposition = await response.headerValue("content-disposition");
+    const disposition = response.headers()["content-disposition"];
     const named = disposition?.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i)?.[1];
     fileName = safeDownloadName(named ? decodeURIComponent(named) : "language-package.xlsx");
     filePath = path.join(outputDir, `${Date.now()}-${fileName}`);
     fs.writeFileSync(filePath, await response.body());
     sourceUrl = resolvedUrl;
   } else {
-    throw new Error("点击 Download 后没有捕获到浏览器下载，按钮也没有可用 href。");
+    throw new Error(
+      "语言包下载失败：按钮未提供可用链接或浏览器下载。"
+      + `语言代码=${langCode || "未识别"}，按钮动作=${ngClick || "无"}，当前页面=${page.url()}。`
+    );
   }
   const stat = fs.statSync(filePath);
   const result = {
@@ -1345,6 +1373,7 @@ module.exports = {
   languageHeaderCode,
   assertLanguagePackageMatchesHeader,
   chooseLanguageTemplateCandidate,
+  languageDownloadUrl,
   globalFirst,
   approvedDatasheetSiteCodes,
   buildGlobalPropagationProbe,

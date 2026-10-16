@@ -433,8 +433,31 @@ function selectAppendSection(packageInfo, plan) {
   });
 }
 
-function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
+function assertPlanPreservesSheet(packageInfo, plan, sheetName) {
+  if (!packageInfo.workbook.Sheets[sheetName]) return;
+  if (plan.updates.some((update) => update.sheetName === sheetName)
+    || plan.sourceUpdates?.some((update) => update.sheetName === sheetName)
+    || (plan.newFields.length && selectAppendSection(packageInfo, plan).sheetName === sheetName)) {
+    throw new Error(`产品上架语言包会修改 ${sheetName}，已停止；仅允许修改 Sheet2。`);
+  }
+}
+
+function sheetCellSnapshot(sheet) {
+  return JSON.stringify({
+    ref: sheet["!ref"] || "",
+    cells: Object.keys(sheet).filter((address) => !address.startsWith("!"))
+      .sort().map((address) => [address, sheet[address]?.t, sheet[address]?.v, sheet[address]?.f])
+  });
+}
+
+function writeUpdatedLanguagePackage(packageInfo, plan, outputPath, options = {}) {
   assertSafePlan(plan);
+  const preservedSheets = options.preserveSheets || [];
+  preservedSheets.forEach((sheetName) => assertPlanPreservesSheet(packageInfo, plan, sheetName));
+  const beforeSnapshots = new Map(preservedSheets.map((sheetName) => [
+    sheetName,
+    sheetCellSnapshot(packageInfo.workbook.Sheets[sheetName] || {})
+  ]));
   plan.updates.forEach((update) => {
     const sheet = packageInfo.workbook.Sheets[update.sheetName];
     const address = XLSX.utils.encode_cell({
@@ -484,6 +507,11 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath) {
   });
 
   const verified = readLanguagePackage(outputPath);
+  preservedSheets.forEach((sheetName) => {
+    if (sheetCellSnapshot(verified.workbook.Sheets[sheetName] || {}) !== beforeSnapshots.get(sheetName)) {
+      throw new Error(`生成的语言包 ${sheetName} 与原包不一致，已停止上传。`);
+    }
+  });
   const failures = [];
   plan.updates.forEach((update) => {
     const sheet = verified.workbook.Sheets[update.sheetName];
@@ -619,6 +647,7 @@ module.exports = {
   planLanguagePackageUpdates,
   languagePackageKeySnapshot,
   assertSafePlan,
+  assertPlanPreservesSheet,
   writeUpdatedLanguagePackage,
   writeUpdatedLanguagePackageNative
 };

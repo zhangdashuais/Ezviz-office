@@ -42,6 +42,26 @@ test("product copy categories omit placeholder and category headings", () => {
   assert.deepEqual(result, [{ value: "22", text: "Others" }]);
 });
 
+test("product copy reuses the source verified just before submission", async () => {
+  const requests = [];
+  const feature = createProductManagement({ logLine() {}, normalizeBool: Boolean });
+  const page = {
+    request: {
+      async post(url, options) {
+        requests.push({ url, options });
+        return { ok: () => true, status: () => 200, text: async () => '{"status":true}' };
+      }
+    }
+  };
+  const result = await feature.copy(page, "CB90f Triple Kit", [], {
+    productName: "CB90f Triple Kit",
+    goodsId: "295737",
+    category: { text: "WiFi Cameras" }
+  });
+  assert.equal(result.goodsId, "295737");
+  assert.deepEqual(requests[0].options.form, { cite: "", copy: "295737," });
+});
+
 test("product editor navigation treats new regional shop hosts as non-legacy", () => {
   assert.equal(isLegacyShopUrl("https://shop.ezvizlife.com/goods/index"), true);
   assert.equal(isLegacyShopUrl("https://new-vn-shop.ezvizlife.com/goods/index"), false);

@@ -11,6 +11,7 @@ const {
   planLanguagePackageUpdates,
   languagePackageKeySnapshot,
   assertSafePlan,
+  assertPlanPreservesSheet,
   writeUpdatedLanguagePackage,
   writeUpdatedLanguagePackageNative,
   normalizeSourceForComparison,
@@ -281,6 +282,37 @@ test("publishing fills blank translations but preserves populated keys and misma
   ], "biff8"), "es-ES");
   const changedSnapshot = languagePackageKeySnapshot(changed, ["reviewed", "empty"]);
   assert.notDeepEqual(changedSnapshot.reviewed, originalSnapshot.reviewed);
+});
+
+test("product publishing preserves Sheet1 and updates only Sheet2", () => {
+  const workbook = XLSX.utils.book_new();
+  const heading = ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"];
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    heading, ["common", "C1", "system_copy", "System source", "Sistema"]
+  ]), "Sheet1");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    heading, ["goods", "G1", "product_copy", "Product source", ""]
+  ]), "Sheet2");
+  const packageInfo = readLanguagePackage(XLSX.write(workbook, { type: "buffer", bookType: "biff8" }), "es-ES");
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"], ["product_copy", "Product source", "Producto"]
+  ]));
+  const plan = planLanguagePackageUpdates(packageInfo, datasheet, "Spanish", { fillBlankOnly: true });
+  assert.doesNotThrow(() => assertPlanPreservesSheet(packageInfo, plan, "Sheet1"));
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ezviz-preserve-sheet1-"));
+  try {
+    const outputPath = path.join(outputDirectory, "updated.xlsx");
+    writeUpdatedLanguagePackage(packageInfo, plan, outputPath, { preserveSheets: ["Sheet1"] });
+    const result = readLanguagePackage(outputPath, "es-ES");
+    assert.equal(result.workbook.Sheets.Sheet1.E2.v, "Sistema");
+    assert.equal(result.workbook.Sheets.Sheet2.E2.v, "Producto");
+    const forbidden = planLanguagePackageUpdates(result, parseLanguageDatasheet(workbookBuffer([
+      ["Field", "Source", "Spanish"], ["system_copy", "System source", "Nuevo"]
+    ])), "Spanish");
+    assert.throws(() => assertPlanPreservesSheet(result, forbidden, "Sheet1"), /仅允许修改 Sheet2/);
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
 });
 
 test("publishing a later product preserves translations filled by an earlier batch", () => {

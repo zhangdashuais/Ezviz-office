@@ -429,23 +429,23 @@ function createProductManagement({ logLine, normalizeBool }) {
           nearMatches.push(`${category.text}: ${cleaned}`);
         }
       });
-      const matches = page.locator(".pro-list-ul li.pro-list-li");
-      const count = await matches.count();
-      for (let index = 0; index < count; index += 1) {
-        const item = matches.nth(index);
-        const title = (await item.locator("p.pro-list-title").first().innerText()).trim();
-        if (normalizeProductNameForMatch(title)
-          !== normalizeProductNameForMatch(normalized)) continue;
-        const product = await item.evaluate((element) => {
+      const listedProducts = await page.locator(".pro-list-ul li.pro-list-li").evaluateAll((elements) =>
+        elements.map((element) => {
+          const title = (element.querySelector("p.pro-list-title")?.textContent || "").trim();
           const scope = window.angular && window.angular.element(element).scope();
           const good = scope?.good || null;
           return {
+            title,
             goodsId: good?.goods_id == null ? "" : String(good.goods_id),
             brief: good?.brief == null ? "" : String(good.brief),
-            imageUrl: good?.image_url == null ? "" : String(good.image_url),
-            modelKeys: good ? Object.keys(good) : []
+            imageUrl: good?.image_url == null ? "" : String(good.image_url)
           };
-        });
+        })
+      );
+      for (const product of listedProducts) {
+        const title = product.title;
+        if (normalizeProductNameForMatch(title)
+          !== normalizeProductNameForMatch(normalized)) continue;
         if (!product.goodsId) {
           throw new Error("Product was found but goods_id is missing: " + title);
         }
@@ -467,8 +467,12 @@ function createProductManagement({ logLine, normalizeBool }) {
     );
   }
 
-  async function copyIntGoodsProductDirect(page, productName, logs) {
-    const product = await findIntGoodsProduct(page, productName, logs);
+  async function copyIntGoodsProductDirect(page, productName, logs, verifiedSource = null) {
+    const product = verifiedSource?.goodsId
+      && normalizeProductNameForMatch(verifiedSource.productName)
+        === normalizeProductNameForMatch(productName)
+      ? verifiedSource
+      : await findIntGoodsProduct(page, productName, logs);
     const requestUrl = shopUrlForPage(page, "/goods/save-cite");
     const response = await page.request.post(requestUrl, {
       form: { cite: "", copy: product.goodsId + "," },

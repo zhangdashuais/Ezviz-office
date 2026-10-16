@@ -57,3 +57,6 @@ npm test
 ```
 
 端口默认是 `3217`。启动前先检查端口是否已有本项目的 Node 进程；不要误停其他服务。
+# 欧洲分类页与 Support 巡查
+
+命令入口：`node scripts/audit-europe-category-support.js`。默认读取配置中的 12 个欧洲站点，覆盖两个分类页、分类导航以及产品卡片的全部变体标签组合；逐产品检查详情页和 Support 入口。可通过 `CATEGORY_AUDIT_SITES` 缩小站点范围。只读，不保存绑定。报告及页面截图位于 `outputs/europe-category-support-audit-2026-10-15/`。

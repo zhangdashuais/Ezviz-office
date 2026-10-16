@@ -103,6 +103,7 @@ function createProductPublishingBatchFeature(deps) {
   async function preview(body, files, logs) {
     const products = groupProductFiles(files, body?.batchManifest);
     const results = [];
+    const sharedLanguagePackages = new Map();
     for (const product of products) {
       try {
         logLine(logs, `预览上架产品：${product.productName}`);
@@ -110,7 +111,8 @@ function createProductPublishingBatchFeature(deps) {
           { ...(body || {}), productName: product.productName },
           product.files.specification,
           product.files.datasheet,
-          logs
+          logs,
+          sharedLanguagePackages
         );
         const executable = Number(result.readyCount || 0) > 0;
         results.push({

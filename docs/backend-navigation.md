@@ -94,7 +94,7 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 
 Detail 批量替换默认选择“全选”，可在一次预览中同时处理地址替换和代码块删除，也可切换为单项操作。替换前后值按精确文本处理，可填写完整 URL、相对路径或地址片段，不要求以 `http://` 或 `https://` 开头。页面和六列 Excel 不再包含或处理 Product Album 高清图。
 
-多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications，语言表头从实际工作簿读取并由页面选择。目标站已有同名产品时跳过复制，只更新 Specification、Product Description 和语言包，保留 Overview。批量提交先逐站合并语言包：按稳定 Key 仅填空译文，已有译文保持原样并列入人工校对 CSV；原文不匹配时后台英文原文不变，空译文仍可填入，同时提示差异。缺少 Key 且原文、译文齐全时可追加。一次上传后最多下载回读 6 次，不重复上传；语言包处理失败的站点不再执行产品复制或保存，其他通过站点可继续。每个产品还须在该站预览通过，才进入产品操作。明确提供 Product Description 时写入目标译文；缺少时首次上架保留国际复制源描述，已存在产品保留目标站当前描述。Detail 规格字段兼容 `Specification/Specifications`、本地化标题与日本站 `仕様`。产品下架仍使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，关闭 `isSearchable` 并设 `whenType=0` 后回读。
+多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications，语言表头从实际工作簿读取并由页面选择。目标站已有同名产品时跳过复制，只更新 Specification、Product Description 和语言包，保留 Overview。批量提交先逐站合并语言包：按稳定 Key 仅填空译文，已有译文保持原样并列入人工校对 CSV；原文不匹配时后台英文原文不变，空译文仍可填入，同时提示差异。缺少 Key 且原文、译文齐全时可追加。产品上架不允许修改语言包 `Sheet1`：预览阻止写入，生成后逐格比对，不一致不上传。一次上传后最多下载回读 6 次，不重复上传；语言包处理失败的站点不再执行产品复制或保存，其他通过站点可继续。每个产品还须在该站预览通过，才进入产品操作。明确提供 Product Description 时写入目标译文；缺少时首次上架保留国际复制源描述，已存在产品保留目标站当前描述。Detail 规格字段兼容 `Specification/Specifications`、本地化标题与日本站 `仕様`。产品下架仍使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，关闭 `isSearchable` 并设 `whenType=0` 后回读。
 
 无需 Excel 的产品内容同步使用 `/api/product-content-sync/preview` 和 `/api/product-content-sync/submit`。源固定为国际站 `hq`，按同名产品只把 PC Details 的 Overview 原样同步到所选目标站；目标站不存在产品时跳过，不复制产品，也不修改 Specifications、语言包、Product Description、Specification 字段名或其他配置。提交前同时校验源站与目标站 Overview 指纹，保存后回读 Overview，并确认原 Specifications 仍保持不变。
 
@@ -127,5 +127,10 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 后台产品资料操作页面用同一个操作类型下拉承载文件夹批量上架、源站同步修订、只改 Specification、只改语言包、多产品相同内容修订和产品下架；页面按模式显示必要字段。只改 Specification 时仅上传 Specification Excel，只改语言包时仅上传 Datasheet。多产品相同部分修订可同时选择多个国家站点，对最多 50 个产品的 Detail 或 Specification 执行同一条精确删除/替换，也可只把 Specification 的 Custom Page Name 输入框修成站点固定文案，并按国家 × 产品逐项预览、保存和回读。直接修订接口可只更新 Basic Information 的 Product Description，或只更新 Specification 自定义字段名；Overview 与 Specification 内容会原样保留。
 
 已上架产品只需更新资料文案和语言包时，`/api/product-revision-sync/preview` 与 `/api/product-revision-sync/submit` 可传 `updateScope=specification-language`。该范围不读取或复制国际站源产品，明确保留目标站当前 Overview 和规格图；Product Description 若在 Datasheet 中存在或能由当前后台文案反查到唯一字段行，则按目标语种更新，缺失时才保留现值；Specification 自定义字段名按官网 tab 固定映射，HTML 顶部标题按规格内容标题映射，正文按目标语言列生成，并按稳定 Key 更新总语言包。新增语言键只追加到与本次既有键匹配最多的语言工作表，避免跨工作表重复。
-
 产品预览、修订、上架与回读查找产品时固定使用旧版 `https://shop.ezvizlife.com/goods/index`。登录后即使落到区域新版后台，也不在 `new-<区域>-shop.ezvizlife.com/goods/index` 查询，因为部分区域该地址会返回 404。
+
+# 欧洲分类页与 Support 只读巡查
+
+运行 `node scripts/audit-europe-category-support.js`。站点来自本地 `/api/campaign/sites`，默认覆盖 `eu,de,fr,it,es,pl,cz,be,uk,nl,ro,tr`；可通过 `CATEGORY_AUDIT_SITES` 指定其中的站点代码。
+
+逐站发现 Security Cameras / Smart Home 分类入口，点击顶部分类导航以及产品卡片的全部可选变体组合，核对切换后的型号、详情链接与图片地址。全部变体按站点和产品 ID 去重后，读取详情页及 Support 入口并检查目标页面可访问性。原始结果和分类页截图保存在 `outputs/europe-category-support-audit-2026-10-15/`。不会提交后台配置，也不执行自动绑定。

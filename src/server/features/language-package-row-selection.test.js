@@ -4,6 +4,7 @@ const XLSX = require("xlsx");
 const {
   chooseLanguageRowCandidate,
   chooseLanguageTemplateCandidate,
+  languageDownloadUrl,
   globalFirst,
   buildGlobalPropagationProbe,
   hasGlobalSourcePropagation,
@@ -61,6 +62,19 @@ test("English-only sites can use the explicit en-US language template download",
     text: "Download Language Template",
     href: "https://shop.ezvizlife.com/language/down?lang_code=en-US"
   }], "Français (France-法语)"), null);
+});
+
+test("Romania downloads the language file when Download is a JavaScript-only button", () => {
+  const pageUrl = "https://shop.ezvizlife.com/language/index";
+  assert.equal(
+    languageDownloadUrl(pageUrl, "https://shop.ezvizlife.com/language/down", "ro-RO"),
+    "https://shop.ezvizlife.com/language/down?lang_code=ro-RO"
+  );
+  assert.equal(
+    languageDownloadUrl(pageUrl, "", "ro-RO"),
+    "https://shop.ezvizlife.com/language/down?lang_code=ro-RO"
+  );
+  assert.equal(languageDownloadUrl(pageUrl, "https://other.example/language/down", "ro-RO"), "");
 });
 
 test("Global propagation is accepted only after the changed English source is visible", () => {
