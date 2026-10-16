@@ -9,15 +9,17 @@ const INT_GOODS_SOURCE_SITE_VALUE = "0";
 const LEGACY_SHOP_HOSTNAME = "shop.ezvizlife.com";
 const LEGACY_GOODS_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
 
-function shopUrlForPage(page, pathname) {
-  try {
-    const current = new URL(page.url());
-    if (current.hostname === LEGACY_SHOP_HOSTNAME
-      || /^new-[a-z]{0,3}-?shop\.ezvizlife\.com$/.test(current.hostname)) {
-      return new URL(pathname, current.origin).href;
-    }
-  } catch {}
+function shopUrlForPage(_page, pathname) {
   return new URL(pathname, LEGACY_GOODS_INDEX_URL).href;
+}
+
+async function openLegacyProductIndex(page, options = {}) {
+  const url = shopUrlForPage(page, "/goods/index");
+  const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  if (!isLegacyShopPath(page.url(), "/goods/index") || response?.status?.() >= 400) {
+    throw new Error(`产品列表打开失败：${page.url()}，请检查商城后台登录状态。`);
+  }
+  await page.waitForTimeout(options.settleMs ?? 1800);
 }
 
 function isLegacyShopPath(rawUrl, pathName) {
@@ -90,12 +92,8 @@ function createProductManagement({ logLine, normalizeBool }) {
       productEditCache.delete(cacheKey);
     }
 
-    if (new URL(page.url()).pathname !== "/goods/index") {
-      await page.goto(shopUrlForPage(page, "/goods/index"), {
-        waitUntil: "domcontentloaded",
-        timeout: 60000
-      }).catch(() => {});
-      await page.waitForTimeout(1800);
+    if (!isLegacyShopPath(page.url(), "/goods/index")) {
+      await openLegacyProductIndex(page);
     }
 
     async function findAndClickEdit() {
@@ -178,11 +176,7 @@ function createProductManagement({ logLine, normalizeBool }) {
   async function productExistsInCurrentSite(page, productName, logs) {
     const targetName = String(productName || "").trim();
     if (!targetName) throw new Error("请填写产品名称。");
-    await page.goto(shopUrlForPage(page, "/goods/index"), {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
-    }).catch(() => {});
-    await page.waitForTimeout(1800);
+    await openLegacyProductIndex(page);
 
     async function findExactProduct() {
       return page.evaluate((name) => {
@@ -229,8 +223,7 @@ function createProductManagement({ logLine, normalizeBool }) {
   }
 
   async function openFirstProductEditPage(page, logs) {
-    await page.goto(shopUrlForPage(page, "/goods/index"), { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(3000);
+    await openLegacyProductIndex(page, { settleMs: 3000 });
     const clicked = await page.evaluate(() => {
       const candidates = [...document.querySelectorAll("a, button")].filter((el) => {
         const text = (el.innerText || el.textContent || "").trim();

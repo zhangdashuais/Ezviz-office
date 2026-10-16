@@ -60,39 +60,35 @@ test("product name matching treats superscript plus as plus", () => {
   ]);
 });
 
-test("product editor keeps the current new-shop goods index", async () => {
-  const visited = [];
+test("product editor uses the legacy index from global and regional backend hosts", async () => {
+  for (const host of ["new-shop", "new-eu-shop", "new-sa-shop", "new-vn-shop"]) {
+    const visited = [];
+    const feature = createProductManagement({ logLine() {}, normalizeBool: Boolean });
+    const page = {
+      currentUrl: `https://${host}.ezvizlife.com/goods/index`,
+      url() { return this.currentUrl; },
+      async evaluate(_fn, arg) {
+        return arg?.name === "H8c"
+          ? { ok: true, href: "https://shop.ezvizlife.com/goods/add?id=123", rowText: "H8c" }
+          : "";
+      },
+      async goto(url) { visited.push(url); this.currentUrl = url; },
+      async waitForTimeout() {}
+    };
+    await feature.openByName(page, "H8c", []);
+    assert.deepEqual(visited, [LEGACY_GOODS_INDEX_URL], host);
+  }
+});
+
+test("product editor reports an index navigation failure instead of product not found", async () => {
   const feature = createProductManagement({ logLine() {}, normalizeBool: Boolean });
   const page = {
-    currentUrl: "https://new-vn-shop.ezvizlife.com/goods/index",
-    url() {
-      return this.currentUrl;
-    },
-    async evaluate(_fn, arg) {
-      if (arg?.name === "H8c") {
-        return {
-          ok: true,
-          href: "https://shop.ezvizlife.com/goods/add?id=123",
-          productPageUrl: "",
-          candidateUrls: [],
-          rowText: "H8c"
-        };
-      }
-      return "";
-    },
-    async goto(url) {
-      visited.push(url);
-      this.currentUrl = url;
-    },
-    async waitForTimeout() {},
-    locator() {
-      throw new Error("search fallback should not be used");
-    }
+    url: () => "https://new-eu-shop.ezvizlife.com/goods/index",
+    evaluate: async () => "",
+    goto: async () => ({ status: () => 404 }),
+    waitForTimeout: async () => {}
   };
-
-  await feature.openByName(page, "H8c", []);
-
-  assert.deepEqual(visited, []);
+  await assert.rejects(feature.openByName(page, "H8c", []), /产品列表打开失败/);
 });
 
 test("product editor forwards exact-only matching to the page search", async () => {

@@ -50,6 +50,8 @@ utm_campaign=web_{siteCode}_popup
 ```
 
 外部链接不自动添加 UTM。坏链只报告，不自动替换。
+普通 Banner 在所有站点（包括波兰站）默认插入第 1 位，UTM 使用 `banner1`。PC/Mobile 素材通过项目共用的带签名上传实现发送到文件服务；不要使用缺少签名参数的旧 `op_image` 直传格式。
+`/api/campaign/banner-fix-utm` 先以 `dryRun=1` 预览，按官网当前可见轮播顺序修正链接；后台定时隐藏的轮播不计入当前位置。保存发布后重新巡查，巡查页面请求使用一次性查询参数绕开旧缓存。
 
 DTC 专用入口固定站点为 `de/fr/es/it/nl`，不读取页面勾选站点和普通 Banner/Popup 表单。请求只需 `assetRootPath`、`onlineAtUtc`、`offlineAtUtc`；三项均为必填。`includeBanner=false` 或 `includePopup=false` 可只执行另一类资源，默认两类都执行；`bannerColor` 支持 `White`（默认）或 `Black`。Banner 使用后台当前 WebUploader 上传，标题固定为 `&nbsp;`，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 后再添加 Banner UTM，`model` 映射为：`de=Angebote`、`fr=Promotion`、`es=Venta Especial`、`it=Offerte top`、`nl=Mega deal`；固定隐藏 More、新窗口打开并直接发布。Popup Name 使用对应 Model，Brief 为空，Web/Mobile 链接使用同一 Hot Sale 地址并添加 Popup UTM，展示范围为全站、频率为每日一次，创建后直接启用。素材根目录按国家代码、英文名、本地名或中文名分类，素材名或子目录名需包含 `banner-pc`、`banner-mobile`、`popup`。Mobile 缺失时回退 PC 图。单文件默认上限 10 MB，缺失、重复匹配或超限会跳过对应国家并返回原因，其他国家继续。先运行 `/api/campaign/dtc-assets` 或 `/api/campaign/dtc-plan`，确认清单后再运行 `/api/campaign/dtc-submit`。
 
@@ -76,6 +78,8 @@ DTC 专用入口固定站点为 `de/fr/es/it/nl`，不读取页面勾选站点�
 
 WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Buy` 按钮，点击后出现零售商弹窗，并且每个已配置平台都能点击且目标地址与期望地址匹配。前台验证优先使用 Excel 的 `Product Page URL`，后台产品列表和编辑模型中的链接仅作为备用候选。四项全部通过时状态为 `completed`；后台已写入但前台验证未通过时为 `configured_unverified`，不得报告为完整成功。
 
+WTB 登录后固定跳转 `https://shop.ezvizlife.com/goods/index`，在旧版产品列表读取当前账号并按产品名进入 Edit；不得停留在 `new-*-shop.ezvizlife.com/templates/list` 的 Custom Page 页面查找产品。
+
 批量错误隔离：完全重复的同产品/平台/URL 行直接跳过；同一产品同一平台存在不同 URL 时跳过该产品并记录冲突。产品未找到或平台不存在记为 `skipped`；保存、会话等执行错误记为 `failed`。每个产品最多检查 3 个前台候选页并受总时限约束，单项异常后继续下一个产品。
 
 临时验证优先使用 `wtb-roundtrip-test`。若接口报告恢复失败，立即调用 `wtb-restore` 恢复保存的原值，并确认 `backendCheck.status === "passed"`。
@@ -100,15 +104,19 @@ WTB 完整成功标准：后台保存回读通过，前台对应产品出现 `Bu
 | POST | `/api/product-publishing/submit` | 在单个目标站复制产品、更新资料并回读 |
 | POST | `/api/product-publishing/batch-preview` | 多产品、逐目标站预览上架；目标站已有同名产品时跳过复制，改为只预览资料/语言包更新，不提交 |
 | POST | `/api/product-publishing/batch-submit` | 多产品、逐目标站执行；未存在则复制上架，已存在则只更新资料/语言包并回读 |
+| POST | `/api/product-empty-link/preview` | 国际站产品空链接只读预览：读取参考产品配置并检查新产品重名 |
+| POST | `/api/product-empty-link/submit` | 按预览指纹通过 Manual Add 原生新增接口创建国际站产品，写入 PC/移动端占位详情、固定关闭 Searchable 并逐条回读 |
 
 `/api/campaign/shop-login-check` 携带 `targetUrl=/goods/int-goods-list` 与 `inspectIntGoodsCopy=true` 时可只读检查国际产品复制列表；快照返回 `goods_id` 等列表字段。响应未包含 `isSearchable` 时，不得据此推断 Detail 开关状态。
 
 产品上架与修订写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列。后台自定义字段名 `vm.pcView.customs[n].name`（Custom Page Name 输入框）使用官网 tab 固定文案，HTML 顶部 Specification 标题使用规格内容标题；未知站点回退到工作簿标题。Custom Page Name 固定映射包括：荷兰/比利时 `Specificaties`，德国 `Technische Daten`，法国 `Spécifications`，西班牙/拉美/阿根廷 `Especificaciones`，意大利 `Specifiche`，捷克 `Technické údaje`，泰国 `รายละเอียด`。
+已上架产品可分开执行：`updateScope=specification-only` 仅接收 `specExcel`，只更新 Specification 内容和 Custom Page Name；`updateScope=language-only` 仅接收 `languageDatasheet`，只更新语言包。只有语言包模式要求 Datasheet；两种模式都不修改 Overview 或 Product Description。
+上述产品预览、提交和回读均固定从旧版 `https://shop.ezvizlife.com/goods/index` 查找产品；登录落到区域新版后台时必须切回旧版列表，不能在可能返回 404 的 `new-<区域>-shop.ezvizlife.com/goods/index` 搜索。
 保存产品资料前会自动把空的 Ads Additional Information → Product Title 补为当前产品名称；已有值不覆盖。
 | POST | `/api/language-package/upload` | 上传语言包 |
 | GET/POST | `/api/language-package/local-i18n-paths` | 读取或保存本机 i18n Datasheet 默认路径 |
 | POST | `/api/language-package/local-i18n-path-picker` | 打开本机 HTML、Excel、输出目录或最终 `.xlsx` 保存路径选择器 |
-| POST | `/api/language-package/local-i18n-datasheet` | 使用请求路径、已保存默认路径或自动匹配路径生成 Datasheet 并替换 HTML；纯数字节点单独出现时跳过，完整文案中的数字随整句转换 |
+| POST | `/api/language-package/local-i18n-datasheet` | 使用请求路径、已保存默认路径或自动匹配路径生成 Datasheet 并替换 HTML；HTML 已有 `goods.*` 字段的英文原文优先从总语言包不可修改的 `en-US` 原文列读取，单产品语言包仅补充总包缺失项；纯数字节点单独出现时跳过，完整文案中的数字随整句转换 |
 | POST | `/api/language-package/datasheet-inspect` | 识别单产品 Datasheet 的语种列和字段，不访问商城后台 |
 | POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖预览；没有 Edit/Download 行的英文站点可使用明确带匹配 `lang_code` 的 Download Language Template；页面默认跳过站点缺失 Key，不上传 |
 | POST | `/api/language-package/datasheet-submit` | 单任务运行；只提交预览为 `ready` 的站点，`failed` / `no-change` 站点跳过且不阻塞批次。Global 的 `English (Source)` 同时更新原文列和译文列并双列回读。含待更新 Global 的全站任务先提交 Global，再等待英文源同步并仅对已验证源字段自动刷新其余站点基线；其他变化仍按预览指纹拦截。随后原生修改、上传并重新下载回读，失败时回滚原包 |

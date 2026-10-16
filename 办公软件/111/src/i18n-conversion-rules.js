@@ -136,7 +136,7 @@
   }
 
   function preserveStylesheetLinks(sourceHtml, convertedBodyHtml) {
-    const pattern = /<link\b(?=[^>]*\brel\s*=\s*(?:"[^"]*\bstylesheet\b[^"]*"|'[^']*\bstylesheet\b[^']*'))[^>]*>/gi;
+    const pattern = /<link\b[^>]*>/gi;
     const links = String(sourceHtml || '').match(pattern) || [];
     if (!links.length) return String(convertedBodyHtml || '');
     const body = String(convertedBodyHtml || '').replace(pattern, '').trimStart();

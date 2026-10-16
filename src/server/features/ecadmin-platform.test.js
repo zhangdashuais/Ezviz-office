@@ -70,6 +70,8 @@ test("language completion can run without creating download material", async () 
     setFileByLabel() {},
     async ensureLoggedIn() {},
     async getContext() { return context; },
+    async inspectProductTracker() { throw new Error("Google must not be used"); },
+    async syncProductTracker() { throw new Error("Google must not be used"); },
   });
 
   const result = await feature.runEcadminPlatform({

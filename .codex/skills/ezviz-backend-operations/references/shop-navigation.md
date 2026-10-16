@@ -58,6 +58,7 @@
 - Popup 自动化优先使用 `https://new-shop.ezvizlife.com/popup/index`，旧侧栏仍显示 `/config/popup`。
 - 商城登录后可能按账号区域落到 `new-<区域>-shop.ezvizlife.com`；拉美账号实测为 `https://new-sa-shop.ezvizlife.com/templates/list`。`new-shop` 的相关页面属于 Custom Page 等新版模块；Banner 的 Homepage 管理仍直接使用 `https://shop.ezvizlife.com/pages/index`，不要从新版 Homepage 菜单进入。
 - 新版商城可将纯站点名称作为显示别名；若身份区域返回包含数字或邮箱标记的具体账号且与目标凭据不一致，必须停止任务，不得把该账号记作目标站点别名。
+- 产品列表与产品编辑固定从 `https://shop.ezvizlife.com/goods/index` 进入；区域新版 `new-<区域>-shop.ezvizlife.com/goods/index` 可能返回 404，不得用于查找产品。
 
 ## 代码调用
 

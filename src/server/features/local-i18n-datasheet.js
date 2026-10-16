@@ -160,14 +160,15 @@ function parseGlobalPackage(file) {
     if (!sheet?.["!ref"]) return;
     const range = XLSX.utils.decode_range(sheet["!ref"]);
     let keyColumn = -1;
-    let englishColumn = -1;
+    let englishSourceColumn = -1;
+    let englishTranslationColumn = -1;
     for (let column = range.s.c; column <= range.e.c; column += 1) {
       const header = value(sheet, range.s.r, column).toLowerCase();
       if (/single\s*word/.test(header)) keyColumn = column;
-      if (/^en-us\b/.test(header) && /cannot be modified|need translation/.test(header)) {
-        if (englishColumn < 0 || /need translation/.test(header)) englishColumn = column;
-      }
+      if (/^en-us\b/.test(header) && /cannot be modified/.test(header)) englishSourceColumn = column;
+      if (/^en-us\b/.test(header) && /need translation/.test(header)) englishTranslationColumn = column;
     }
+    const englishColumn = englishSourceColumn >= 0 ? englishSourceColumn : englishTranslationColumn;
     if (keyColumn < 0 || englishColumn < 0) return;
     for (let row = range.s.r + 1; row <= range.e.r; row += 1) {
       const key = value(sheet, row, keyColumn);
@@ -361,8 +362,9 @@ function buildWorkbook({ productName, productKey, productData, globalEntries, ht
   });
   const addRow = (entry, rowIndex, yellow = false) => {
     const productRow = productData.rows.get(entry.key.toLowerCase());
+    const globalSource = globalEntries.get(entry.key.toLowerCase())?.source;
     const items = [entry.key, ...headers.map((header, index) => index === 0
-      ? (productRow?.values[header] || entry.source)
+      ? (globalSource || productRow?.values[header] || entry.source)
       : (productRow?.values[header] || ""))];
     items.forEach((item, column) => {
       const sourceCell = cell(templateSheet, 1, Math.min(column, 29));
@@ -421,11 +423,12 @@ function generateLocalI18nDatasheet(input = {}) {
     previousOutput.rows.forEach((entry, key) => productData.rows.set(key, entry));
   }
   recoverRowsFromHtmlBackup(htmlFile, fs.readFileSync(htmlFile, "utf8"), cleanName, productData);
-  const knownEntries = new Map(globalEntries);
+  const knownEntries = new Map();
   productData.rows.forEach((entry, key) => knownEntries.set(key, {
     key: entry.key,
     source: entry.values[productData.headers[0]] || ""
   }));
+  globalEntries.forEach((entry, key) => knownEntries.set(key, entry));
   const html = fs.readFileSync(htmlFile, "utf8");
   const htmlKeys = extractHtmlKeys(html, knownEntries);
   const extracted = extractNewProductRows(html, cleanName, productKey, productData, globalEntries);
@@ -482,6 +485,8 @@ module.exports = {
   generateLocalI18nDatasheet,
   findProductWorkbook,
   initializeProductData,
+  parseGlobalPackage,
+  buildWorkbook,
   extractNewProductRows,
   replaceHtmlText,
   isProductNameOnlyText,

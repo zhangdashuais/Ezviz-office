@@ -79,8 +79,9 @@
   const isBatchPublishing = () => currentMode() === "publish-batch";
   const isDelisting = () => currentMode() === "delist";
   const isSpecificationLanguageOnly = () => currentMode() === "specification-language";
+  const isSpecificationOnly = () => currentMode() === "specification-only";
+  const isLanguageOnly = () => currentMode() === "language-only";
   const isContentSync = () => currentMode() === "content-sync";
-  const isAvailabilitySearch = () => currentMode() === "availability-search";
   const isCommonRevision = () => currentMode() === "common";
   const usesSourceSite = () => currentMode() === "revision";
 
@@ -138,7 +139,9 @@
       const packageLanguage = row.querySelector(".revision-target-package-language");
       const checkbox = row.querySelector(".revision-target-check");
       const canRun = isDelisting() || isContentSync()
-        || Boolean(language?.value && packageLanguage?.value);
+        || (isSpecificationOnly() ? Boolean(language?.value)
+          : isLanguageOnly() ? Boolean(packageLanguage?.value)
+            : Boolean(language?.value && packageLanguage?.value));
       if (canRun) executable += 1;
       checkbox.checked = canRun && selected < maxTargets;
       if (checkbox.checked) selected += 1;
@@ -174,9 +177,18 @@
       site.enabled !== false
       && (!usesSourceSite() || site.siteCode !== sourceCode)
       && (!isContentSync() || site.siteCode !== "hq"));
+    const missingRequiredHeaders = isSpecificationOnly()
+      ? !specificationHeaders.length
+      : isLanguageOnly()
+        ? !languagePackageHeaders.length
+        : !specificationHeaders.length || !languagePackageHeaders.length;
     if (!isBatchPublishing() && !isDelisting() && !isContentSync()
-      && (!specificationHeaders.length || !languagePackageHeaders.length)) {
-      targetsElement.textContent = "上传 Specification Excel 和语言包 Datasheet 后显示站点与语言列。";
+      && missingRequiredHeaders) {
+      targetsElement.textContent = isSpecificationOnly()
+        ? "上传 Specification Excel 后显示站点与语言列。"
+        : isLanguageOnly()
+          ? "上传语言包 Datasheet 后显示站点与译文列。"
+          : "上传 Specification Excel 和语言包 Datasheet 后显示站点与语言列。";
       updateSelectedCount();
       return;
     }
@@ -210,14 +222,16 @@
       "<table>",
       '<thead><tr><th><input class="revision-target-check-all" type="checkbox" '
         + 'aria-label="全选可执行目标站点"> 同步</th><th>目标站点</th>'
-        + "<th>Specification 语言列</th><th>本站使用的 Datasheet 译文列</th></tr></thead>",
+        + (isLanguageOnly() ? "" : "<th>Specification 语言列</th>")
+        + (isSpecificationOnly() ? "" : "<th>本站使用的 Datasheet 译文列</th>")
+        + "</tr></thead>",
       "<tbody>",
       ...targetSites.map((site) => [
         `<tr data-site-code="${escapeHtml(site.siteCode)}">`,
         '<td><input class="revision-target-check" type="checkbox"></td>',
         `<td>${escapeHtml(site.name)} (${escapeHtml(site.siteCode)})</td>`,
-        `<td><select class="revision-target-language">${specificationOptions}</select></td>`,
-        `<td><select class="revision-target-package-language">${languagePackageOptions}</select></td>`,
+        isLanguageOnly() ? "" : `<td><select class="revision-target-language">${specificationOptions}</select></td>`,
+        isSpecificationOnly() ? "" : `<td><select class="revision-target-package-language">${languagePackageOptions}</select></td>`,
         "</tr>"
       ].join("")),
       "</tbody></table>"
@@ -231,10 +245,12 @@
       );
       const packageMatched = autoLanguageHeader(site.siteCode, languagePackageHeaders);
       if (row && specificationMatched) {
-        row.querySelector(".revision-target-language").value = specificationMatched;
+        const select = row.querySelector(".revision-target-language");
+        if (select) select.value = specificationMatched;
       }
       if (row && packageMatched) {
-        row.querySelector(".revision-target-package-language").value = packageMatched;
+        const select = row.querySelector(".revision-target-package-language");
+        if (select) select.value = packageMatched;
       }
     });
     bindTargetEvents();
@@ -415,8 +431,10 @@
         const languagePackageHeader = row.querySelector(
           ".revision-target-package-language"
         )?.value || "";
-        if (!isDelisting() && !isContentSync() && !localeHeader) throw new Error(`${siteCode} 尚未选择 Excel 语言列。`);
-        if (!isDelisting() && !isContentSync() && !languagePackageHeader) {
+        if (!isDelisting() && !isContentSync() && !isLanguageOnly() && !localeHeader) {
+          throw new Error(`${siteCode} 尚未选择 Excel 语言列。`);
+        }
+        if (!isDelisting() && !isContentSync() && !isSpecificationOnly() && !languagePackageHeader) {
           throw new Error(`${siteCode} 尚未选择语言包 Datasheet 译文列。`);
         }
         return { siteCode, localeHeader, languagePackageHeader };
@@ -450,17 +468,15 @@
   }
 
   function buildForm(extra) {
-    const targets = isAvailabilitySearch() ? [] : selectedTargets();
-    if (!isAvailabilitySearch() && !targets.length) throw new Error("请至少勾选一个目标站点。");
+    const targets = selectedTargets();
+    if (!targets.length) throw new Error("请至少勾选一个目标站点。");
     const form = new FormData();
     form.append("sourceSiteCode", sourceSiteSelect.value || "hq");
     form.append("targetsJson", JSON.stringify(targets));
     if (isSpecificationLanguageOnly()) form.append("updateScope", "specification-language");
-    if (isAvailabilitySearch()) {
-      const productName = productNameInput.value.trim();
-      if (!productName) throw new Error("请填写产品名称。");
-      form.append("productName", productName);
-    } else if (isBatchPublishing()) {
+    if (isSpecificationOnly()) form.append("updateScope", "specification-only");
+    if (isLanguageOnly()) form.append("updateScope", "language-only");
+    if (isBatchPublishing()) {
       if (!batchProducts.length) throw new Error("请选择并解析待上架产品文件夹。");
       const manifest = [];
       let index = 0;
@@ -484,12 +500,14 @@
     } else {
     const file = excelInput.files?.[0];
     const languageDatasheet = languageDatasheetInput.files?.[0];
-    if (!file) throw new Error("请上传 Specification 翻译 Excel。");
-    if (!languageDatasheet) throw new Error("请上传语言包 Datasheet。");
+    if (!isLanguageOnly() && !file) throw new Error("请上传 Specification 翻译 Excel。");
+    if (!isSpecificationOnly() && !languageDatasheet) throw new Error("请上传语言包 Datasheet。");
     const productName = productNameInput.value.trim();
     if (!productName) throw new Error("请填写产品名称。");
-    form.append("specExcel", file);
-    form.append("languageDatasheet", languageDatasheet);
+    if (!isLanguageOnly() && file) form.append("specExcel", file);
+    if (!isSpecificationOnly() && languageDatasheet) {
+      form.append("languageDatasheet", languageDatasheet);
+    }
     form.append("productName", productName);
     }
     Object.entries(extra || {}).forEach(([key, value]) => form.append(key, value));
@@ -508,7 +526,6 @@
   }
 
   function productEndpoint(action) {
-    if (isAvailabilitySearch()) return "/api/product-availability/search";
     if (isBatchPublishing()) return `/api/product-publishing/batch-${action}`;
     if (isDelisting()) return `/api/product-delisting/${action}`;
     if (isContentSync()) return `/api/product-content-sync/${action}`;
@@ -516,44 +533,10 @@
   }
 
   function renderProductResult(data, submitting) {
-    if (isAvailabilitySearch()) return renderAvailabilitySearch(data);
     if (isBatchPublishing()) return submitting ? renderBatchSubmit(data) : renderBatchPreview(data);
     if (isDelisting()) return renderDelisting(data);
     if (isContentSync()) return renderContentSync(data);
     return submitting ? renderSubmit(data) : renderPreview(data);
-  }
-
-  function renderAvailabilitySearch(data) {
-    const result = data.result;
-    const lines = [
-      "产品已上线站点搜索结果",
-      `产品：${result.productName}`,
-      `匹配规则：${result.matchRule}`,
-      `官网站点 ${result.siteCount}：命中 ${result.matchedCount}，未找到 ${result.notFoundCount}，失败 ${result.failedCount}`,
-      "",
-      "命中站点："
-    ];
-    const matched = result.results.filter((item) => item.status === "matched");
-    if (!matched.length) lines.push("- 无");
-    matched.forEach((item) => {
-      lines.push(`- ${item.site.name} (${item.site.siteCode})`);
-      item.matches.forEach((match) => lines.push(`  ${match.name} | ${match.url}`));
-    });
-    const candidates = result.results.filter((item) => item.candidates?.length);
-    if (candidates.length) {
-      lines.push("", "未精确匹配但官网返回了候选：");
-      candidates.forEach((item) => {
-        lines.push(`- ${item.site.name} (${item.site.siteCode})`);
-        item.candidates.slice(0, 5).forEach((candidate) =>
-          lines.push(`  ${candidate.name} | ${candidate.url}`));
-      });
-    }
-    const failed = result.results.filter((item) => item.status === "failed");
-    if (failed.length) {
-      lines.push("", "搜索失败站点：");
-      failed.forEach((item) => lines.push(`- ${item.site.name} (${item.site.siteCode}) | ${item.error}`));
-    }
-    showLines(lines, data);
   }
 
   function renderContentSync(data) {
@@ -597,9 +580,15 @@
     const result = data.result;
     const publishing = result.mode === "product-publishing-preview";
     const languageOnly = !publishing && !result.source;
+    const specificationOnly = result.updateScope === "specification-only";
+    const packageOnly = result.updateScope === "language-only";
     const lines = [
       publishing
         ? "产品上架预览（尚未复制或保存）"
+        : specificationOnly
+          ? "只改 Specification 预览（尚未保存）"
+          : packageOnly
+            ? "只改语言包预览（尚未上传）"
         : languageOnly
           ? "只改语言包 / Specification 文案预览（尚未保存）"
           : "产品修订同步预览（尚未保存）",
@@ -616,9 +605,11 @@
         `自动继承图片：${result.source.image.src}`,
         `图片 alt：${result.source.image.alt || "（空）"}`
       ]),
-      `Excel 工作表：${result.workbook.sheetName}`,
-      `语言包 Datasheet：${result.languageDatasheet.sheetName}，`
-        + `${result.languageDatasheet.fieldCount} 个字段`,
+      ...(result.workbook ? [`Excel 工作表：${result.workbook.sheetName}`] : []),
+      ...(result.languageDatasheet ? [
+        `语言包 Datasheet：${result.languageDatasheet.sheetName}，`
+          + `${result.languageDatasheet.fieldCount} 个字段`
+      ] : []),
       `目标站点：${result.targetCount}，待更新：${result.readyCount}，`
         + `无需更新：${result.noChangeCount}，失败：${result.failedCount}`,
       "",
@@ -659,15 +650,15 @@
       if (publishing && item.targetProductName && item.targetProductName !== result.productName) {
         lines.push(`  · 日本站上架名称：${result.productName} → ${item.targetProductName}`);
       }
-      lines.push(
+      if (!specificationOnly && !packageOnly) lines.push(
         `  · Detail：${item.detailChanged ? "将替换" : "相同"} `
         + `(${item.currentOverviewLength} → ${item.desiredOverviewLength} 字符)`
       );
-      lines.push(
+      if (!packageOnly) lines.push(
         `  · Specification：${item.specificationChanged ? "将替换" : "相同"} `
         + `(${item.currentSpecificationLength} → ${item.desiredSpecificationLength} 字符)`
       );
-      lines.push(
+      if (!specificationOnly && !packageOnly) lines.push(
         `  · Product Description：${item.descriptionChanged ? "将更新" : "相同"} `
         + `| ${item.productDescriptionHeader || ""} | ${item.desiredProductDescription || ""}`
       );
@@ -706,9 +697,15 @@
     const result = data.result;
     const publishing = result.mode === "product-publishing-submit";
     const languageOnly = !publishing && !result.sourceSite;
+    const specificationOnly = result.updateScope === "specification-only";
+    const packageOnly = result.updateScope === "language-only";
     const lines = [
       publishing
         ? "产品上架执行结果"
+        : specificationOnly
+          ? "只改 Specification 执行结果"
+          : packageOnly
+            ? "只改语言包执行结果"
         : languageOnly
           ? "只改语言包 / Specification 文案执行结果"
           : "产品修订同步执行结果",
@@ -854,28 +851,30 @@
     const batch = isBatchPublishing();
     const delist = isDelisting();
     const languageOnly = isSpecificationLanguageOnly();
+    const specificationOnly = isSpecificationOnly();
+    const packageOnly = isLanguageOnly();
     const contentSync = isContentSync();
-    const availabilitySearch = isAvailabilitySearch();
     const common = isCommonRevision();
     const revision = usesSourceSite();
     revisionModeTabs.hidden = true;
     showRevisionPanel(common ? "common" : "same");
     mainCard.hidden = false;
-    targetsCard.hidden = common || availabilitySearch;
+    targetsCard.hidden = common;
     statusElement.hidden = common;
     resultCard.hidden = common;
     operationLabel.hidden = false;
     operationSelect.hidden = false;
-    selectMatchedButton.hidden = common || availabilitySearch;
-    clearTargetsButton.hidden = common || availabilitySearch;
-    selectedCountElement.hidden = common || availabilitySearch;
+    selectMatchedButton.hidden = common;
+    clearTargetsButton.hidden = common;
+    selectedCountElement.hidden = common;
     syncHeading.textContent = "后台产品资料操作";
     syncDescription.textContent = ({
       "publish-batch": "从本地文件夹识别多个产品，逐站执行国际站复制、Product Description 翻译、Overview/Specification 和语言包更新。",
       revision: "将一个源站点中已有产品的 Product Description、Detail、Specification 和语言包同步到多个已存在该产品的目标站点。只修订，不复制新产品。",
       "content-sync": "以国际站同名产品为源，一键同步目标站点的 PC Details Overview；不修改 Specifications、语言包、Product Description 或其他配置，产品不存在时跳过。",
-      "availability-search": "输入产品名称后搜索全部 EZVIZ 国家官网，返回当前能精确搜索到该产品的上线站点；匹配忽略大小写和所有空格。",
       "specification-language": "只修改目标站点已有产品的 Specification 文案、Specification 输入框名称、Product Description 和语言包；不使用源站，不改 Overview。",
+      "specification-only": "只修改目标站点已有产品的 Specification 内容和输入框名称；只需上传 Specification Excel。",
+      "language-only": "只修改目标站点当前语言包；只需上传语言包 Datasheet，不改产品 Details、Specification 或 Product Description。",
       common: "在下方表单中选择多个站点和多个产品，对 Detail 或 Specification 执行同一条精确删除/替换。",
       delist: "只关闭 Searchable，并将 Type of listing 设为 No Set Uptime。"
     })[currentMode()] || "选择操作类型后，页面只显示该流程需要的字段。所有写操作都必须先预览。";
@@ -883,46 +882,62 @@
     folderGroup.hidden = !batch;
     productNameLabel.hidden = batch || delist || common;
     productNameInput.hidden = batch || delist || common;
-    excelLabel.hidden = batch || delist || common || contentSync || availabilitySearch;
-    excelInput.hidden = batch || delist || common || contentSync || availabilitySearch;
-    languageDatasheetLabel.hidden = batch || delist || common || contentSync || availabilitySearch;
-    languageDatasheetInput.hidden = batch || delist || common || contentSync || availabilitySearch;
+    excelLabel.hidden = batch || delist || common || contentSync || packageOnly;
+    excelInput.hidden = batch || delist || common || contentSync || packageOnly;
+    languageDatasheetLabel.hidden = batch || delist || common || contentSync || specificationOnly;
+    languageDatasheetInput.hidden = batch || delist || common || contentSync || specificationOnly;
     delistLabel.hidden = !delist;
     delistProductsInput.hidden = !delist;
     sourceSiteLabel.hidden = !revision;
     sourceSiteSelect.hidden = !revision;
-    languageHelp.hidden = delist || common || contentSync || availabilitySearch;
-    languageHelp.textContent = languageOnly
+    languageHelp.hidden = delist || common || contentSync;
+    languageHelp.textContent = specificationOnly
+      ? "只改 Specification：按目标站点选择 Specification 语言列；系统只更新 Specification 内容及 Custom Page Name 输入框，不改语言包、Overview 或 Product Description。"
+      : packageOnly
+        ? "只改语言包：按目标站点选择 Datasheet 译文列；系统只更新并回读语言包，不改产品 Details、Specification 或 Product Description。"
+      : languageOnly
       ? "只改文案模式：按目标站点选择 Specification 语言列和 Datasheet 译文列；系统会更新 Specification 内容、Custom Page Name 输入框、Product Description 和总语言包，不改 Overview。"
       : "产品上架/修订语言包操作：先按目标站点选择 Datasheet 语种列 → 下载该站当前总语言包 → 以站点包的字段键和原文列为准，仅把 Datasheet 对应译文覆盖到目标列 → 上传新语言包 → 再次下载回读验证。";
     targetsHeading.textContent = delist ? "下架目标站点"
       : contentSync ? "Details 同步目标站点"
-        : "目标站点与两份 Excel 的语言列";
+        : specificationOnly ? "目标站点与 Specification 语言列"
+          : packageOnly ? "目标站点与 Datasheet 译文列"
+            : "目标站点与两份 Excel 的语言列";
     targetsHelp.textContent = delist
       ? "选择需要执行下架的国家站点；每个产品、每个站点都会独立预览、保存和回读。"
       : contentSync
         ? "只需选择目标站点；系统固定从国际站读取同名产品，目标站没有该产品时自动跳过。"
+      : specificationOnly
+        ? "选择已有产品所在的目标站点，并核对每个站点使用的 Specification 语言列。"
+        : packageOnly
+          ? "选择目标站点，并核对每个站点当前语言包使用的 Datasheet 译文列。"
       : languageOnly
         ? "选择已有产品所在的目标站点；系统会按站点语言列生成 Specification，并同步 Custom Page Name 输入框和语言包。"
         : "每一行都是独立映射：目标站点 → Specification 语言列 → 本站使用的 Datasheet 译文列。系统会自动匹配，执行前可逐站核对。";
-    previewButton.textContent = availabilitySearch
-      ? "搜索全部国家官网"
-      : batch
+    previewButton.textContent = batch
       ? "预览批量上架（不复制）"
       : delist
         ? "预览下架（不保存）"
         : contentSync
           ? "预览一键同步（不保存）"
+        : specificationOnly
+          ? "预览 Specification（不保存）"
+          : packageOnly
+            ? "预览语言包（不上传）"
         : languageOnly
           ? "预览文案更新（不保存）"
           : "预览同步（不保存）";
-    submitButton.hidden = availabilitySearch;
+    submitButton.hidden = false;
     submitButton.textContent = batch
       ? "确认并批量上架"
       : delist
         ? "确认并执行下架"
         : contentSync
           ? "确认并同步 Details"
+        : specificationOnly
+          ? "确认并更新 Specification"
+          : packageOnly
+            ? "确认并更新语言包"
         : languageOnly
           ? "确认并更新文案"
           : "确认并执行同步";
@@ -931,8 +946,9 @@
       "publish-batch": "批量上架模式：选择资料文件夹，预览确认后逐产品、逐站点执行；目标站已有同名产品时跳过复制，只更新 Specification / Product Description / 语言包。",
       revision: "修订同步模式：选择源站、目标站和两份 Excel，只修改目标站点已经存在的产品。",
       "content-sync": "一键同步模式：填写产品名并选择目标站点，不需要 Excel；产品不存在的站点自动跳过。",
-      "availability-search": "官网搜索模式：只读搜索全部国家官网，不登录商城后台，不保存任何产品数据。",
       "specification-language": "文案更新模式：不读取源站，只更新目标站已有产品的 Specification / Product Description / 语言包。",
+      "specification-only": "Specification 模式：只上传 Specification Excel，只更新目标站已有产品的 Specification。",
+      "language-only": "语言包模式：只上传 Datasheet，只更新目标站当前语言包。",
       common: "多产品相同内容修订：请使用下方表单填写站点、产品和替换/删除内容。",
       delist: "下架模式：只关闭 Searchable，并将 Type of listing 设为 No Set Uptime。"
     })[currentMode()] || "请选择操作类型。");
@@ -1001,10 +1017,8 @@
       renderProductResult(data, false);
       validatedPreview = data.result;
       validatedSignature = request.signature;
-      submitButton.disabled = isAvailabilitySearch() || !data.result.readyCount;
-      setStatus(isAvailabilitySearch()
-        ? `搜索完成：命中 ${data.result.matchedCount}/${data.result.siteCount} 个站点，失败 ${data.result.failedCount}。`
-        : `预览完成：待执行 ${data.result.readyCount}，跳过 ${data.result.skippedCount || 0}，失败 ${data.result.failedCount}。`,
+      submitButton.disabled = !data.result.readyCount;
+      setStatus(`预览完成：待执行 ${data.result.readyCount}，跳过 ${data.result.skippedCount || 0}，失败 ${data.result.failedCount}。`,
         data.result.failedCount ? "warn" : "ok");
     } catch (error) {
       showRequestError("预览", error);
@@ -1075,6 +1089,10 @@
         ? `将执行 ${validatedPreview.readyCount} 项下架：取消 Searchable，并把 Type of listing 改为 No Set Uptime。确认继续？`
         : isContentSync()
           ? `将从国际站同步 ${validatedPreview.productName} 的 Details 到 ${validatedPreview.readyCount} 个待更新站点；不存在的站点会跳过。确认继续？`
+        : isSpecificationOnly()
+          ? `将只更新 ${validatedPreview.productName} 在 ${validatedPreview.readyCount} 个目标站点的 Specification 内容和输入框名称。确认继续？`
+        : isLanguageOnly()
+          ? `将只更新 ${validatedPreview.productName} 在 ${validatedPreview.readyCount} 个目标站点的语言包。确认继续？`
         : isSpecificationLanguageOnly()
           ? `将更新 ${validatedPreview.productName} 在 ${validatedPreview.readyCount} 个目标站点的 Specification 文案、输入框名称、Product Description 和语言包。确认继续？`
           : `将把 ${validatedPreview.source.site.name} 的产品 ${validatedPreview.productName} 同步到 ${validatedPreview.readyCount} 个目标站点。确认继续？`);

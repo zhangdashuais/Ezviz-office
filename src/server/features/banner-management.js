@@ -1,5 +1,31 @@
+const { uploadWebflowAssetBuffer } = require("./webflow-asset-upload");
+const cheerio = require("cheerio");
+
+function planVisibleBannerUtmFixes(slides, visibleUrls, siteCode, config, buildCampaignUrl) {
+  const normalized = (url) => { try { return new URL(url).toString(); } catch { return String(url || ""); } };
+  const positions = new Map();
+  visibleUrls.forEach((url, index) => {
+    const key = normalized(url);
+    if (positions.has(key)) throw new Error("前台存在重复 Banner 链接，无法安全确定位置：" + key);
+    positions.set(key, index + 1);
+  });
+  const changes = [];
+  for (const [index, url] of slides.entries()) {
+    const position = positions.get(normalized(url));
+    if (!position) continue; // 定时隐藏的 Banner 不占当前前台位置。
+    const fixedUrl = buildCampaignUrl(url, { siteCode, placement: "banner", position }, config);
+    if (fixedUrl !== url) changes.push({ index, position, from: url, to: fixedUrl });
+  }
+  for (const url of visibleUrls) {
+    if (!slides.some((slide) => normalized(slide) === normalized(url))) {
+      throw new Error("前台 Banner 与后台配置不一致，停止修复：" + url);
+    }
+  }
+  return changes;
+}
+
 function createBannerManagement(deps) {
-  const { fs, path, logLine, normalizeBool, SHOP_HOMEPAGE_URL, readCampaignConfig,
+  const { fs, logLine, normalizeBool, SHOP_HOMEPAGE_URL, readCampaignConfig,
     getShopContext, getOpenPage, ensureShopLoggedIn,
     credentialDomainForSite, selectedCampaignSites, parseSelectedSites,
     buildCampaignUrl, buildBannerPlan, auditAndRepairBannerAfterSubmit } = deps;
@@ -327,7 +353,7 @@ function createBannerManagement(deps) {
   }
 
   function bannerTargetPosition(site) {
-    return site?.siteCode === "pl" ? 2 : 1;
+    return 1;
   }
 
   async function bannerSlideState(page) {
@@ -411,25 +437,33 @@ function createBannerManagement(deps) {
     await page.waitForTimeout(400);
   }
 
-  async function fixBannerSlideUtmByOrder(page, site, config, logs) {
+  async function fixBannerSlideUtmByOrder(page, site, config, logs, { dryRun = false } = {}) {
+    const homepage = new URL(site.url);
+    homepage.searchParams.set("_banner_utm_check", String(Date.now()));
+    const response = await fetch(homepage, { cache: "no-store" });
+    if (!response.ok) throw new Error("读取前台 Banner 失败：HTTP " + response.status);
+    const $ = cheerio.load(await response.text());
+    const visibleUrls = $(".home-banner.js-widget-wrapper .swiper-container-home > .swiper-wrapper > .swiper-slide")
+      .map((_, slide) => $(slide).find("a[href]").first().attr("href") || "").get().filter(Boolean)
+      .map((href) => new URL(href, site.url).toString());
+    if (!visibleUrls.length) throw new Error("前台没有读取到 Banner，停止 UTM 修复。");
     const state = await bannerSlideState(page);
-    let fixedCount = 0;
+    const slides = [];
     for (let index = 0; index < state.count; index += 1) {
       await selectBannerSlide(page, index);
-      const url = await page.locator("#url").first().inputValue().catch(() => "");
-      const fixedUrl = buildCampaignUrl(url, {
-        siteCode: site.siteCode,
-        placement: "banner",
-        position: index + 1
-      }, config);
-      if (fixedUrl && fixedUrl !== url) {
-        await setInputValueBySelector(page, "#url", fixedUrl);
-        fixedCount += 1;
-        logLine(logs, "修正第 " + (index + 1) + " 位 Banner UTM：" + url + " -> " + fixedUrl);
+      slides.push(await page.locator("#url").first().inputValue());
+    }
+    const changes = planVisibleBannerUtmFixes(slides, visibleUrls, site.siteCode, config, buildCampaignUrl);
+    logLine(logs, "前台显示 " + visibleUrls.length + " 张、后台配置 " + slides.length + " 张；待修正 " + changes.length + " 条。");
+    for (const change of changes) {
+      logLine(logs, "前台第 " + change.position + " 位 UTM：" + change.from + " -> " + change.to);
+      if (!dryRun) {
+        await selectBannerSlide(page, change.index);
+        if (await page.locator("#url").first().inputValue() !== change.from) throw new Error("Banner 链接已变化，停止修复。");
+        await setInputValueBySelector(page, "#url", change.to);
       }
     }
-    logLine(logs, "Banner UTM 巡查完成，修正 " + fixedCount + " 条。");
-    return fixedCount;
+    return changes;
   }
 
   function normalizeBannerDateTime(value) {
@@ -474,25 +508,9 @@ function createBannerManagement(deps) {
 
   async function uploadMallImageDirect(file, logs, label) {
     if (!file?.path || !fs.existsSync(file.path)) throw new Error("缺少 " + label + " 图片文件。");
-    const form = new FormData();
-    form.append("app", "mall");
-    form.append("flag", "op_image");
-    form.append("quality", "100");
-    const blob = new Blob([fs.readFileSync(file.path)], { type: file.mimetype || "application/octet-stream" });
-    form.append("file", blob, file.originalname || path.basename(file.path));
-    const response = await fetch("https://fs.ezvizlife.com/upload.php", { method: "POST", body: form });
-    const text = await response.text();
-    let data = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error(label + " 图片上传返回不是 JSON：" + text.slice(0, 300));
-    }
-    if (!response.ok || !data.status || !data.uri) {
-      throw new Error(label + " 图片上传失败：" + (data.msg || text.slice(0, 300)));
-    }
-    logLine(logs, label + " 图片已上传到文件服务：" + data.uri);
-    return data.uri;
+    const result = await uploadWebflowAssetBuffer(fs.readFileSync(file.path), file);
+    logLine(logs, label + " 图片已上传到文件服务：" + result.url);
+    return result.url;
   }
 
   async function getHomepageBannerWidgetInfo(page) {
@@ -574,15 +592,11 @@ function createBannerManagement(deps) {
     };
     existingSlides.splice(insertIndex, 0, newSlide);
 
-    const fixedSlides = existingSlides.map((slide, index) => ({
+    const fixedSlides = existingSlides.map((slide) => ({
       title: slide.title || "",
       sub_title: slide.sub_title || "",
       model: slide.model || "",
-      url: buildCampaignUrl(slide.url || "", {
-        siteCode: site.siteCode,
-        placement: "banner",
-        position: index + 1
-      }, config),
+      url: slide.url || "",
       color: normalizeBannerColor(slide.color || "#fff"),
       pc_img: slide.pc_img || "",
       info: slide.info || "",
@@ -697,8 +711,6 @@ function createBannerManagement(deps) {
     if (fileInputCount > 1 && mobileImage) await fileInputs.nth(1).setInputFiles(mobileImage.path);
     await page.waitForTimeout(8000);
 
-    await fixBannerSlideUtmByOrder(page, site, config, logs);
-
     logLine(logs, "保存 Banner 弹窗。");
     await clickByText(page, /^Save$/i);
     await page.waitForTimeout(5000);
@@ -746,7 +758,9 @@ function createBannerManagement(deps) {
     logLine(logs, "Open home banner edit dialog for UTM repair.");
     await openHomeBannerEditDialog(page, logs);
     await waitForBannerEditForm(page, logs);
-    const fixedCount = await fixBannerSlideUtmByOrder(page, site, config, logs);
+    const changes = await fixBannerSlideUtmByOrder(page, site, config, logs, { dryRun: normalizeBool(body.dryRun) });
+    if (normalizeBool(body.dryRun)) return { site, editorUrl, changes, fixedCount: 0, preview: true };
+    const fixedCount = changes.length;
 
     if (fixedCount > 0) {
       logLine(logs, "Save banner dialog after UTM repair.");
@@ -773,4 +787,4 @@ function createBannerManagement(deps) {
   };
 }
 
-module.exports = { createBannerManagement };
+module.exports = { createBannerManagement, planVisibleBannerUtmFixes };

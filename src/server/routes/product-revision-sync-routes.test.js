@@ -48,7 +48,7 @@ function setup() {
   return { routes, calls };
 }
 
-async function invoke(handler) {
+async function invoke(handler, request = {}) {
   const response = { statusCode: 200 };
   response.status = (statusCode) => {
     response.statusCode = statusCode;
@@ -58,8 +58,8 @@ async function invoke(handler) {
     response.body = body;
   };
   await handler({
-    body: { productName: "CP8" },
-    files: {
+    body: request.body || { productName: "CP8" },
+    files: request.files || {
       specExcel: [{ path: "spec.xlsx" }],
       languageDatasheet: [{ path: "datasheet.xlsx" }]
     }
@@ -102,4 +102,32 @@ test("product availability search has a read-only route", async () => {
   const { routes } = setup();
   const response = await invoke(routes.get("/api/product-availability/search"));
   assert.equal(response.body.result.mode, "product-availability-search");
+});
+
+test("Specification-only revision accepts only the Specification workbook", async () => {
+  const { routes } = setup();
+  const response = await invoke(routes.get("/api/product-revision-sync/preview"), {
+    body: { productName: "CP8", updateScope: "specification-only" },
+    files: { specExcel: [{ path: "spec.xlsx" }] }
+  });
+  assert.equal(response.statusCode, 200);
+});
+
+test("language-only revision accepts only the Datasheet workbook", async () => {
+  const { routes } = setup();
+  const response = await invoke(routes.get("/api/product-revision-sync/preview"), {
+    body: { productName: "CP8", updateScope: "language-only" },
+    files: { languageDatasheet: [{ path: "datasheet.xlsx" }] }
+  });
+  assert.equal(response.statusCode, 200);
+});
+
+test("language-only revision still requires a Datasheet workbook", async () => {
+  const { routes } = setup();
+  const response = await invoke(routes.get("/api/product-revision-sync/preview"), {
+    body: { productName: "CP8", updateScope: "language-only" },
+    files: {}
+  });
+  assert.equal(response.statusCode, 400);
+  assert.match(response.body.error, /语言包 Datasheet/);
 });

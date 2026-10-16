@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createBannerManagement } = require('./banner-management');
+const { createBannerManagement, planVisibleBannerUtmFixes } = require('./banner-management');
+const { buildCampaignUrl } = require('./campaign-link-inspector');
 
 test('Banner submission uses the injected plan builder', async () => {
   let buildCount = 0;
@@ -46,4 +47,26 @@ test('Banner editor opens the legacy Homepage URL directly', async () => {
   await banner.openEditor(page, []);
 
   assert.deepEqual(visited, [homepageUrl, editorUrl]);
+});
+
+test('Poland banner is inserted in the first position', () => {
+  const banner = createBannerManagement({});
+  assert.equal(banner.targetPosition({ siteCode: 'pl' }), 1);
+  assert.equal(banner.targetPosition({ siteCode: 'de' }), 1);
+});
+
+test('UTM repair follows rendered order and skips scheduled-out slides', () => {
+  const slides = [
+    'https://www.ezviz.com/pl/a?utm_medium=banner1',
+    'https://external.example/b',
+    'https://www.ezviz.com/pl/hidden',
+    'https://www.ezviz.com/pl/c?utm_medium=banner4'
+  ];
+  const visible = [slides[0], slides[1], slides[3]];
+  const changes = planVisibleBannerUtmFixes(slides, visible, 'pl', {}, buildCampaignUrl);
+  assert.deepEqual(changes.map(({ index, position }) => ({ index, position })), [
+    { index: 0, position: 1 }, { index: 3, position: 3 }
+  ]);
+  assert.match(changes[1].to, /utm_medium=banner3/);
+  assert.ok(!changes.some(({ index }) => index === 2));
 });

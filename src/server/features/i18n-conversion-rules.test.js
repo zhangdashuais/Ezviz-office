@@ -107,10 +107,14 @@ test('i18n conversion skips standalone numbers and keeps numbers inside full cop
   assert.equal(extractTranslatableText('Up to 30 days of battery life', 'H9c Dual'), 'Up to 30 days of battery life');
 });
 
-test('i18n fragment conversion preserves the original stylesheet link', () => {
-  const link = '<link rel="stylesheet" href="https://mfs.ezvizlife.com/mall/static/20260929/qi2d5pw.css">';
+test('i18n fragment conversion preserves every original link tag', () => {
+  const links = [
+    '<link rel="stylesheet" href="https://mfs.ezvizlife.com/mall/static/20260929/qi2d5pw.css">',
+    '<link href="theme.css" rel=stylesheet>',
+    '<link rel="preload" href="fonts/main.woff2" as="font">'
+  ];
   assert.equal(
-    preserveStylesheetLinks(`${link}\n<section>Product copy</section>`, '<section>{{t(&#39;goods.CB30_1&#39;)}}</section>'),
-    `${link}\n<section>{{t(&#39;goods.CB30_1&#39;)}}</section>`
+    preserveStylesheetLinks(`${links.join('\n')}\n<section>Product copy</section>`, `${links[1]}\n<section>{{t(&#39;goods.CB30_1&#39;)}}</section>`),
+    `${links.join('\n')}\n<section>{{t(&#39;goods.CB30_1&#39;)}}</section>`
   );
 });

@@ -44,11 +44,19 @@ const isoDateDaysAgo = (days) => new Date(Date.now() - days * 86400000).toISOStr
 function createGa4Connection(options = {}) {
   const fetchImpl = options.fetchImpl || fetch;
   const { clientPath, configPath, tokenPath, redirectUri } = options;
+  const pendingPath = options.pendingPath || path.join(path.dirname(tokenPath), "ga4-oauth-pending.json");
   const pending = new Map();
   const productTracker = { ...DEFAULT_PRODUCT_TRACKER, ...(options.productTracker || {}) };
   let cachedToken = null;
 
   const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+  const readPending = () => {
+    try {
+      return readJson(pendingPath);
+    } catch {
+      return {};
+    }
+  };
   const readClient = () => {
     if (!fs.existsSync(clientPath)) throw new Error(`Missing OAuth client JSON: ${clientPath}`);
     return oauthClient(readJson(clientPath));
@@ -57,6 +65,7 @@ function createGa4Connection(options = {}) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify(value, null, 2), mode ? { mode } : undefined);
   };
+  const savePending = (value) => saveJson(pendingPath, value, 0o600);
 
   async function json(url, options = {}) {
     const response = await fetchImpl(url, options);
@@ -122,7 +131,14 @@ function createGa4Connection(options = {}) {
     const client = readClient();
     saveJson(configPath, { propertyId: id });
     const state = crypto.randomBytes(24).toString("hex");
-    pending.set(state, { propertyId: id, createdAt: Date.now() });
+    const request = { propertyId: id, createdAt: Date.now() };
+    pending.set(state, request);
+    const saved = readPending();
+    for (const [key, value] of Object.entries(saved)) {
+      if (!value?.createdAt || Date.now() - value.createdAt > 600000) delete saved[key];
+    }
+    saved[state] = request;
+    savePending(saved);
     return {
       propertyId: id,
       authUrl: `${AUTH_URL}?${new URLSearchParams({
@@ -139,14 +155,18 @@ function createGa4Connection(options = {}) {
   }
 
   async function complete(code, state) {
-    const request = pending.get(String(state || ""));
-    pending.delete(String(state || ""));
+    const key = String(state || "");
+    const saved = readPending();
+    const request = pending.get(key) || saved[key];
     if (!request || Date.now() - request.createdAt > 600000) throw new Error("OAuth request expired. Reconnect first.");
     const token = await tokenRequest({ ...readClient(), code: String(code || ""), redirect_uri: redirectUri, grant_type: "authorization_code" });
     if (!token.refresh_token) throw new Error("Google did not return a refresh token. Reconnect and approve again.");
     token.scope = token.scope || SCOPES.join(" ");
     token.expires_at = Date.now() + Number(token.expires_in || 3600) * 1000;
     saveJson(tokenPath, token, 0o600);
+    pending.delete(key);
+    delete saved[key];
+    savePending(saved);
     cachedToken = { value: token.access_token, expiresAt: token.expires_at };
     return { propertyId: request.propertyId, report: await runReport(request.propertyId, token.access_token) };
   }

@@ -10,7 +10,9 @@ const {
   isProductNameOnlyText,
   normalizePathDefaults,
   findProductWorkbook,
-  initializeProductData
+  initializeProductData,
+  parseGlobalPackage,
+  buildWorkbook
 } = require("./local-i18n-datasheet");
 
 test("puts new product copy above the separator and reuses old product copy below it", () => {
@@ -120,4 +122,54 @@ test("missing product workbook keeps i18n conversion without reference rows", (t
   assert.equal(productFile, "");
   assert.deepEqual(productData.headers, ["English", "French"]);
   assert.equal(productData.rows.size, 0);
+});
+
+test("uses the immutable en-US column as the total-package source", (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "local-i18n-global-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const globalFile = path.join(folder, "en-US.xls");
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category (cannot be modified)", "Serial number (cannot be modified)", "Single word (cannot be modified)", "en-US(cannot be modified)", "en-US(need translation)"],
+    ["goods", "G1", "CB90_1", "Original copy from total package", "{{t('goods.CB90_1')}}"]
+  ]), "Sheet1");
+  XLSX.writeFile(workbook, globalFile);
+
+  assert.deepEqual(parseGlobalPackage(globalFile).get("cb90_1"), {
+    key: "CB90_1",
+    source: "Original copy from total package"
+  });
+});
+
+test("total-package source overrides a token stored in the single-product workbook", () => {
+  const template = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(template, XLSX.utils.aoa_to_sheet([
+    ["", "English"],
+    ["", ""]
+  ]), "Datasheet");
+  const templateFile = path.join(os.tmpdir(), `local-i18n-template-${process.pid}.xlsx`);
+  XLSX.writeFile(template, templateFile);
+  try {
+    const { workbook } = buildWorkbook({
+      productName: "CB90",
+      productKey: "cb90",
+      productData: {
+        headers: ["English"],
+        rows: new Map([["cb90_1", {
+          key: "CB90_1",
+          values: { English: "{{t('goods.CB90_1')}}" }
+        }]])
+      },
+      globalEntries: new Map([["cb90_1", {
+        key: "CB90_1",
+        source: "Original copy from total package"
+      }]]),
+      htmlKeys: [],
+      newProductRows: [{ key: "CB90_1", source: "{{t('goods.CB90_1')}}" }],
+      templateFile
+    });
+    assert.equal(workbook.Sheets.Datasheet.B2.v, "Original copy from total package");
+  } finally {
+    fs.rmSync(templateFile, { force: true });
+  }
 });

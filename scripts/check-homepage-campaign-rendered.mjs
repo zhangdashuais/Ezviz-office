@@ -80,7 +80,9 @@ async function auditRenderedSite(site, cfg) {
     if (cfg.rendered?.resetStorageBeforeSite !== false) {
       await resetBrowserStorage();
     }
-    await cli([`-s=${session}`, "goto", site.url], cfg.rendered?.navigationTimeoutMs || 45000);
+    const freshUrl = new URL(site.url);
+    freshUrl.searchParams.set("_campaign_audit", String(Date.now()));
+    await cli([`-s=${session}`, "goto", freshUrl.toString()], cfg.rendered?.navigationTimeoutMs || 45000);
     await sleep(cfg.rendered?.settleMs || 3000);
     await sleep(Number(args.popupWaitMs || cfg.rendered?.popupWaitMs || 5000));
     result.homepageStatus = await readMainDocumentStatus();

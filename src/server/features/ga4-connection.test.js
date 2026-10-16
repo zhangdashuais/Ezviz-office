@@ -17,31 +17,37 @@ test("GA4 OAuth completes authorization and reads a report", async (t) => {
     installed: { client_id: "client-id", client_secret: "client-secret" }
   }));
   const requests = [];
-  const feature = createGa4Connection({
-    ...files,
-    redirectUri: "http://localhost:3217/api/ga4/oauth/callback",
-    fetchImpl: async (url, options) => {
-      requests.push([url, options]);
-      if (url.includes("oauth2")) {
-        return {
-          ok: true,
-          json: async () => ({ access_token: "token", refresh_token: "refresh", expires_in: 3600 })
-        };
-      }
+  const fetchImpl = async (url, options) => {
+    requests.push([url, options]);
+    if (url.includes("oauth2")) {
       return {
         ok: true,
-        json: async () => ({
-          dimensionHeaders: [{ name: "date" }],
-          metricHeaders: [{ name: "activeUsers" }],
-          rows: [{ dimensionValues: [{ value: "20260808" }], metricValues: [{ value: "12" }] }]
-        })
+        json: async () => ({ access_token: "token", refresh_token: "refresh", expires_in: 3600 })
       };
     }
+    return {
+      ok: true,
+      json: async () => ({
+        dimensionHeaders: [{ name: "date" }],
+        metricHeaders: [{ name: "activeUsers" }],
+        rows: [{ dimensionValues: [{ value: "20260808" }], metricValues: [{ value: "12" }] }]
+      })
+    };
+  };
+  let feature = createGa4Connection({
+    ...files,
+    redirectUri: "http://localhost:3217/api/ga4/oauth/callback",
+    fetchImpl
   });
 
   const started = feature.start({ propertyId: "properties/311294431" });
   const authParams = new URL(started.authUrl).searchParams;
   const state = authParams.get("state");
+  feature = createGa4Connection({
+    ...files,
+    redirectUri: "http://localhost:3217/api/ga4/oauth/callback",
+    fetchImpl
+  });
   const result = await feature.complete("authorization-code", state);
 
   for (const scope of SCOPES) assert.match(authParams.get("scope"), new RegExp(scope.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

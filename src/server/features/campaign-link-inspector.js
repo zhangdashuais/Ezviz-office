@@ -21,7 +21,7 @@ function campaignCodeForSite(site) {
   return site?.campaignCode || (site?.siteCode === "inter" ? "hq" : site?.siteCode) || "";
 }
 
-function isInternalUrl(rawUrl, config) {
+function isInternalCampaignUrl(rawUrl, config = {}) {
   try {
     const host = new URL(rawUrl).hostname.toLowerCase();
     return (config.internalDomains || ["ezviz.com"]).some((domain) => {
@@ -34,13 +34,16 @@ function isInternalUrl(rawUrl, config) {
 }
 
 function validateCampaignUtm(rawUrl, site, placement, position, config = {}) {
-  const internal = isInternalUrl(rawUrl, config);
+  const internal = isInternalCampaignUrl(rawUrl, config);
   if (!internal) {
     return { required: false, valid: true, expected: null, actual: null, problems: [], correctedUrl: "" };
   }
 
   const campaignCode = campaignCodeForSite(site);
-  const policy = config.utmPolicies?.[placement] || DEFAULT_POLICIES[placement];
+  const policy = config.utmPolicies?.[placement]
+    || (placement === "banner" ? config.utmPolicy : null)
+    || DEFAULT_POLICIES[placement]
+    || {};
   const values = { siteCode: campaignCode, position: position || 1 };
   const expected = {
     utm_source: fillTemplate(policy.sourceTemplate, values),
@@ -63,6 +66,20 @@ function validateCampaignUtm(rawUrl, site, placement, position, config = {}) {
     problems,
     correctedUrl: problems.length ? corrected.toString() : ""
   };
+}
+
+function buildCampaignUrl(rawUrl, options = {}, config = {}) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return value;
+
+  const result = validateCampaignUtm(
+    value,
+    { siteCode: options.siteCode, campaignCode: options.campaignCode },
+    options.placement || "banner",
+    options.position || 1,
+    config
+  );
+  return result.required ? (result.correctedUrl || value) : value;
 }
 
 async function checkLinkAvailability(request, rawUrl) {
@@ -187,6 +204,8 @@ function createCampaignLinkInspector({ chromium }) {
 module.exports = {
   DEFAULT_POLICIES,
   campaignCodeForSite,
+  isInternalCampaignUrl,
   validateCampaignUtm,
+  buildCampaignUrl,
   createCampaignLinkInspector
 };

@@ -8,10 +8,13 @@ function registerProductRevisionSyncRoutes(app, deps) {
   } = deps;
 
   const excelArgs = (req) => {
+    const updateScope = String(req.body?.updateScope || "").trim().toLowerCase();
+    const specificationOnly = updateScope === "specification-only";
+    const languageOnly = updateScope === "language-only";
     const specificationExcel = req.files?.specExcel?.[0];
     const languageDatasheet = req.files?.languageDatasheet?.[0];
-    if (!specificationExcel) throw new Error("请上传 Specification Excel。");
-    if (!languageDatasheet) throw new Error("请上传语言包 Datasheet。");
+    if (!languageOnly && !specificationExcel) throw new Error("请上传 Specification Excel。");
+    if (!specificationOnly && !languageDatasheet) throw new Error("请上传语言包 Datasheet。");
     return [req.body || {}, specificationExcel, languageDatasheet];
   };
   const batchArgs = (req) => [req.body || {}, req.files || []];

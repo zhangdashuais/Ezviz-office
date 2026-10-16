@@ -11,7 +11,7 @@
 | 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；自动合并编辑器产生的同族数字后缀类（含组合选择器，保留 `w-*` 系统类）；最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: medium; }`，并将每个 `li` 的 `style` 统一为 `list-style: decimal;`，保留原有 class；可选输出 `head`、`body` 标签，正文开头添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
 | 基础工具 | 图片 AI 标志 | 支持拖拽或文件选择多张图片，用 Canvas 在右下角叠加 `AI GENERATED` 标志；输出超过 512 KB 时保持原分辨率并转为 JPG、降低画质，最低画质仍超限时明确报错 | 本地生成；不缩放、不上传、不覆盖原文件；透明区域转 JPG 时填充白底 |
 | 基础工具 | PDF / HTML 文字对比 | 先汇总 HTML 全部可见文字，排除 PDF 从 Specification 标题页到文件末尾的全部内容，再逐条检查此前正文；支持 HTML/PDF 拆分的数值与单位反向匹配，仅列出未匹配片段；可将语言字段建议应用到原 HTML 并在页面显示完整源码 | 本地读取；不覆盖原文件 |
-| 基础工具 | i18n 语言转换 | 英文文案先按单产品语言包原文复用 Key，未命中再按产品名生成；本地 Datasheet 的六项路径可直接编辑，并通过一个“同步所有默认路径”按钮统一保存 | 本地处理 |
+| 基础工具 | i18n 语言转换 | 英文文案先按单产品语言包原文复用 Key，未命中再按产品名生成；HTML 片段中的全部原始 `<link>` 标签原样保留；本地 Datasheet 的六项路径可直接编辑，并通过一个“同步所有默认路径”按钮统一保存 | 本地处理 |
 | 产品资料处理 | PDF 上传转地址 | 上传 PDF 并返回线上地址 | 写入文件服务 |
 | 产品资料处理 | Spec 参数解析 | Excel 转 PC/Mobile Specifications HTML | 本地处理 |
 | 产品资料处理 | Datasheet 生成 Spec 表 | 从 PDF/文本生成 Spec Excel | 本地生成 |
@@ -19,16 +19,16 @@
 | 产品上架与维护 | Specification 翻译上架 | 预览翻译结果或提交后台 | `preview` 只读；`submit` 写后台 |
 | 产品上架与维护 | 语言包上传 | 上传 `.xls/.xlsx` 到 Language Management | 写后台 |
 | 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；允许英文原文内容变化并警告，上传后遇到短暂旧包时只重下验证、不重复上传 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
-| 产品上架与维护 | 已上架产品仅更新 Specification、Product Description 与语言包 | 产品修订请求使用 `updateScope=specification-language`；保留目标站 Overview 和现有规格图，按 Datasheet 更新 Product Description、Specification 文本及语言包；Datasheet 缺少显式 Product Description 时，会用后台当前描述反查 Datasheet 唯一字段行，仍未命中才保留现值 | `preview` 只读；`submit` 写后台并回读 |
+| 产品上架与维护 | 已上架产品单独更新 Specification 或语言包 | `updateScope=specification-only` 时只需 Specification Excel，只保存并回读 Specification；`updateScope=language-only` 时只需 Datasheet，只上传并回读语言包。两种模式都不改 Overview 或 Product Description | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | Details 一键同步 | 固定以国际站同名产品为源，只需填写产品名并选择目标站点；仅同步 PC Details Overview，目标站不存在产品时跳过，不修改 Specifications、语言包、Product Description 或其他配置 | `preview` 只读；`submit` 写后台并回读 |
-| 产品上架与维护 | 搜索产品已上线站点 | 输入产品名称后只读搜索全部启用的 EZVIZ 国家官网；匹配忽略大小写和所有空格，返回命中站点、产品链接及失败站点 | 只读官网搜索 |
+| 产品上架与维护 | 产品上线站点搜索（独立 Tab） | 输入产品名称后只读搜索全部启用的 EZVIZ 国家官网；匹配忽略大小写和所有空格，返回命中站点、产品链接及失败站点 | 只读官网搜索 |
 | 产品上架与维护 | HG2_400_4 语言包定向修订 | 逐站预览 E 列，删除 `15s / 18s / 20s` 后原生保存、上传并回读；空值不上传 | `preview` 只读；`submit` 写后台并可回滚 |
 | 产品上架与维护 | WTB 产品购买链接 | 下拉框单选站点，计划、提交、回读、往返测试和恢复购买链接 | `plan` 只读；其他接口可写后台 |
 | 产品上架与维护 | TDK 配置 | 按国家站校验 Excel 并提交 SEO TDK | `plan` 只读；`submit` 写后台 |
 | 产品上架与维护 | 后台产品替换 | 批量读取 Overview/Specifications | 当前只读，不保存产品 |
 | 临时功能 | Detail 批量替换/删除 | 七列表格逐产品配置 Detail 地址、代码块和 Product Album 本地高清图路径；提交时上传并覆盖 | `preview` 只读；`submit` 每产品保存一次并逐项回读 |
 | 资料平台 | 资料上传平台 | 识别资料并按选项上传/创建/归档；扩展语言接口可仅凭产品标题独立访问；SharePoint 素材类目固定为四类 | 依勾选项可能写外部后台 |
-| 营销运营 | Banner / Popup / 巡查 | 生成清单、提交活动、发布、巡查、修复 UTM | plan/audit 只读；submit/fix 写后台 |
+| 营销运营 | Banner / Popup / 巡查 | 生成清单、提交活动、发布、巡查、按前台可见顺序修复 UTM；Banner 各站默认第 1 位，图片使用带签名上传 | plan/audit/fix dryRun 只读；submit/fix 写后台 |
 | 巡查与质量 | EZVIZ 官网定时巡查 | 产品文案/详情巡查、随机任务、定时执行 | 只读巡查并生成报告 |
 
 ## 关键文件

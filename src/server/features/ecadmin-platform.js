@@ -19,9 +19,7 @@ function createEcadminPlatformFeature(deps) {
     setFileByLabel,
     ensureLoggedIn,
     getContext,
-    productRoot = "D:\\产品",
-    inspectProductTracker,
-    syncProductTracker
+    productRoot = "D:\\产品"
   } = deps;
 
   function findProductFolder(productName) {
@@ -268,10 +266,6 @@ async function updateProductImage(page, payload, file, logs) {
     }
 
     const result = { localFiles: files };
-    if (inspectProductTracker) {
-      result.productTrackerBefore = await inspectProductTracker(payload.title);
-      logLine(logs, result.productTrackerBefore.exists ? "Google Sheet 已有该产品。" : "Google Sheet 尚无该产品，成功后将追加。");
-    }
 
     const needsEcadmin = payload.createDownload || payload.extendLanguages || payload.updateProductImage;
     const context = needsEcadmin ? await getContext() : null;
@@ -288,13 +282,6 @@ async function updateProductImage(page, payload, file, logs) {
 
     if (payload.updateProductImage) {
       result.productImageUrl = await updateProductImage(page, payload, files.highResImage, logs);
-    }
-
-    if (syncProductTracker) {
-      result.productTracker = await syncProductTracker(payload.title);
-      logLine(logs, result.productTracker.status === "appended"
-        ? `Google Sheet 已追加到第 ${result.productTracker.row} 行。`
-        : `Google Sheet 第 ${result.productTracker.row} 行已存在，无需重复填写。`);
     }
 
     return result;

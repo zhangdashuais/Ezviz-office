@@ -32,8 +32,14 @@ const { registerDetailAddressReplacementRoutes } = require("./src/server/routes/
 const { createProductRevisionSyncFeature } = require("./src/server/features/product-revision-sync");
 const { createProductPublishingBatchFeature } = require("./src/server/features/product-publishing-batch");
 const { createProductDelistingFeature } = require("./src/server/features/product-delisting");
+const { createProductEmptyLinkFeature } = require("./src/server/features/product-empty-link");
 const { registerProductRevisionSyncRoutes } = require("./src/server/routes/product-revision-sync-routes");
-const { createCampaignLinkInspector } = require("./src/server/features/campaign-link-inspector");
+const { registerProductEmptyLinkRoutes } = require("./src/server/routes/product-empty-link-routes");
+const {
+  createCampaignLinkInspector,
+  isInternalCampaignUrl,
+  buildCampaignUrl
+} = require("./src/server/features/campaign-link-inspector");
 const textComparisonFeature = require("./src/server/features/text-comparison");
 const textComparisonFileFeature = require("./src/server/features/text-comparison-files");
 const { registerTextComparisonRoutes } = require("./src/server/routes/text-comparison-routes");
@@ -65,19 +71,6 @@ const NEW_SHOP_TDK_INDEX_URL = "https://new-shop.ezvizlife.com/tdk/index";
 const NEW_SHOP_API_BASE = "https://sgpshop-api.ezvizlife.com";
 const FS_UPLOAD_URL = "https://fs.ezvizlife.com/upload.php";
 const SHOP_WTB_INDEX_URL = "https://shop.ezvizlife.com/whereToBuy/index";
-const DEFAULT_UTM_POLICIES = {
-  banner: {
-    sourceTemplate: "{siteCode}_banner",
-    mediumTemplate: "banner{position}",
-    campaignTemplate: "web_{siteCode}_banner"
-  },
-  popup: {
-    sourceTemplate: "{siteCode}_popup",
-    mediumTemplate: "popup",
-    campaignTemplate: "web_{siteCode}_popup"
-  }
-};
-
 const ezvizSiteAuditFeature = createEzvizSiteAuditFeature({ chromium });
 const ezvizSiteAuditScheduler = createEzvizSiteAuditScheduler({
   feature: ezvizSiteAuditFeature,
@@ -279,44 +272,6 @@ function selectedCampaignSites(config, selectedCodes) {
   if (!selectedCodes.length) return [];
   const selectedSet = new Set(selectedCodes);
   return sites.filter((site) => selectedSet.has(site.siteCode));
-}
-
-function isInternalCampaignUrl(rawUrl, config) {
-  try {
-    const parsed = new URL(rawUrl);
-    const host = parsed.hostname.toLowerCase();
-    return (config.internalDomains || []).some((domain) => {
-      const normalized = String(domain).toLowerCase();
-      return host === normalized || host.endsWith("." + normalized);
-    });
-  } catch {
-    return false;
-  }
-}
-
-function fillCampaignTemplate(template, values) {
-  return String(template || "").replace(/\{(\w+)\}/g, (match, key) => values[key] == null ? "" : String(values[key]));
-}
-
-function buildCampaignUrl(rawUrl, options, config) {
-  const value = String(rawUrl || "").trim();
-  if (!value || !isInternalCampaignUrl(value, config)) return value;
-
-  const placement = options.placement || "banner";
-  const policy = (config.utmPolicies && config.utmPolicies[placement])
-    || config.utmPolicy
-    || DEFAULT_UTM_POLICIES[placement]
-    || {};
-  const parsed = new URL(value);
-  const values = {
-    siteCode: options.siteCode || "",
-    position: options.position || ""
-  };
-
-  parsed.searchParams.set("utm_source", fillCampaignTemplate(policy.sourceTemplate, values));
-  parsed.searchParams.set("utm_medium", fillCampaignTemplate(policy.mediumTemplate, values));
-  parsed.searchParams.set("utm_campaign", fillCampaignTemplate(policy.campaignTemplate, values));
-  return parsed.toString();
 }
 
 function localizedCampaignUrlSuggestion(rawUrl, site, options, config) {
@@ -770,9 +725,7 @@ const ecadminPlatformFeature = createEcadminPlatformFeature({
   setFileByLabel: browserAuth.setFileByLabel,
   ensureLoggedIn: browserAuth.ensureLoggedIn,
   getContext: browserAuth.getContext,
-  productRoot: process.env.EZVIZ_PRODUCT_ROOT || "D:\\产品",
-  inspectProductTracker: ga4Feature.inspectServiceCenterProduct,
-  syncProductTracker: ga4Feature.syncServiceCenterProduct
+  productRoot: process.env.EZVIZ_PRODUCT_ROOT || "D:\\产品"
 });
 
 registerCampaignRoutes(app, {
@@ -860,6 +813,17 @@ const productDelistingFeature = createProductDelistingFeature({
   credentialDomainForSite,
   openProductEditorByName: productManagement.openByName
 });
+const productEmptyLinkFeature = createProductEmptyLinkFeature({
+  logLine,
+  readCampaignConfig,
+  getCampaignSites,
+  getShopContext: browserAuth.getShopContext,
+  getOpenPage: browserAuth.getOpenPage,
+  ensureShopLoggedIn: browserAuth.ensureShopLoggedIn,
+  credentialDomainForSite,
+  openProductEditorByName: productManagement.openByName,
+  productExistsInCurrentSite: productManagement.existsInCurrentSite
+});
 registerWtbRoutes(app, { upload, wtbFeature, logLine });
 registerLanguagePackageRoutes(app, { upload, languagePackageFeature, logLine });
 registerTdkRoutes(app, { upload, tdkManagement, logLine });
@@ -872,6 +836,11 @@ registerProductRevisionSyncRoutes(app, {
   feature: productRevisionSyncFeature,
   batchFeature: productPublishingBatchFeature,
   delistingFeature: productDelistingFeature,
+  logLine
+});
+registerProductEmptyLinkRoutes(app, {
+  upload,
+  feature: productEmptyLinkFeature,
   logLine
 });
 registerTextComparisonRoutes(app, {

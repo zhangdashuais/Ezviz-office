@@ -57,7 +57,7 @@
     const title = el.title.value.trim();
     if (!title) return setStatus("请先填写产品名称。", "warn");
     el.run.disabled = true;
-    setStatus("正在执行服务中心流程；完成后会查重并同步 Google Sheet。");
+    setStatus("正在执行服务中心流程。");
     appendLog("开始执行：" + title);
     try {
       await detectFiles();
@@ -68,10 +68,6 @@
         updateProductImage: el.updateProductImage.checked
       });
       (payload.logs || []).forEach(appendLog);
-      const tracker = payload.result?.productTracker;
-      if (tracker) appendLog(tracker.status === "appended"
-        ? "Product Status 已追加第 " + tracker.row + " 行。"
-        : "Product Status 第 " + tracker.row + " 行已有该产品，未重复追加。");
       setStatus("执行完成。", "ok");
     } catch (error) {
       appendLog("错误：" + (error?.message || String(error)));

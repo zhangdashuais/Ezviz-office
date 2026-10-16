@@ -8,6 +8,8 @@
 
 本地平台的“一键内联打包”会同步完成 Webflow CSS 作用域处理，并把编辑器产生的同族数字后缀类在 HTML、CSS 和组合选择器中统一为基础类；`w-*` 系统类及没有同族证据的单个编号类保持不变。最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: medium; }`，每个 `li` 的 `style` 固定为 `list-style: decimal;`，但保留原有 class。可选输出 `head`、`body` 标签；默认不输出，便于粘贴到商城后台。输出正文以 `<!-- product detail webflow -->` 标记开头，保留 `body` 时标记位于其下一行。下载 `store.html` 的同时在页面展示最终 CSS，并提供 `webflow.scoped.css` 下载。“图片 AI 标志”的输出超过 512 KB 时会保持原分辨率转为 JPG 并降低画质；最低画质仍超限时明确报错，不会缩放图片。其“DOC上传”使用文件服务 `service/attach` 动态 token 批量上传 PDF，并为每个成功文件生成一个与 `declaration-of-conformity.html` 一致的独立 `<li>` 标签，不包含外层 `<ul>`；“PDF / HTML 文字对比”可上传总语言包还原 `goods.xxx` 字段；生成字段修改建议后，可将建议应用到原始 HTML 的对应语言字段，并在页面显示完整修改版源码，不覆盖用户原文件。若原始 HTML 是片段，输出仍保持片段，不额外补 `DOCTYPE` / `html` 外层标签。
 
+本地 GA4 / Google 数据连接会把十分钟有效的 OAuth 临时状态保存在忽略 Git 的 `runtime/ga4-oauth-pending.json`，即使授权期间后台进程重载，回调也能继续完成；成功后立即清除对应状态。
+
 ## 菜单结构
 
 | 一级菜单 | 子菜单 | 后台原始路由 |
@@ -61,11 +63,16 @@ const popupUrl = resolveShopNavigationUrl("popup", { preferAutomationUrl: true }
 
 TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife.com/tdk/index`。Popup 自动化目前使用 `new-shop.ezvizlife.com/popup/index`，与旧侧栏路由 `/config/popup` 并存。Banner 不使用新版 Custom Page 入口；Homepage 管理固定直接访问 `https://shop.ezvizlife.com/pages/index`。
 
+普通 Banner 对所有站点（含波兰）插入轮播第 1 位；PC/Mobile 图片使用项目共用的带签名文件服务上传方式，避免旧版 `op_image` 参数被拒绝。
+Banner UTM 修复按前台当前可见顺序匹配后台轮播链接，跳过定时隐藏的轮播；`banner-fix-utm` 可带 `dryRun=1` 只读预览。官网巡查请求带一次性查询参数，避免误读发布前的缓存页面。
+
 DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/下线时间，并可在界面选择“Banner + Popup”“仅 Banner”或“仅 Popup”；选择 Banner 时还可指定 White / Black 字体颜色。它不读取普通 Banner/Popup 表单：标题固定为空白占位，Model 使用五国固定文案，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 并分别添加 Banner/Popup UTM；Banner 通过后台当前 WebUploader 上传，默认隐藏 More、新窗口打开、直接发布，Popup 通过 Playwright 填写真实后台表单、文件控件上传图片、点击 Submit 并在列表页点击 Enable。接口可用 `includeBanner=false` 或 `includePopup=false` 只执行另一类资源，并用 `bannerColor=White|Black` 选择颜色。根目录下按 `de/fr/es/it/nl`（亦支持国家英文名、本地名和中文名）分类；文件名或子目录名用 `banner-pc`、`banner-mobile`、`popup` 标识用途。`POST /api/campaign/dtc-assets` 只读预检目录；单文件超过 10 MB、必需素材缺失或同一用途匹配多个文件时，该国家会被跳过并返回原因，不影响其他国家继续执行。
 
 ## 添加产品特殊入口
 
-从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。只读页面快照同时返回列表产品的 `goods_id`、型号、类型、上架状态、创建时间、URL，以及响应中实际存在的 Searchable 字段；未返回该字段时不得由列表数据推断 Detail 开关。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。
+国际站创建占位产品使用本地工具“产品空链接创建”。预览接口为 `POST /api/product-empty-link/preview`，提交接口为 `POST /api/product-empty-link/submit`。它读取一个现有国际站产品作为配置参考，经 Manual Add 对应的 `/goods/do-add` 新增产品，保留分类、类型、品牌、相册、规格、价格和库存，重置产品名称、序列号、SEO 与推荐关系，把 PC / Mobile Details 写为指定占位 HTML，并固定写入 `is_search=0`（取消勾选 Searchable）。提交前检查重名和预览指纹；创建后按 `goods_id` 调用 `/goods/edit-goods` 回读详情与 Searchable 状态，不因前台缓存未刷新而重复创建。
+
+从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。只读页面快照同时返回列表产品的 `goods_id`、型号、类型、上架状态、创建时间、URL，以及响应中实际存在的 Searchable 字段；未返回该字段时不得由列表数据推断 Detail 开关。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。WTB 不使用新版 Custom Page 落点；登录后固定从 `https://shop.ezvizlife.com/goods/index` 读取账号、查找产品并进入 Edit。
 
 本地完整上架流程提供 `POST /api/product-publishing/preview` 和 `POST /api/product-publishing/submit`。产品上架只登录目标国家站账号，不登录国际站账号；目标站没有同名产品时，在目标站会话中打开 `/goods/int-goods-list`，明确把复制来源站选择为“国际站”，再等待目标分类的产品列表真实刷新后精确匹配。预览读取 `goods_id`、摘要和列表图片并生成复制源指纹，不打开尚未复制的空 Detail；提交时先复制国际产品，再从目标站新产品回读完整 Detail、Specification 图片和 Product Description，随后执行本地化更新。目标站已有同名产品时跳过国际复制，直接读取现有产品并只更新 Specification、Product Description 和语言包，Overview 保持不变。预览接口不写入后台。
 保存产品资料前，空的 Ads Additional Information → Product Title 会自动补为当前产品名称；已有值不覆盖。
@@ -79,7 +86,7 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 语言包页另有独立的“按单产品 Datasheet 更新站点语言包”功能。`datasheet-inspect` 识别第三列起的语种说明；`datasheet-preview` 按字段 Key 对比所选站点当前语言包；`datasheet-submit` 只提交预览状态为 `ready` 的站点，`failed` 与 `no-change` 会显示为跳过，不再禁用整批确认按钮，也不会在提交阶段再次登录这些站点。Global 选择 `English (Source)` 时会同时覆盖 `en-US` 原文列和译文列，并在上传后双列回读；其他站点仍只覆盖译文列。没有 Edit/Download 行、但明确提供带 `lang_code` 的 `Download Language Template` 时，英文站点可用该链接读取当前模板，语种不匹配时仍拒绝。页面默认跳过站点不存在的 Key，避免追加缺少后台元数据的行。空译文跳过，实际下载语言代码必须与 Datasheet 语种一致。全站提交中 Global 为 `ready` 时会强制先更新 Global，再等待英文原文同步到其他站点并自动刷新这些站点的预览基线；基线只忽略本批次已验证的英文源字段变化，其他字段变化仍停止提交。同一时间只允许一个 Datasheet 预览或提交任务。旧 `.xls` 仍由本机 Excel 原生保存，尾部格式化空行不会被当成追加模板行；上传后最多回读 6 次、每次间隔 3 秒，重试只重新下载而不重复上传，最终仍不一致时恢复原包。
 
 “本地 i18n Datasheet 生成”从产品 HTML 提取未 i18n 化的英文文案，将当前产品的新字段放在黄色提示行上方；HTML 已引用或按英文原文复用的旧字段放在黄色提示行下方。生成成功后先备份原 HTML，再把硬编码文案写回对应的 `goods.*` 字段；重复执行会复用现有输出并保持字段归类不变。
-“i18n 语言转换”处理 HTML 片段时会保留原始 `<link rel="stylesheet">` 样式库引用，避免浏览器解析时将其移入临时 `head` 后从片段输出中丢失。
+“i18n 语言转换”处理 HTML 片段时会原样保留全部 `<link>` 标签，包括样式表、预加载字体以及属性顺序或引号写法不同的 CSS 引用，避免浏览器解析时将其移入临时 `head` 后从片段输出中丢失。
 产品名及其从左到右的名称前缀（如 `TY1`、`TY1 G1`、`TY1 G1 3K`）视为型号，不生成语言包字段；包含型号的完整描述句不受此规则影响。
 纯数字单独出现时不转换为语言字段；数字出现在完整文案中时保留在整句语言字段内，例如 `Up to 15m` 必须整体转换。单位值、角度和加密协议单独出现时也不转换。
 重复生成会读取输出目录中的既有 Datasheet 和备份，为 HTML 已引用但当前输出缺少的产品字段恢复源文案。
@@ -91,7 +98,7 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 无需 Excel 的产品内容同步使用 `/api/product-content-sync/preview` 和 `/api/product-content-sync/submit`。源固定为国际站 `hq`，按同名产品只把 PC Details 的 Overview 原样同步到所选目标站；目标站不存在产品时跳过，不复制产品，也不修改 Specifications、语言包、Product Description、Specification 字段名或其他配置。提交前同时校验源站与目标站 Overview 指纹，保存后回读 Overview，并确认原 Specifications 仍保持不变。
 
-产品上线站点搜索使用只读接口 `POST /api/product-availability/search`。它访问全部启用站点的官网 `/search?keywords=` 页面，同时读取普通搜索结果和组合产品卡片 `data-jsond` 内全部规格 Tab。按 Unicode NFKC、忽略大小写和所有空格后的完整产品名精确匹配；括号后缀仍参与最终匹配，但会追加一次去后缀搜索以兼容官网检索。单站搜索失败独立记录，不影响其他站点。
+左侧“后台运营”分组中的独立 Tab“产品上线站点搜索”使用只读接口 `POST /api/product-availability/search`，不再放在“产品资料操作”的流程下拉框中。它访问全部启用站点的官网 `/search?keywords=` 页面，同时读取普通搜索结果和组合产品卡片 `data-jsond` 内全部规格 Tab。按 Unicode NFKC、忽略大小写和所有空格后的完整产品名精确匹配；括号后缀仍参与最终匹配，但会追加一次去后缀搜索以兼容官网检索。单站搜索失败独立记录，不影响其他站点。
 
 ## 后台会话与产品查询复用
 
@@ -99,13 +106,13 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 ## 本地 i18n 语言转换
 
-本地页面的 i18n 工具将 HTML 英文文案生成新字段；单独出现的纯数字跳过，完整文案中的数字保留在原句内一起转换。单独出现的单位值、产品名称、数字上下角标、AES/TLS、度数和纯标点节点也跳过。新字段与英文原文在页面单独展示；HTML 已有字段按总语言包 `Single word` 与 `en-US` 列回查。结果 Excel 分为“新语言包字段”和“已有字段原文”两个工作表。
+本地页面的 i18n 工具将 HTML 英文文案生成新字段；单独出现的纯数字跳过，完整文案中的数字保留在原句内一起转换。单独出现的单位值、产品名称、数字上下角标、AES/TLS、度数和纯标点节点也跳过。新字段与英文原文在页面单独展示；HTML 已有字段按总语言包 `Single word` 与不可修改的 `en-US` 原文列回查，总语言包缺失时才使用单产品语言包补充。结果 Excel 分为“新语言包字段”和“已有字段原文”两个工作表。
 
 上传单产品语言包后，解析器只接受 Datasheet 布局（第 1 列字段键、第 2 列英文原文）；硬编码英文文案会先按原文精确匹配并复用原字段，只有未匹配文案才按用户设置的产品名称生成新字段。页面和结果 Excel 会单独列出“产品包复用字段”。
 
 ## 服务中心资料平台
 
-本地入口 `POST /api/ecadmin/local-files` 根据产品名读取 `D:\产品\<产品名称>\upload`；`POST /api/ecadmin/run` 支持按选项创建下载资料、补全多语言和更新产品背景图，不再接收浏览器上传文件，也不再生成 SharePoint 归档计划。补全多语言会在 UMP 的“服务中心 → 下载中心管理 → 程序下载管理”中按标题精确搜索资料并提交弹窗标题。全部动作成功后，接口通过 Google Sheets API 精确查重 `Product Status`，缺失时复制上一数据行的格式和下拉验证，再写入产品名、当天日期及两个 `Live`，最后回读验证。
+本地入口 `POST /api/ecadmin/local-files` 根据产品名读取 `D:\产品\<产品名称>\upload`；`POST /api/ecadmin/run` 支持按选项创建下载资料、补全多语言和更新产品背景图，不再接收浏览器上传文件，也不再生成 SharePoint 归档计划。补全多语言会在 UMP 的“服务中心 → 下载中心管理 → 程序下载管理”中按标题精确搜索资料并提交弹窗标题。该流程只依赖 ecadmin 登录，不读取或写入 Google Sheet。
 
 ## 商城后台登录兼容
 
@@ -117,6 +124,8 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 规格 HTML 的主图地址支持标准 `src` 以及常见懒加载属性 `data-src`、`data-original`、`data-lazy-src` 和 `srcset`。
 若源规格明确包含无地址的空图片占位标签，则视为源产品无规格图，目标规格会省略图片块；不会猜测或生成图片地址。
-后台产品资料操作页面用同一个操作类型下拉承载文件夹批量上架、源站同步修订、只改语言包 / Specification 文案、多产品相同内容修订和产品下架；页面按模式显示必要字段。多产品相同部分修订可同时选择多个国家站点，对最多 50 个产品的 Detail 或 Specification 执行同一条精确删除/替换，也可只把 Specification 的 Custom Page Name 输入框修成站点固定文案，并按国家 × 产品逐项预览、保存和回读。直接修订接口可只更新 Basic Information 的 Product Description，或只更新 Specification 自定义字段名；Overview 与 Specification 内容会原样保留。
+后台产品资料操作页面用同一个操作类型下拉承载文件夹批量上架、源站同步修订、只改 Specification、只改语言包、多产品相同内容修订和产品下架；页面按模式显示必要字段。只改 Specification 时仅上传 Specification Excel，只改语言包时仅上传 Datasheet。多产品相同部分修订可同时选择多个国家站点，对最多 50 个产品的 Detail 或 Specification 执行同一条精确删除/替换，也可只把 Specification 的 Custom Page Name 输入框修成站点固定文案，并按国家 × 产品逐项预览、保存和回读。直接修订接口可只更新 Basic Information 的 Product Description，或只更新 Specification 自定义字段名；Overview 与 Specification 内容会原样保留。
 
 已上架产品只需更新资料文案和语言包时，`/api/product-revision-sync/preview` 与 `/api/product-revision-sync/submit` 可传 `updateScope=specification-language`。该范围不读取或复制国际站源产品，明确保留目标站当前 Overview 和规格图；Product Description 若在 Datasheet 中存在或能由当前后台文案反查到唯一字段行，则按目标语种更新，缺失时才保留现值；Specification 自定义字段名按官网 tab 固定映射，HTML 顶部标题按规格内容标题映射，正文按目标语言列生成，并按稳定 Key 更新总语言包。新增语言键只追加到与本次既有键匹配最多的语言工作表，避免跨工作表重复。
+
+产品预览、修订、上架与回读查找产品时固定使用旧版 `https://shop.ezvizlife.com/goods/index`。登录后即使落到区域新版后台，也不在 `new-<区域>-shop.ezvizlife.com/goods/index` 查询，因为部分区域该地址会返回 404。

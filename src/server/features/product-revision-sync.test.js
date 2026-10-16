@@ -9,6 +9,8 @@ const {
   readDetailFromPcView,
   revisionPreviewStatus,
   isSpecificationLanguageOnly,
+  isSpecificationOnly,
+  isLanguagePackageOnly,
   effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,
   internationalListSource,
@@ -63,6 +65,8 @@ test("Japan publishing converts resolution labels in product names but keeps 4K"
 test("Specification and language-only scope preserves unrelated product content", () => {
   assert.equal(isSpecificationLanguageOnly({ updateScope: "specification-language" }), true);
   assert.equal(isSpecificationLanguageOnly({}), false);
+  assert.equal(isSpecificationOnly({ updateScope: "specification-only" }), true);
+  assert.equal(isLanguagePackageOnly({ updateScope: "language-only" }), true);
 });
 
 test("Specification and language-only scope updates Product Description when Datasheet provides it", () => {

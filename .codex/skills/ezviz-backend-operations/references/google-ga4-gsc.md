@@ -10,9 +10,12 @@ The historical Popup Upload project used fixed local files:
 credentials/ga4-oauth-client.json
 runtime/ga4-config.json
 runtime/ga4-oauth-token.json
+runtime/ga4-oauth-pending.json
 ```
 
 Never print, commit, or copy the contents of OAuth client JSON or token JSON. It is safe to report only whether the files exist and their paths.
+
+`ga4-oauth-pending.json` stores the short-lived OAuth state so the callback remains valid if the local service reloads during authorization. It is pruned after ten minutes and removed from the active set after a successful callback.
 
 `credentials/*.json` and `runtime/` must stay out of Git.
 

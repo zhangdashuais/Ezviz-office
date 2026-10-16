@@ -551,6 +551,14 @@ function isSpecificationLanguageOnly(body) {
   return normalize(body?.updateScope).toLowerCase() === "specification-language";
 }
 
+function isSpecificationOnly(body) {
+  return normalize(body?.updateScope).toLowerCase() === "specification-only";
+}
+
+function isLanguagePackageOnly(body) {
+  return normalize(body?.updateScope).toLowerCase() === "language-only";
+}
+
 function effectiveProductDescriptionForScope(specificationLanguageOnly, currentDescription, desiredProductDescription) {
   return specificationLanguageOnly && desiredProductDescription?.inherited
     ? currentDescription
@@ -1120,7 +1128,15 @@ function createProductRevisionSyncFeature(deps) {
       fallbackOptions.currentDescription = options.currentDescription;
     }
     if (options.tolerant === true) fallbackOptions.tolerant = true;
-    const productDescription = resolveProductDescription(parsedDatasheet, target, fallbackOptions);
+    const productDescription = options.skipProductDescription
+      ? {
+          description: normalize(options.currentDescription),
+          translationHeader: "",
+          key: "",
+          rowNumber: 0,
+          inherited: true
+        }
+      : resolveProductDescription(parsedDatasheet, target, fallbackOptions);
     return { language: { ...language, title: specificationFieldTitle, htmlTitle: specificationTitle }, specifications, productDescription };
   }
 
@@ -1762,13 +1778,18 @@ function createProductRevisionSyncFeature(deps) {
   async function preview(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
     const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
+    const specificationOnly = !publishing && isSpecificationOnly(body);
+    const languagePackageOnly = !publishing && isLanguagePackageOnly(body);
+    const targetOnly = specificationLanguageOnly || specificationOnly || languagePackageOnly;
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
     const request = validateRevisionRequest(body, sites, {
-      ignoreSourceSite: publishing || specificationLanguageOnly
+      ignoreSourceSite: publishing || targetOnly
     });
-    const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
-    const parsedDatasheet = parseLanguageDatasheet(languageDatasheetFile.path);
-    const source = publishing || specificationLanguageOnly
+    const parsedWorkbook = excelFile ? parseSpecificationWorkbook(excelFile.path) : null;
+    const parsedDatasheet = languageDatasheetFile
+      ? parseLanguageDatasheet(languageDatasheetFile.path)
+      : null;
+    const source = publishing || targetOnly
       ? null
       : await readSource(request, body, logs);
     const results = [];
@@ -1844,26 +1865,35 @@ function createProductRevisionSyncFeature(deps) {
           }
         } else {
           current = await readProductSnapshot(session.page, request.productName, logs);
-          if (specificationLanguageOnly) {
+          if (targetOnly) {
             targetSource = {
               snapshot: current,
               image: extractSpecificationImage(current.detail.specifications)
             };
           }
         }
-        const desired = buildTargetRevision(
-          parsedWorkbook,
-          parsedDatasheet,
-          target,
-          targetSource,
-          {
-            fallbackDescription: publishing
-              ? targetSource.snapshot.productDescription
-              : current.productDescription,
-            currentDescription: current?.productDescription,
-            tolerant: publishing
-          }
-        );
+        const desired = languagePackageOnly
+          ? {
+              language: { header: "", title: current.detail.specificationsFieldName },
+              specifications: current.detail.specifications,
+              productDescription: { description: current.productDescription, translationHeader: "", inherited: true }
+            }
+          : buildTargetRevision(
+              parsedWorkbook,
+              parsedDatasheet,
+              target,
+              targetSource,
+              {
+                fallbackDescription: specificationOnly
+                  ? current.productDescription
+                  : publishing
+                    ? targetSource.snapshot.productDescription
+                    : current.productDescription,
+                currentDescription: current?.productDescription,
+                tolerant: publishing || specificationOnly,
+                skipProductDescription: specificationOnly
+              }
+            );
         if (desired.productDescription.warning) {
           warnings.push({
             type: "product-description",
@@ -1874,28 +1904,34 @@ function createProductRevisionSyncFeature(deps) {
         const currentSpecificationFieldName = copyRequired
           ? targetSource.snapshot.detail.specificationsFieldName
           : current.detail.specificationsFieldName;
-        const desiredSpecificationFieldName = desired.language.title;
-        const specificationFieldNameChanged = normalize(currentSpecificationFieldName)
-          !== normalize(desiredSpecificationFieldName);
+        const desiredSpecificationFieldName = languagePackageOnly
+          ? currentSpecificationFieldName
+          : desired.language.title;
+        const specificationFieldNameChanged = !languagePackageOnly
+          && normalize(currentSpecificationFieldName) !== normalize(desiredSpecificationFieldName);
         if (copyRequired) {
           detailChanged = false;
-          specificationChanged = targetSource.snapshot.detail.specifications !== desired.specifications
-            || specificationFieldNameChanged;
-          descriptionChanged = !desired.productDescription.inherited;
+          specificationChanged = !languagePackageOnly
+            && (targetSource.snapshot.detail.specifications !== desired.specifications
+              || specificationFieldNameChanged);
+          descriptionChanged = !specificationOnly && !languagePackageOnly
+            && !desired.productDescription.inherited;
         } else {
-          detailChanged = specificationLanguageOnly
+          detailChanged = targetOnly
             ? false
             : current.detail.overview !== targetSource.snapshot.detail.overview;
-          specificationChanged = current.detail.specifications !== desired.specifications
-            || specificationFieldNameChanged;
-          descriptionChanged = current.productDescription !== effectiveProductDescriptionForScope(
-            specificationLanguageOnly,
-            current.productDescription,
-            desired.productDescription
-          );
+          specificationChanged = !languagePackageOnly
+            && (current.detail.specifications !== desired.specifications
+              || specificationFieldNameChanged);
+          descriptionChanged = !specificationOnly && !languagePackageOnly
+            && current.productDescription !== effectiveProductDescriptionForScope(
+              specificationLanguageOnly,
+              current.productDescription,
+              desired.productDescription
+            );
         }
         if (publishing && !copyRequired) detailChanged = false;
-        try {
+        if (!specificationOnly) try {
           languagePackage = await prepareLanguagePackage(
             session,
             target,
@@ -1967,7 +2003,8 @@ function createProductRevisionSyncFeature(deps) {
     return {
       mode: publishing ? "product-publishing-preview" : "product-revision-sync-preview",
       productName: request.productName,
-      source: publishing || specificationLanguageOnly ? null : {
+      updateScope: normalize(body?.updateScope),
+      source: publishing || targetOnly ? null : {
         site: request.sourceSite,
         goodsId: source.snapshot.goodsId,
         editUrl: source.snapshot.editUrl,
@@ -1978,17 +2015,17 @@ function createProductRevisionSyncFeature(deps) {
         image: source.image,
         fingerprint: source.fingerprint
       },
-      workbook: {
+      workbook: parsedWorkbook ? {
         sheetName: parsedWorkbook.sheetName,
         fingerprint: parsedWorkbook.fingerprint,
         languages: parsedWorkbook.languages.map((language) => language.header)
-      },
-      languageDatasheet: {
+      } : null,
+      languageDatasheet: parsedDatasheet ? {
         sheetName: parsedDatasheet.sheetName,
         fingerprint: parsedDatasheet.fingerprint,
         languages: parsedDatasheet.headers,
         fieldCount: parsedDatasheet.rows.length
-      },
+      } : null,
       targetCount: results.length,
       readyCount: results.filter((result) => result.status === "ready").length,
       noChangeCount: results.filter((result) => result.status === "no-change").length,
@@ -2128,32 +2165,37 @@ function createProductRevisionSyncFeature(deps) {
     const publishing = options.publishing === true;
     const skipLanguagePackage = options.skipLanguagePackage === true;
     const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
+    const specificationOnly = !publishing && isSpecificationOnly(body);
+    const languagePackageOnly = !publishing && isLanguagePackageOnly(body);
+    const targetOnly = specificationLanguageOnly || specificationOnly || languagePackageOnly;
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
     const request = validateRevisionRequest(body, sites, {
-      ignoreSourceSite: publishing || specificationLanguageOnly
+      ignoreSourceSite: publishing || targetOnly
     });
-    const parsedWorkbook = parseSpecificationWorkbook(excelFile.path);
-    const parsedDatasheet = parseLanguageDatasheet(languageDatasheetFile.path);
+    const parsedWorkbook = excelFile ? parseSpecificationWorkbook(excelFile.path) : null;
+    const parsedDatasheet = languageDatasheetFile
+      ? parseLanguageDatasheet(languageDatasheetFile.path)
+      : null;
     const expectedWorkbookFingerprint = normalize(body?.expectedWorkbookFingerprint);
-    if (!expectedWorkbookFingerprint
-      || expectedWorkbookFingerprint !== parsedWorkbook.fingerprint) {
+    if (parsedWorkbook && (!expectedWorkbookFingerprint
+      || expectedWorkbookFingerprint !== parsedWorkbook.fingerprint)) {
       throw new Error("Specification Excel 与预览时不一致，请重新预览。");
     }
     const expectedLanguageDatasheetFingerprint = normalize(
       body?.expectedLanguageDatasheetFingerprint
     );
-    if (!expectedLanguageDatasheetFingerprint
-      || expectedLanguageDatasheetFingerprint !== parsedDatasheet.fingerprint) {
+    if (parsedDatasheet && (!expectedLanguageDatasheetFingerprint
+      || expectedLanguageDatasheetFingerprint !== parsedDatasheet.fingerprint)) {
       throw new Error("语言包 Datasheet 与预览时不一致，请重新预览。");
     }
     const expectedLanguagePackageFingerprints =
       parseExpectedLanguagePackageFingerprints(
         body?.expectedLanguagePackageFingerprints
       );
-    const source = publishing || specificationLanguageOnly
+    const source = publishing || targetOnly
       ? null
       : await readSource(request, body, logs);
-    if (!publishing && !specificationLanguageOnly) {
+    if (!publishing && !targetOnly) {
       const expectedSourceFingerprint = normalize(body?.expectedSourceFingerprint);
       if (!expectedSourceFingerprint || expectedSourceFingerprint !== source.fingerprint) {
         throw new Error("国际站产品 Detail 在预览后发生变化，请重新预览。");
@@ -2256,23 +2298,30 @@ function createProductRevisionSyncFeature(deps) {
           }
         }
         if (!before) before = await readProductSnapshot(session.page, activeProductName, logs);
-        if (specificationLanguageOnly) {
+        if (targetOnly) {
           targetSource = {
             snapshot: before,
             image: extractSpecificationImage(before.detail.specifications)
           };
         }
-        const desired = buildTargetRevision(
-          parsedWorkbook,
-          parsedDatasheet,
-          target,
-          targetSource,
-          {
-            fallbackDescription: before.productDescription,
-            currentDescription: before.productDescription,
-            tolerant: publishing
-          }
-        );
+        const desired = languagePackageOnly
+          ? {
+              language: { header: "", title: before.detail.specificationsFieldName },
+              specifications: before.detail.specifications,
+              productDescription: { description: before.productDescription, translationHeader: "", inherited: true }
+            }
+          : buildTargetRevision(
+              parsedWorkbook,
+              parsedDatasheet,
+              target,
+              targetSource,
+              {
+                fallbackDescription: before.productDescription,
+                currentDescription: before.productDescription,
+                tolerant: publishing || specificationOnly,
+                skipProductDescription: specificationOnly
+              }
+            );
         if (desired.productDescription.warning) {
           warnings.push({
             type: "product-description",
@@ -2280,22 +2329,27 @@ function createProductRevisionSyncFeature(deps) {
             message: desired.productDescription.warning
           });
         }
-        const detailChanged = specificationLanguageOnly || (publishing && !copyRequired)
+        const detailChanged = targetOnly || (publishing && !copyRequired)
           ? false
           : before.detail.overview !== targetSource.snapshot.detail.overview;
-        const desiredSpecificationFieldName = desired.language.title;
-        const specificationFieldNameChanged = normalize(before.detail.specificationsFieldName)
-          !== normalize(desiredSpecificationFieldName);
-        const specificationChanged = before.detail.specifications !== desired.specifications
-          || specificationFieldNameChanged;
-        const expectedProductDescription = effectiveProductDescriptionForScope(
-          specificationLanguageOnly,
-          before.productDescription,
-          desired.productDescription
-        );
+        const desiredSpecificationFieldName = languagePackageOnly
+          ? before.detail.specificationsFieldName
+          : desired.language.title;
+        const specificationFieldNameChanged = !languagePackageOnly
+          && normalize(before.detail.specificationsFieldName) !== normalize(desiredSpecificationFieldName);
+        const specificationChanged = !languagePackageOnly
+          && (before.detail.specifications !== desired.specifications
+            || specificationFieldNameChanged);
+        const expectedProductDescription = specificationOnly || languagePackageOnly
+          ? before.productDescription
+          : effectiveProductDescriptionForScope(
+              specificationLanguageOnly,
+              before.productDescription,
+              desired.productDescription
+            );
         const descriptionChanged = before.productDescription !== expectedProductDescription;
         const productNameChanged = publishing && activeProductName !== targetProductName;
-        if (!skipLanguagePackage) {
+        if (!skipLanguagePackage && !specificationOnly) {
           try {
             languagePackage = await prepareLanguagePackage(
               session,
@@ -2325,7 +2379,7 @@ function createProductRevisionSyncFeature(deps) {
             logLine(logs, `${target.site.name} ${message}，产品上架继续执行。`);
           }
         }
-        const languagePackageChanged = Boolean(!skipLanguagePackage
+        const languagePackageChanged = Boolean(!skipLanguagePackage && !specificationOnly
           && languagePackage?.plan.changedCellCount > 0);
         if (!copyRequired && !productNameChanged && !detailChanged && !specificationChanged
           && !descriptionChanged && !languagePackageChanged) {
@@ -2376,7 +2430,7 @@ function createProductRevisionSyncFeature(deps) {
         let save = null;
         let after = before;
         if (productNameChanged || detailChanged || specificationChanged || descriptionChanged) {
-          const overview = specificationLanguageOnly
+          const overview = targetOnly
               ? before.detail.overview
               : targetSource.snapshot.detail.overview;
           await readProductSnapshot(session.page, activeProductName, logs);
@@ -2510,6 +2564,7 @@ function createProductRevisionSyncFeature(deps) {
     );
     return {
       mode: publishing ? "product-publishing-submit" : "product-revision-sync-submit",
+      updateScope: normalize(body?.updateScope),
       productName: request.productName,
       sourceSite: request.sourceSite,
       targetCount: results.length,
@@ -2575,6 +2630,8 @@ module.exports = {
   readDetailFromPcView,
   revisionPreviewStatus,
   isSpecificationLanguageOnly,
+  isSpecificationOnly,
+  isLanguagePackageOnly,
   effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,
   internationalListSource,

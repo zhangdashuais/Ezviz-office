@@ -35,6 +35,8 @@
       <div class="nav-label">后台运营</div>
       <div class="nav-items-wrapper">
         <div class="nav-item" data-target="tab-product-revision-sync" data-operation="publish-batch">产品资料操作</div>
+        <div class="nav-item" data-target="tab-product-availability">产品上线站点搜索</div>
+        <div class="nav-item" data-target="tab-product-empty-link">产品空链接创建</div>
         <div class="nav-item" data-target="tab-detail-address-replace">Detail 批量替换</div>
         <div class="nav-item" data-target="tab-language-package">语言包上传</div>
         <div class="nav-item" data-target="tab-wtb-tools">WTB 购买链接</div>
@@ -417,6 +419,49 @@
         <iframe id="textPreviewFrame" title="页面预览"></iframe>
       </div>
 
+      <div id="tab-product-empty-link" class="tab-content">
+        <div class="card">
+          <h3>国际站产品空链接创建</h3>
+          <p class="desc">以国际站已有产品为配置参考，通过 Manual Add 的原生新增接口批量创建产品。保留分类、类型、品牌、相册、规格、价格与库存；PC 和移动端详情仅写入占位 HTML，并固定取消勾选 Searchable。必须先预览，重名产品不会重复创建。</p>
+          <div class="form-grid">
+            <label for="emptyLinkReferenceProduct">参考产品名称</label>
+            <input id="emptyLinkReferenceProduct" type="text" placeholder="例如 HB9c Dual 3K Kit">
+            <label for="emptyLinkProductNames">新产品名称（可多个）</label>
+            <textarea id="emptyLinkProductNames" rows="7" placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
+            <label for="emptyLinkDetailHtml">详情占位 HTML</label>
+            <textarea id="emptyLinkDetailHtml" rows="3"><p>1<p></textarea>
+          </div>
+          <div class="row">
+            <button id="emptyLinkPreview" type="button">预览空链接（不创建）</button>
+            <button id="emptyLinkSubmit" type="button" disabled>确认并创建</button>
+          </div>
+        </div>
+        <div id="emptyLinkStatus" class="status">填写参考产品和新产品名称后先执行预览。</div>
+        <div class="card">
+          <h3>预览与执行结果</h3>
+          <textarea id="emptyLinkOutput" rows="18" readonly placeholder="参考配置、重名检查、创建结果和前台链接会显示在这里..."></textarea>
+        </div>
+      </div>
+
+      <div id="tab-product-availability" class="tab-content">
+        <div class="card">
+          <h3>搜索产品已上线站点</h3>
+          <p class="desc">搜索全部启用的 EZVIZ 国家官网，同时检查组合产品卡片内的所有规格 Tab。匹配忽略大小写和空格；该功能只读，不登录商城后台，也不修改产品数据。</p>
+          <div class="form-grid">
+            <label for="availabilityProductName">产品名称</label>
+            <input id="availabilityProductName" type="text" placeholder="例如 H8c Pro 2K (New)">
+          </div>
+          <div class="row">
+            <button id="availabilitySearchButton" type="button">搜索全部国家官网</button>
+          </div>
+        </div>
+        <div id="availabilityStatus" class="status">填写产品名称后开始搜索。</div>
+        <div class="card">
+          <h3>搜索结果</h3>
+          <textarea id="availabilityOutput" rows="22" readonly placeholder="命中站点、产品链接、候选结果和失败站点会显示在这里..."></textarea>
+        </div>
+      </div>
+
       <div id="tab-product-revision-sync" class="tab-content">
         <div id="revisionModeTabs" class="row" role="tablist" aria-label="产品修订模式" hidden>
           <button id="revisionSameProductTab" type="button" role="tab" aria-selected="true">同一产品跨国家修订</button>
@@ -432,8 +477,8 @@
               <option value="publish-batch" selected>产品上架（文件夹批量）</option>
               <option value="revision">修订已上架产品（源站同步）</option>
               <option value="content-sync">一键同步 Details</option>
-              <option value="availability-search">搜索产品已上线站点</option>
-              <option value="specification-language">只改语言包 / Specification 文案</option>
+              <option value="specification-only">只改 Specification</option>
+              <option value="language-only">只改语言包</option>
               <option value="common">多产品相同内容修订</option>
               <option value="delist">产品下架（关闭搜索与上架时间）</option>
             </select>
@@ -612,7 +657,7 @@
       <div id="tab-ecadmin-platform" class="tab-content">
         <div class="card">
           <h3>服务中心资料上传平台</h3>
-          <p class="desc">只需填写产品名称。系统会自动读取 D:\产品\产品名称\upload，创建下载资料、补全多语言并更新产品背景图；全部完成后自动检查 Product Status，未登记的产品会追加到末行。</p>
+          <p class="desc">只需填写产品名称。系统会自动读取 D:\产品\产品名称\upload，并在服务中心后台创建下载资料、补全多语言和更新产品背景图。</p>
 
           <div class="form-grid">
             <label>产品名称</label>
@@ -769,7 +814,7 @@
       <div id="tab-campaign-tools" class="tab-content">
         <div class="card">
           <h3>Banner / Popup / 巡查</h3>
-          <p class="desc">活动配置、站点清单和巡查规则均来自本项目。Banner 执行后台配置后会自动放到目标位置，发布后会巡查链接，UTM 问题会自动修复，失效链接会返回结果。</p>
+          <p class="desc">活动配置、站点清单和巡查规则均来自本项目。普通 Banner 与 Popup 的 EZVIZ 站内链接会在预览和提交时默认补齐或纠正 UTM，外部链接保持不变；Banner 执行后台配置后会自动放到目标位置，发布后会巡查链接。</p>
 
           <div class="row">
             <button id="campaignReloadSitesBtn" type="button">加载站点</button>
@@ -819,7 +864,7 @@
           <div class="form-grid">
             <label for="bannerHeadlineInput">标题 Headline（必填）</label>
             <input id="bannerHeadlineInput" type="text" placeholder="例如 EP8 Ultra" required>
-            <label>链接 Link</label>
+            <label>链接 Link（站内链接默认添加 UTM）</label>
             <input id="bannerLinkInput" type="text" placeholder="https://www.ezviz.com/...">
             <label>副标题 Slogan</label>
             <input id="bannerSloganInput" type="text">
@@ -833,7 +878,7 @@
               <option value="Black">Black</option>
             </select>
             <label>轮播位置</label>
-            <input id="bannerPositionInput" type="text" value="普通站点第 1 位；波兰站第 2 位" readonly>
+            <input id="bannerPositionInput" type="text" value="所有站点第 1 位" readonly>
             <label>上线时间 UTC</label>
             <input id="bannerOnlineInput" type="datetime-local">
             <label>下线时间 UTC</label>
@@ -878,9 +923,9 @@
             <input id="popupStartInput" type="datetime-local">
             <label>结束时间</label>
             <input id="popupEndInput" type="datetime-local">
-            <label>Web Url</label>
+            <label>Web Url（站内链接默认添加 UTM）</label>
             <input id="popupWebUrlInput" type="text" placeholder="https://www.ezviz.com/...">
-            <label>Mobile Url</label>
+            <label>Mobile Url（站内链接默认添加 UTM）</label>
             <input id="popupMobileUrlInput" type="text" placeholder="默认同 Web Url">
           </div>
           <div class="row">
@@ -921,7 +966,7 @@
       <div id="tab-ga4" class="tab-content">
         <div class="card">
           <h3>连接 GA4 / Search Console / Google Sheets</h3>
-          <p class="desc">使用 Google OAuth 授予 GA4、Search Console 与 Google Sheets 权限，不保存 Google 账号密码。Google Sheets 读写权限用于服务中心流程完成后的 Product Status 查重和追加。</p>
+          <p class="desc">使用 Google OAuth 授予 GA4、Search Console 与 Google Sheets 权限，不保存 Google 账号密码；此连接与服务中心资料上传相互独立。</p>
           <div class="row">
             <label for="ga4PropertyId">Property ID</label>
             <input id="ga4PropertyId" type="text" inputmode="numeric" value="311294431" placeholder="例如 123456789">
@@ -1053,7 +1098,7 @@
   <script src="src/ui.js"></script>
   <script src="src/css-scope.js?v=20260821-1"></script>
   <script src="src/inline-output.js?v=20260928-3"></script>
-  <script src="src/module-task-progress.js?v=20261013-2"></script>
+  <script src="src/module-task-progress.js?v=20261015-1"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-asset-upload.js?v=20260924-1"></script>
   <script src="src/module-ai-badge.js?v=20260911-2"></script>
@@ -1066,12 +1111,14 @@
   <script src="src/module-spec-excel-build.js"></script>
   <script src="src/language-column-filter-rules.js?v=20260814-1"></script>
   <script src="src/module-language-column-filter.js?v=20260814-1"></script>
-  <script src="src/i18n-conversion-rules.js?v=20260930-2"></script>
+  <script src="src/i18n-conversion-rules.js?v=20261013-3"></script>
   <script src="src/module-text.js?v=20260930-1"></script>
   <script src="src/module-ecadmin-platform.js"></script>
   <script src="src/module-language-package.js?v=20260911-1"></script>
   <script src="src/product-publishing-input-rules.js?v=20260923-2"></script>
-  <script src="src/module-product-revision-sync.js?v=20261013-2"></script>
+  <script src="src/module-product-empty-link.js?v=20261008-1"></script>
+  <script src="src/module-product-availability.js?v=20261015-1"></script>
+  <script src="src/module-product-revision-sync.js?v=20261015-2"></script>
   <script src="src/module-product-direct-revision.js?v=20260825-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>
