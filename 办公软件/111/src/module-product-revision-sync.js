@@ -836,6 +836,11 @@
       `产品：${result.productCount}，可执行：${result.readyCount}，部分失败：${result.partialCount}，失败：${result.failedCount}`,
       ""
     ];
+    (result.dependencies || []).forEach((dependency) => lines.push(
+      `语言包依赖：${dependency.productName} → ${dependency.dependsOn}（${dependency.fieldCount} 个字段；`
+      + `${dependency.inBatch ? "依赖产品也在本批次，已排在前面" : "依赖产品不在本批次，逐站查询后台"}）`
+    ));
+    if (result.dependencies?.length) lines.push("");
     result.results.forEach((item) => {
       lines.push(`- ${item.productName} | ${item.status}`);
       if (item.error) lines.push(`  · ${item.error}`);
@@ -860,6 +865,10 @@
             + `已有译文保留 ${siteResult.languagePackage.preservedExistingCount || 0} 个：`
             + (siteResult.languagePackage.preservedExisting || []).slice(0, 20).map((entry) => entry.key).join("、")
           );
+          (siteResult.languagePackage?.dependencyChecks || []).forEach((dependency) => lines.push(
+            `      黄色行依赖：${dependency.productName} 在后台${dependency.exists ? "已存在" : "不存在"}；`
+            + `后续 ${dependency.fieldCount} 个字段仅补空译文或缺失字段。`
+          ));
           (siteResult.warnings || []).slice(0, 3).forEach((warning) => {
             lines.push(`      警告：${warning.message}`);
           });

@@ -2,6 +2,8 @@ const {
   publishingWorkbookInfo,
   publishingProductMatchKey
 } = require("../../../办公软件/111/src/product-publishing-input-rules");
+const fs = require("node:fs");
+const { parseLanguageDatasheet } = require("./language-package-workbook");
 
 const MAX_BATCH_PRODUCTS = 20;
 
@@ -97,13 +99,59 @@ function groupProductFiles(files, manifestValue) {
   return products.sort((left, right) => left.productName.localeCompare(right.productName));
 }
 
+function orderProductsByLanguageDependencies(products, readDependencies = (filePath) =>
+  parseLanguageDatasheet(filePath).dependencies || []) {
+  const byName = new Map(products.map((product) => [
+    publishingProductMatchKey(product.productName), product
+  ]));
+  const dependencies = products.map((product) => {
+    const filePath = product.files.datasheet?.path;
+    const markers = filePath && fs.existsSync(filePath)
+      ? readDependencies(filePath) : [];
+    return { productName: product.productName, markers };
+  });
+  const markersByName = new Map(dependencies.map((item) => [
+    publishingProductMatchKey(item.productName), item.markers
+  ]));
+  const ordered = [];
+  const visiting = new Set();
+  const visited = new Set();
+  function visit(product) {
+    const key = publishingProductMatchKey(product.productName);
+    if (visiting.has(key)) throw new Error(`本批次产品语言包存在循环依赖：${product.productName}。`);
+    if (visited.has(key)) return;
+    visiting.add(key);
+    for (const marker of markersByName.get(key) || []) {
+      const dependency = byName.get(publishingProductMatchKey(marker.productName));
+      if (dependency) visit(dependency);
+    }
+    visiting.delete(key);
+    visited.add(key);
+    ordered.push(product);
+  }
+  products.forEach(visit);
+  return {
+    products: ordered,
+    dependencies: dependencies.flatMap((item) => item.markers.map((marker) => ({
+      productName: item.productName,
+      dependsOn: marker.productName,
+      markerRow: marker.markerRow,
+      fieldCount: marker.keys.length,
+      inBatch: byName.has(publishingProductMatchKey(marker.productName))
+    })))
+  };
+}
+
 function createProductPublishingBatchFeature(deps) {
   const { revisionFeature, logLine } = deps;
 
   async function preview(body, files, logs) {
-    const products = groupProductFiles(files, body?.batchManifest);
+    const { products, dependencies } = orderProductsByLanguageDependencies(
+      groupProductFiles(files, body?.batchManifest)
+    );
     const results = [];
     const sharedLanguagePackages = new Map();
+    const sharedDependencyChecks = new Map();
     for (const product of products) {
       try {
         logLine(logs, `预览上架产品：${product.productName}`);
@@ -112,7 +160,8 @@ function createProductPublishingBatchFeature(deps) {
           product.files.specification,
           product.files.datasheet,
           logs,
-          sharedLanguagePackages
+          sharedLanguagePackages,
+          sharedDependencyChecks
         );
         const executable = Number(result.readyCount || 0) > 0;
         results.push({
@@ -131,12 +180,15 @@ function createProductPublishingBatchFeature(deps) {
       readyCount: results.filter((item) => ["ready", "partial"].includes(item.status)).length,
       partialCount: results.filter((item) => item.status === "partial").length,
       failedCount: results.filter((item) => item.status === "failed").length,
+      dependencies,
       results
     };
   }
 
   async function submit(body, files, logs) {
-    const products = groupProductFiles(files, body?.batchManifest);
+    const { products, dependencies } = orderProductsByLanguageDependencies(
+      groupProductFiles(files, body?.batchManifest)
+    );
     let expected;
     try {
       expected = JSON.parse(String(body?.expectedBatchPreviews || "{}"));
@@ -238,6 +290,7 @@ function createProductPublishingBatchFeature(deps) {
       partialCount: results.filter((item) => item.status === "partial").length,
       failedCount: results.filter((item) => item.status === "failed").length,
       warnings: languagePackageBatch.warnings || [],
+      dependencies,
       languagePackageResults: languagePackageBatch.results || [],
       results
     };
@@ -253,5 +306,6 @@ module.exports = {
   productNameFromPath,
   uploadSequence,
   groupProductFiles,
+  orderProductsByLanguageDependencies,
   createProductPublishingBatchFeature
 };

@@ -1716,7 +1716,32 @@ function createProductRevisionSyncFeature(deps) {
 
   const parseExpectedCopySourceFingerprints = parseExpectedLanguagePackageFingerprints;
 
+  async function checkPublishingLanguageDependencies(session, target, parsedDatasheet, logs, cache) {
+    const checks = [];
+    for (const dependency of parsedDatasheet?.dependencies || []) {
+      const cacheKey = `${target.site.siteCode}\n${normalize(dependency.productName).toLowerCase()}`;
+      let exists = cache?.get(cacheKey);
+      if (exists === undefined) {
+        const result = await productExistsInCurrentSite(
+          session.page, dependency.productName, logs
+        );
+        exists = result.exists === true;
+        cache?.set(cacheKey, exists);
+      }
+      logLine(logs, `${target.site.name} 语言包依赖 ${dependency.productName}：`
+        + `${exists ? "后台产品已存在" : "后台产品不存在"}；`
+        + `后续 ${dependency.keys.length} 个字段只填空译文或追加缺失字段，非空译文不覆盖。`);
+      checks.push({ productName: dependency.productName, exists,
+        markerRow: dependency.markerRow, fieldCount: dependency.keys.length });
+    }
+    return checks;
+  }
+
   async function prepareLanguagePackage(session, target, parsedDatasheet, logs, options = {}) {
+    const dependencyChecks = options.publishing
+      ? await checkPublishingLanguageDependencies(
+        session, target, parsedDatasheet, logs, options.sharedDependencyChecks
+      ) : [];
     const translationHeader = resolveDatasheetLanguage(
       parsedDatasheet,
       target,
@@ -1737,7 +1762,8 @@ function createProductRevisionSyncFeature(deps) {
         downloaded: { langCode: cached.langCode },
         packageInfo: cached.packageInfo,
         plan,
-        translationHeader
+        translationHeader,
+        dependencyChecks
       };
     }
     const downloaded = await languagePackageFeature.downloadCurrentLanguagePackageForPage(
@@ -1766,7 +1792,7 @@ function createProductRevisionSyncFeature(deps) {
         + `${plan.matchedFieldCount} 个，第 5 列待写入 ${plan.changedCellCount + plan.newFields.length} 个，`
         + `已有译文保留 ${plan.preservedExistingCount} 个。`
       );
-      return { downloaded, packageInfo, plan, translationHeader };
+      return { downloaded, packageInfo, plan, translationHeader, dependencyChecks };
     } catch (error) {
       removeTemporaryFile(downloaded.filePath);
       throw error;
@@ -1987,7 +2013,8 @@ function createProductRevisionSyncFeature(deps) {
             target,
             parsedDatasheet,
             logs,
-            { publishing, sharedLanguagePackages: options.sharedLanguagePackages }
+            { publishing, sharedLanguagePackages: options.sharedLanguagePackages,
+              sharedDependencyChecks: options.sharedDependencyChecks }
           );
         }
         const languagePackageSummary = languagePackage
@@ -2030,6 +2057,7 @@ function createProductRevisionSyncFeature(deps) {
           desiredSpecificationLength: desired.specifications.length,
           languagePackage: languagePackage ? {
             ...languagePackageSummary,
+            dependencyChecks: languagePackage.dependencyChecks,
             langCode: languagePackage.downloaded.langCode,
             sourceFingerprint: languagePackage.packageInfo.contentFingerprint
           } : null,
@@ -2096,6 +2124,7 @@ function createProductRevisionSyncFeature(deps) {
     }));
     const expectedBatchPreviews = JSON.parse(String(body?.expectedBatchPreviews || "{}"));
     const results = [];
+    const dependencyChecksCache = new Map();
     logLine(logs, `开始合并 ${parsedDatasheets.length} 个产品的语言包译文。`);
 
     for (const target of request.targets) {
@@ -2121,6 +2150,11 @@ function createProductRevisionSyncFeature(deps) {
           )
         }));
         const session = await prepareSiteSession(target.site, body, logs);
+        for (const entry of targetDatasheets) {
+          await checkPublishingLanguageDependencies(
+            session, target, entry.parsed, logs, dependencyChecksCache
+          );
+        }
         const targetHeaders = [...new Set(
           targetDatasheets.map((entry) => entry.translationHeader)
         )];
@@ -2665,10 +2699,12 @@ function createProductRevisionSyncFeature(deps) {
     };
   }
 
-  const previewPublishing = (body, excelFile, languageDatasheetFile, logs, sharedLanguagePackages) =>
+  const previewPublishing = (body, excelFile, languageDatasheetFile, logs,
+    sharedLanguagePackages, sharedDependencyChecks) =>
     preview(body, excelFile, languageDatasheetFile, logs, {
       publishing: true,
-      sharedLanguagePackages
+      sharedLanguagePackages,
+      sharedDependencyChecks
     });
   const submitPublishing = (body, excelFile, languageDatasheetFile, logs) =>
     submit(body, excelFile, languageDatasheetFile, logs, { publishing: true });

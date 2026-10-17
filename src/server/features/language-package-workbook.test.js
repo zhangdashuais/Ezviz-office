@@ -6,6 +6,7 @@ const path = require("path");
 const XLSX = require("xlsx");
 const {
   parseLanguageDatasheet,
+  yellowPublishingDependency,
   resolveDatasheetLanguage,
   readLanguagePackage,
   planLanguagePackageUpdates,
@@ -18,6 +19,34 @@ const {
   normalizeTranslationForComparison,
   workbookContentFingerprintForGlobalRebase
 } = require("./language-package-workbook");
+
+test("recognizes only yellow proofread-dependency rows", () => {
+  const text = "If you have proofread CP8, then no need to review the following strings.";
+  assert.equal(yellowPublishingDependency({ v: text, s: {
+    patternType: "solid", fgColor: { rgb: "FFFF00" }
+  } }), "CP8");
+  assert.equal(yellowPublishingDependency({ v: text, s: {
+    patternType: "solid", fgColor: { rgb: "FFFFFF" }
+  } }), "");
+  assert.equal(yellowPublishingDependency({ v: text, s: { patternType: "none" } }), "CP8");
+  assert.equal(yellowPublishingDependency({ v: "CP8_5", s: {
+    patternType: "solid", fgColor: { rgb: "FFFF00" }
+  } }), "");
+});
+
+test("keeps the dependency section when a combined workbook loses its yellow fill", () => {
+  const parsed = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "French"],
+    ["HP8_1", "Own source", "HP8 text"],
+    ["If you have proofread CP8, then no need to review the following strings.", "", ""],
+    ["CP8_5", "Shared source", "CP8 text"]
+  ]));
+  assert.deepEqual(parsed.dependencies, [{
+    productName: "CP8", markerRow: 3, keys: ["CP8_5"]
+  }]);
+  assert.equal(parsed.rows.find((row) => row.key === "CP8_5").dependencyProductName, "CP8");
+  assert.equal(parsed.rows.find((row) => row.key === "HP8_1").dependencyProductName, undefined);
+});
 
 test("source comparison ignores casing and whitespace but not changed words", () => {
   assert.equal(

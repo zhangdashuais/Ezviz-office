@@ -1,12 +1,30 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const path = require("node:path");
 const {
   fileKind,
   productNameFromPath,
   uploadSequence,
   groupProductFiles,
+  orderProductsByLanguageDependencies,
   createProductPublishingBatchFeature
 } = require("./product-publishing-batch");
+
+test("batch puts proofread source products before dependent products", () => {
+  const products = [
+    { productName: "HP8", files: { datasheet: { path: __filename } } },
+    { productName: "CP8", files: { datasheet: { path: path.join(__dirname, "product-publishing-batch.js") } } }
+  ];
+  const readDependencies = (filePath) => filePath === __filename
+    ? [{ productName: "CP8", markerRow: 13, keys: ["CP8_5"] }]
+    : [{ productName: "EP8 Ultra", markerRow: 105, keys: ["EP8_Ultra_119"] }];
+  const ordered = orderProductsByLanguageDependencies(products, readDependencies);
+  assert.deepEqual(ordered.products.map((item) => item.productName), ["CP8", "HP8"]);
+  assert.deepEqual(ordered.dependencies.map((item) => item.inBatch), [true, false]);
+  assert.throws(() => orderProductsByLanguageDependencies(products, () => [
+    { productName: "HP8", markerRow: 5, keys: [] }
+  ]), /循环依赖/);
+});
 
 test("recognizes Datasheet and Specifications files in a selected folder", () => {
   assert.equal(fileKind("Products/CP8/CP8 Datasheet.xlsx"), "datasheet");

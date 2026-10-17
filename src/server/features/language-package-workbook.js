@@ -24,9 +24,18 @@ function cellValue(sheet, row, column) {
   return cell ? (cell.v == null ? "" : cell.v) : "";
 }
 
+function yellowPublishingDependency(cell) {
+  const fill = cell?.s;
+  const color = fill?.fgColor?.rgb || fill?.bgColor?.rgb || "";
+  // ExcelJS may discard the marker fill when it splits a combined workbook.
+  if (fill?.patternType === "solid" && !/^(?:ff|00)?ffff00$/i.test(color)) return "";
+  const text = normalize(cell?.v);
+  return text.match(/^If you have proofread\s+(.+?),\s*then no need to review the following strings\.?$/i)?.[1]?.trim() || "";
+}
+
 function parseLanguageDatasheet(input) {
   const buffer = readInputBuffer(input);
-  const workbook = XLSX.read(buffer, { type: "buffer", cellText: true });
+  const workbook = XLSX.read(buffer, { type: "buffer", cellText: true, cellStyles: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("语言包 Datasheet 中没有工作表。");
   const sheet = workbook.Sheets[sheetName];
@@ -38,7 +47,17 @@ function parseLanguageDatasheet(input) {
     if (header) headers.push({ header, column });
   }
   const rows = [];
+  const dependencies = [];
+  let currentDependency = null;
   for (let row = range.s.r + 1; row <= range.e.r; row += 1) {
+    const dependencyProductName = yellowPublishingDependency(
+      sheet[XLSX.utils.encode_cell({ r: row, c: range.s.c })]
+    );
+    if (dependencyProductName) {
+      currentDependency = { productName: dependencyProductName, markerRow: row + 1, keys: [] };
+      dependencies.push(currentDependency);
+      continue;
+    }
     const key = normalize(cellValue(sheet, row, range.s.c));
     const source = normalize(cellValue(sheet, row, range.s.c + 1));
     const translations = {};
@@ -49,14 +68,17 @@ function parseLanguageDatasheet(input) {
     const hasTranslation = Object.values(translations).some((value) => normalize(value));
     if (!key && !source && !hasTranslation) continue;
     if (key && !source && !hasTranslation) continue;
-    rows.push({ key, source, rowNumber: row + 1, translations });
+    rows.push({ key, source, rowNumber: row + 1, translations,
+      ...(currentDependency ? { dependencyProductName: currentDependency.productName } : {}) });
+    if (currentDependency && key) currentDependency.keys.push(key);
   }
   return {
     sheetName,
     fingerprint: hashBuffer(buffer),
     headers: headers.map((item) => item.header),
     headerColumns: Object.fromEntries(headers.map((item) => [item.header, item.column])),
-    rows
+    rows,
+    dependencies
   };
 }
 
@@ -637,6 +659,7 @@ function writeUpdatedLanguagePackageNative(
 module.exports = {
   normalize,
   parseLanguageDatasheet,
+  yellowPublishingDependency,
   resolveDatasheetLanguage,
   findLanguagePackageSections,
   normalizeSourceForComparison,
