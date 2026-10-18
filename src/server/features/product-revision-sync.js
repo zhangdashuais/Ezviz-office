@@ -562,6 +562,10 @@ function isLanguagePackageOnly(body) {
   return normalize(body?.updateScope).toLowerCase() === "language-only";
 }
 
+function usesPublishingLanguageRules(body, publishing = false) {
+  return publishing || isSpecificationLanguageOnly(body);
+}
+
 function effectiveProductDescriptionForScope(specificationLanguageOnly, currentDescription, desiredProductDescription) {
   return specificationLanguageOnly && desiredProductDescription?.inherited
     ? currentDescription
@@ -1848,6 +1852,7 @@ function createProductRevisionSyncFeature(deps) {
 
   async function preview(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
+    const publishingLanguageRules = usesPublishingLanguageRules(body, publishing);
     const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
     const specificationOnly = !publishing && isSpecificationOnly(body);
     const languagePackageOnly = !publishing && isLanguagePackageOnly(body);
@@ -2008,7 +2013,7 @@ function createProductRevisionSyncFeature(deps) {
             target,
             parsedDatasheet,
             logs,
-            { publishing, sharedLanguagePackages: options.sharedLanguagePackages,
+            { publishing: publishingLanguageRules, sharedLanguagePackages: options.sharedLanguagePackages,
               sharedDependencyChecks: options.sharedDependencyChecks }
           );
         }
@@ -2017,7 +2022,7 @@ function createProductRevisionSyncFeature(deps) {
           : null;
         const languagePackageChanged = Boolean(languagePackage
           && (languagePackage.plan.changedCellCount
-            || (publishing && languagePackage.plan.newFields.length)));
+            || (publishingLanguageRules && languagePackage.plan.newFields.length)));
         results.push({
           status: revisionPreviewStatus({
             publishing,
@@ -2256,6 +2261,7 @@ function createProductRevisionSyncFeature(deps) {
 
   async function submit(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
+    const publishingLanguageRules = usesPublishingLanguageRules(body, publishing);
     const skipLanguagePackage = options.skipLanguagePackage === true;
     const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
     const specificationOnly = !publishing && isSpecificationOnly(body);
@@ -2464,7 +2470,7 @@ function createProductRevisionSyncFeature(deps) {
         const productNameChanged = publishing && activeProductName !== targetProductName;
         if (!publishing && !skipLanguagePackage && !specificationOnly) {
           languagePackage = await prepareLanguagePackage(
-            session, target, parsedDatasheet, logs
+            session, target, parsedDatasheet, logs, { publishing: publishingLanguageRules }
           );
           const expectedPackageFingerprint = normalize(
             expectedLanguagePackageFingerprints[target.site.siteCode]
@@ -2474,12 +2480,14 @@ function createProductRevisionSyncFeature(deps) {
             throw new Error(`${target.site.name} 当前语言包在预览后发生变化，请重新预览。`);
           }
           assertSafePlan(languagePackage.plan);
-          warnings.push(...languagePackageInputWarnings(languagePackage.plan, request.productName));
+          warnings.push(...languagePackageInputWarnings(
+            languagePackage.plan, request.productName, publishingLanguageRules
+          ));
         }
         const languagePackageChanged = Boolean(!skipLanguagePackage && !specificationOnly
           && languagePackage
           && (languagePackage.plan.changedCellCount
-            || (publishing && languagePackage.plan.newFields.length)));
+            || (publishingLanguageRules && languagePackage.plan.newFields.length)));
         if (!copyRequired && !productNameChanged && !detailChanged && !specificationChanged
           && !descriptionChanged && !languagePackageChanged) {
           components.detail = "no-change";
@@ -2519,7 +2527,7 @@ function createProductRevisionSyncFeature(deps) {
             languagePackage.packageInfo,
             languagePackage.plan,
             outputPath,
-            publishing ? { preserveSheets: ["Sheet1"] } : {}
+            publishingLanguageRules ? { preserveSheets: ["Sheet1"] } : {}
           );
           logLine(
             logs,
@@ -2580,7 +2588,7 @@ function createProductRevisionSyncFeature(deps) {
             },
             logs
           );
-          const expectedSnapshot = publishing
+          const expectedSnapshot = publishingLanguageRules
             ? languagePackageKeySnapshot(
                 readLanguagePackage(generatedPackage.filePath, languagePackage.downloaded.langCode),
                 parsedDatasheet.rows.filter((row) => row.key
@@ -2599,11 +2607,11 @@ function createProductRevisionSyncFeature(deps) {
             logs,
             expectedSnapshot
           );
-          if (publishing && !readback.verification.passed) {
+          if (publishingLanguageRules && !readback.verification.passed) {
             throw new Error(`${target.site.name} 语言包上传后回读不一致：`
               + readback.verification.mismatchedKeys.slice(0, 10).join("、"));
           }
-          if (!publishing) {
+          if (!publishingLanguageRules) {
             const verificationPlan = readback.verification.plans[0].plan;
             if (verificationPlan.changedCellCount) {
               const readbackWarnings = languagePackageReadbackWarnings(
@@ -2753,6 +2761,7 @@ module.exports = {
   isSpecificationLanguageOnly,
   isSpecificationOnly,
   isLanguagePackageOnly,
+  usesPublishingLanguageRules,
   effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,
   internationalListSource,

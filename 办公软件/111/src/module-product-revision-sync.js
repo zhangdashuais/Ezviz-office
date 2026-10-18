@@ -978,8 +978,8 @@
       "content-sync": "以国际站同名产品为源，一键同步目标站点的 PC Details Overview；不修改 Specifications、语言包、Product Description 或其他配置，产品不存在时跳过。",
       "specification-language": "只修改目标站点已有产品的 Specification 文案、Specification 输入框名称、Product Description 和语言包；不使用源站，不改 Overview。",
       "specification-only": "只修改目标站点已有产品的 Specification 内容和输入框名称；只需上传 Specification Excel。",
-      "language-only": "只修改目标站点当前语言包；只需上传语言包 Datasheet，不改产品 Details、Specification 或 Product Description。",
-      common: "在下方表单中选择多个站点和多个产品，对 Detail 或 Specification 执行同一条精确删除/替换。",
+      "language-only": "只修改目标站点当前语言包；按修订规则更新译文，不套用产品上架的只填空值规则；不改产品 Details、Specification 或 Product Description。",
+      common: "在下方表单中选择多个站点和多个产品，对 Detail 或 Specification 执行同一条精确删除/替换；不操作语言包。",
       delist: "只关闭 Searchable，并将 Type of listing 设为 No Set Uptime。"
     })[currentMode()] || "选择操作类型后，页面只显示该流程需要的字段。所有写操作都必须先预览。";
     folderLabel.hidden = !batch;
@@ -998,10 +998,12 @@
     languageHelp.textContent = specificationOnly
       ? "只改 Specification：按目标站点选择 Specification 语言列；系统只更新 Specification 内容及 Custom Page Name 输入框，不改语言包、Overview 或 Product Description。"
       : packageOnly
-        ? "只改语言包：按目标站点选择 Datasheet 译文列；系统只更新并回读语言包，不改产品 Details、Specification 或 Product Description。"
+        ? "只改语言包：按目标站点选择 Datasheet 译文列，按修订规则更新并回读语言包；不套用产品上架的只填空值规则，也不改产品内容。"
       : languageOnly
       ? "只改文案模式：按目标站点选择 Specification 语言列和 Datasheet 译文列；系统会更新 Specification 内容、Custom Page Name 输入框、Product Description 和总语言包，不改 Overview。"
-      : "产品上架/修订语言包操作：先按目标站点选择 Datasheet 语种列 → 下载该站当前总语言包 → 以站点包的字段键和原文列为准，仅把 Datasheet 对应译文覆盖到目标列 → 上传新语言包 → 再次下载回读验证。";
+      : revision
+        ? "修订已上架产品：按 Datasheet 译文更新目标站语言包，不套用产品上架的只填空值规则；上传后回读验证。"
+        : "产品上架/只改文案：下载目标站当前总语言包，仅补空译文；已有译文不覆盖，新 Key 满足条件时追加，Sheet1 不变；上传后回读验证。";
     targetsHeading.textContent = delist ? "下架目标站点"
       : contentSync ? "Details 同步目标站点"
         : specificationOnly ? "目标站点与 Specification 语言列"

@@ -11,6 +11,7 @@ const {
   isSpecificationLanguageOnly,
   isSpecificationOnly,
   isLanguagePackageOnly,
+  usesPublishingLanguageRules,
   effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,
   internationalListSource,
@@ -67,6 +68,14 @@ test("Specification and language-only scope preserves unrelated product content"
   assert.equal(isSpecificationLanguageOnly({}), false);
   assert.equal(isSpecificationOnly({ updateScope: "specification-only" }), true);
   assert.equal(isLanguagePackageOnly({ updateScope: "language-only" }), true);
+});
+
+test("only publishing and content-only updates use publishing language rules", () => {
+  assert.equal(usesPublishingLanguageRules({}, true), true);
+  assert.equal(usesPublishingLanguageRules({ updateScope: "specification-language" }), true);
+  assert.equal(usesPublishingLanguageRules({ updateScope: "language-only" }), false);
+  assert.equal(usesPublishingLanguageRules({ updateScope: "revision" }), false);
+  assert.equal(usesPublishingLanguageRules({ updateScope: "common" }), false);
 });
 
 test("Specification and language-only scope updates Product Description when Datasheet provides it", () => {
