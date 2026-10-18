@@ -13,6 +13,7 @@ const {
   planLanguagePackageUpdates,
   planPublishingLanguagePackageUpdates,
   languagePackageKeySnapshot,
+  languagePackageSheetSnapshot,
   assertSafePlan,
   assertPlanPreservesSheet,
   writeUpdatedLanguagePackage,
@@ -343,6 +344,46 @@ test("product publishing preserves Sheet1 and updates only Sheet2", () => {
     assert.throws(() => assertPlanPreservesSheet(result, forbidden, "Sheet1"), /仅允许修改 Sheet2/);
   } finally {
     fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test("publishing ignores BIFF8 blank placeholders but still protects Sheet1 content", () => {
+  const workbook = XLSX.utils.book_new();
+  const heading = ["Category", "Serial", "Single word", "en-US", "ro-RO(need translation)"];
+  const sheet1 = XLSX.utils.aoa_to_sheet([
+    heading, ["common", "C1", "system_copy", "System source", "Original"]
+  ]);
+  sheet1.F2 = { t: "z" };
+  sheet1["!ref"] = "A1:F2";
+  XLSX.utils.book_append_sheet(workbook, sheet1, "Sheet1");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    heading, ["goods", "G1", "product_copy", "Product source", ""]
+  ]), "Sheet2");
+  const source = readLanguagePackage(
+    XLSX.write(workbook, { type: "buffer", bookType: "biff8" }), "ro-RO"
+  );
+  assert.equal(source.workbook.Sheets.Sheet1.F2.t, "z");
+  const plan = planPublishingLanguagePackageUpdates(source, parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Romanian"],
+    ["product_copy", "Product source", "Traducere"]
+  ])), "Romanian");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ezviz-blank-sheet1-"));
+  try {
+    const generated = writeUpdatedLanguagePackage(source, plan,
+      path.join(directory, "updated.xlsx"), { preserveSheets: ["Sheet1"] });
+    const result = readLanguagePackage(generated.filePath, "ro-RO");
+    assert.equal(languagePackageSheetSnapshot(source, "Sheet1"),
+      languagePackageSheetSnapshot(result, "Sheet1"));
+    assert.equal(result.workbook.Sheets.Sheet2.E2.v, "Traducere");
+    result.workbook.Sheets.Sheet1.E2.v = "Changed";
+    assert.notEqual(languagePackageSheetSnapshot(source, "Sheet1"),
+      languagePackageSheetSnapshot(result, "Sheet1"));
+    result.workbook.Sheets.Sheet1.E2.v = "Original";
+    result.workbook.Sheets.Sheet1.E2.f = "1+1";
+    assert.notEqual(languagePackageSheetSnapshot(source, "Sheet1"),
+      languagePackageSheetSnapshot(result, "Sheet1"));
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 

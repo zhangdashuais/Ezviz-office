@@ -513,6 +513,12 @@ function sheetCellSnapshot(sheet) {
   return JSON.stringify({
     ref: sheet["!ref"] || "",
     cells: Object.keys(sheet).filter((address) => !address.startsWith("!"))
+      .filter((address) => {
+        const cell = sheet[address];
+        // BIFF8 blank placeholders (t: "z") are discarded when saved as XLSX.
+        // They have no value or formula and must not look like Sheet1 edits.
+        return cell?.t !== "z" || cell.v != null || cell.f != null;
+      })
       .sort().map((address) => [address, sheet[address]?.t, sheet[address]?.v, sheet[address]?.f])
   });
 }

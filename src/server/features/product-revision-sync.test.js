@@ -579,9 +579,36 @@ test("parses paired language columns and generates Specification HTML", () => {
   assert.match(html, /2,4 GHz/);
   assert.match(html, /src="https:\/\/cdn\.example\/spec\.jpg"/);
   assert.match(html, /alt="Caméra &quot;Pro&quot;"/);
-  assert.match(html, /word-break: normal/);
+  assert.doesNotMatch(html, /<style>|pc-content|<tr class="line">/);
+  assert.match(html, /<tr class="firstRow"><th class="title"/);
+  assert.match(html, /<tr><th class="title"[^>]*>Réseau<\/th><\/tr>/);
   assert.match(html, /<th colspan="1" rowspan="1" width="200">Modèle<\/th>/);
   assert.doesNotMatch(html, /<td class="tdline3" colspan="1" rowspan="1" width="200">Modèle<\/td>/);
+});
+
+test("Europe-drive Specification skips OK status and keeps the reference table structure", () => {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ["English", "", "Romanian", ""],
+    ["OK", "", "OK", ""],
+    ["Specifications", "", "Specificații", ""],
+    ["Model", "CS-HP8", "Model", "CS-HP8"],
+    ["Camera Parameters", "", "Parametrii camerei", ""],
+    ["Lens", "2.3 mm", "Obiectiv", "2,3 mm"]
+  ]);
+  sheet["!merges"] = [1, 2, 4].flatMap((row) => [0, 2].map((column) => ({
+    s: { r: row, c: column }, e: { r: row, c: column + 1 }
+  })));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Specifications");
+  const parsed = parseSpecificationWorkbook(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+  const romanian = parsed.languages.find((language) => language.header === "Romanian");
+  assert.equal(romanian.title, "Specificații");
+  const html = buildPcSpecificationHtml(romanian, null);
+  assert.doesNotMatch(html, />OK<|pc-content|<style>|<tr class="line">/);
+  assert.match(html, /^<div class="p960">/);
+  assert.match(html, /<tr class="firstRow"><th class="title" colspan="2" rowspan="1">Specificații<\/th><\/tr>/);
+  assert.match(html, /<tr class="lines"><th[^>]*>Model<\/th><td[^>]*>CS-HP8<\/td><\/tr>/);
+  assert.match(html, /<tr><th class="title"[^>]*>Parametrii camerei<\/th><\/tr>/);
 });
 
 test("maps the Specification title to the selected target site", () => {

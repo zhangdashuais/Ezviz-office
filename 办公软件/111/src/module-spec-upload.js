@@ -40,6 +40,10 @@
     return cell.w != null ? cell.w : cell.v;
   }
 
+  function isStatusRow(values) {
+    return window.languageColumnFilterRules.isStatusRow(values);
+  }
+
   function buildLangSelect() {
     langSelect.innerHTML = "";
     languageList.forEach((name, index) => {
@@ -73,54 +77,52 @@
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const range = window.XLSX.utils.decode_range(sheet["!ref"]);
     const mergeMap = {};
+    const mergedCells = new Set();
 
     (sheet["!merges"] || []).forEach((merge) => {
       mergeMap["c" + merge.s.c + "r" + merge.s.r] = {
         cols: merge.e.c - merge.s.c + 1,
         rows: merge.e.r - merge.s.r + 1
       };
-    });
-
-    for (let col = 0, langIndex = 0; col <= range.e.c; col += 2, langIndex += 1) {
-      const firstHeader = getCellValue(sheet, 0, col);
-      const secondHeader = getCellValue(sheet, 0, col + 1);
-      languageList.push(String(firstHeader || secondHeader || "Language " + (langIndex + 1)));
-      excelDataByLang[langIndex] = [];
-    }
-
-    Object.keys(sheet).forEach((address) => {
-      if (address[0] === "!") return;
-      const pos = window.XLSX.utils.decode_cell(address);
-      if (pos.r <= 0) return;
-
-      const langIndex = Math.floor(pos.c / 2);
-      if (!excelDataByLang[langIndex]) return;
-
-      const rowIndex = pos.r - 1;
-      const isFirstCol = pos.c % 2 === 0;
-      const mergeKey = "c" + pos.c + "r" + pos.r;
-      const cell = sheet[address];
-
-      if (!excelDataByLang[langIndex][rowIndex]) {
-        excelDataByLang[langIndex][rowIndex] = [];
+      for (let row = merge.s.r; row <= merge.e.r; row += 1) {
+        for (let col = merge.s.c; col <= merge.e.c; col += 1) {
+          if (row !== merge.s.r || col !== merge.s.c) mergedCells.add(`${row}:${col}`);
+        }
       }
-
-      excelDataByLang[langIndex][rowIndex].push({
-        name: (isFirstCol ? "A" : "B") + (pos.r + 1),
-        position: pos,
-        value: cell.w != null ? cell.w : cell.v,
-        unitMerge: mergeMap[mergeKey] || { cols: 1, rows: 1 }
-      });
     });
+
+    for (let col = range.s.c; col <= range.e.c; col += 2) {
+      const header = String(getCellValue(sheet, range.s.r, col)
+        || getCellValue(sheet, range.s.r, col + 1) || "").trim();
+      if (!header) continue;
+      const rows = [];
+      for (let row = range.s.r + 1; row <= range.e.r; row += 1) {
+        const items = [];
+        for (let cellCol = col; cellCol <= Math.min(col + 1, range.e.c); cellCol += 1) {
+          const cell = sheet[window.XLSX.utils.encode_cell({ r: row, c: cellCol })];
+          if (!cell || mergedCells.has(`${row}:${cellCol}`)) continue;
+          items.push({
+            name: `${cellCol === col ? "A" : "B"}${row + 1}`,
+            value: cell.w != null ? cell.w : cell.v,
+            unitMerge: mergeMap[`c${cellCol}r${row}`] || { cols: 1, rows: 1 }
+          });
+        }
+        if (isStatusRow(items.map((item) => item.value))) continue;
+        if (items.length) rows.push(items);
+      }
+      languageList.push(header);
+      excelDataByLang.push(rows);
+    }
 
     buildLangSelect();
   }
 
   function renderPcHtml(excelData, title, imageSrc, imageAlt) {
-    const rows = excelData
-      .filter(Boolean)
+    const visibleRows = excelData.filter(Boolean);
+    const rows = visibleRows
       .map((items, index) => {
-        const rowClass = items.length > 1 ? "lines" : "line";
+        const rowClass = items.length > 1 ? ' class="lines"'
+          : index === 0 && items[0]?.unitMerge?.cols > 1 ? ' class="firstRow"' : "";
         const cells = items.map((item, key) => {
           const value = escapeHtml(item.value);
           const colspan = item.unitMerge.cols;
@@ -137,52 +139,36 @@
             return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="160">${value}</td>`;
           }
 
-          if (excelData[0] && excelData[0].length > 3 && index === 0) {
-            const width = parseInt(660 / (excelData[0].length - 2) * colspan, 10);
+          if (visibleRows[0]?.length > 3 && index === 0) {
+            const width = parseInt(660 / (visibleRows[0].length - 2) * colspan, 10);
             return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="${width}">${value}</td>`;
           }
 
           return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}">${value}</td>`;
         }).join("");
 
-        return `<tr class="${rowClass}">${cells}</tr>`;
+        return `<tr${rowClass}>${cells}</tr>`;
       })
       .join("\n");
 
     return [
-      '<div class="pc-content">',
-      '  <div class="p960">',
-      '    <div class="pro-img">',
-      `      <img class="pro-img__src" src="${escapeHtml(imageSrc)}" alt="${escapeHtml(imageAlt)}">`,
-      "    </div>",
-      `    <div class="pro-title">${escapeHtml(title)}</div>`,
-      '    <table class="pro_infobox">',
-      "      <tbody>",
+      '<div class="p960">',
+      ...(imageSrc ? [
+        '    <div class="pro-img">',
+        `      <img class="pro-img__src" src="${escapeHtml(imageSrc)}" alt="${escapeHtml(imageAlt)}">`,
+        "    </div>"
+      ] : []),
+      `  <div class="pro-title">${escapeHtml(title)}</div>`,
+      '  <table class="pro_infobox">',
+      "    <tbody>",
       rows,
-      "      </tbody>",
-      "    </table>",
-      "  </div>",
+      "    </tbody>",
+      "  </table>",
       "</div>"
     ].join("\n");
   }
 
   function renderMobileHtml(excelData, title, imageSrc, imageAlt) {
-    const fixedNum = Number(fixedNumSelect.value || 1);
-    const mobileData = excelData.filter(Boolean).map((row) => row.slice());
-
-    for (let i = mobileData.length - 1; i >= 0; i -= 1) {
-      for (let j = mobileData[i].length - 1; j >= 0; j -= 1) {
-        const item = mobileData[i][j];
-        if (!item) continue;
-
-        if (item.name.indexOf("A") > -1) {
-          mobileData[i].splice(j, 1);
-        } else if (fixedNum !== 1 && item.name.indexOf("B") > -1) {
-          mobileData[i].splice(j, 1);
-        }
-      }
-    }
-
     const rows = excelData
       .filter(Boolean)
       .map((items) => items.map((item) => {
@@ -202,9 +188,11 @@
     return [
       '<div class="mobile-mall_us-content">',
       '  <div class="product-spec">',
-      '    <div class="pro-img">',
-      `      <img class="pro-img__src" src="${escapeHtml(imageSrc)}" alt="${escapeHtml(imageAlt)}">`,
-      "    </div>",
+      ...(imageSrc ? [
+        '    <div class="pro-img">',
+        `      <img class="pro-img__src" src="${escapeHtml(imageSrc)}" alt="${escapeHtml(imageAlt)}">`,
+        "    </div>"
+      ] : []),
       `    <div class="pro-title">${escapeHtml(title)}</div>`,
       '    <div class="table">',
       "      <table>",
@@ -216,10 +204,6 @@
       "  </div>",
       "</div>"
     ].join("\n");
-  }
-
-  function addCopyStyle(html) {
-    return html + "\n<style> td{word-break: normal !important}</style>";
   }
 
   async function copyText(text, label) {
@@ -271,9 +255,9 @@
     mobilePreview.innerHTML = mobileHtml;
     copyPcBtn.disabled = false;
     copyMobileBtn.disabled = false;
-    setStatus("生成完成。line / lines 类名按原模板规则输出，没有额外替换。", "ok");
+    setStatus("生成完成，已按标准表格结构输出并忽略 OK 状态行。", "ok");
   });
 
-  copyPcBtn.addEventListener("click", () => copyText(addCopyStyle(pcOutput.value), "PC HTML"));
-  copyMobileBtn.addEventListener("click", () => copyText(addCopyStyle(mobileOutput.value), "Mobile HTML"));
+  copyPcBtn.addEventListener("click", () => copyText(pcOutput.value, "PC HTML"));
+  copyMobileBtn.addEventListener("click", () => copyText(mobileOutput.value, "Mobile HTML"));
 })();

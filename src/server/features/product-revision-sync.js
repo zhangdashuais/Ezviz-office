@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
 const cheerio = require("cheerio");
+const { isStatusRow } = require("../../../办公软件/111/src/language-column-filter-rules");
 const {
   parseLanguageDatasheet,
   resolveDatasheetLanguage,
@@ -276,11 +277,17 @@ function parseSpecificationWorkbook(input) {
   if (!sheet?.["!ref"]) throw new Error("Specification Excel 的第一个工作表为空。");
   const range = XLSX.utils.decode_range(sheet["!ref"]);
   const mergeMap = new Map();
+  const mergedCells = new Set();
   (sheet["!merges"] || []).forEach((merge) => {
     mergeMap.set(`${merge.s.r}:${merge.s.c}`, {
       cols: merge.e.c - merge.s.c + 1,
       rows: merge.e.r - merge.s.r + 1
     });
+    for (let row = merge.s.r; row <= merge.e.r; row += 1) {
+      for (let column = merge.s.c; column <= merge.e.c; column += 1) {
+        if (row !== merge.s.r || column !== merge.s.c) mergedCells.add(`${row}:${column}`);
+      }
+    }
   });
 
   const languages = [];
@@ -296,13 +303,14 @@ function parseSpecificationWorkbook(input) {
       for (let column = startColumn; column <= Math.min(startColumn + 1, range.e.c); column += 1) {
         const address = XLSX.utils.encode_cell({ r: row, c: column });
         const cell = sheet[address];
-        if (!cell) continue;
+        if (!cell || mergedCells.has(`${row}:${column}`)) continue;
         items.push({
           name: `${column === startColumn ? "A" : "B"}${row + 1}`,
           value: cell.w != null ? cell.w : cell.v,
           unitMerge: mergeMap.get(`${row}:${column}`) || { cols: 1, rows: 1 }
         });
       }
+      if (isStatusRow(items.map((item) => item.value))) continue;
       if (items.length) rows[row - range.s.r - 1] = items;
     }
     const firstValue = rows.flat().find((item) => normalize(item?.value));
@@ -352,10 +360,11 @@ function resolveWorkbookLanguage(parsedWorkbook, target) {
 }
 
 function buildPcSpecificationHtml(language, image, titleOverride) {
-  const rows = language.rows
-    .filter(Boolean)
+  const visibleRows = language.rows.filter(Boolean);
+  const rows = visibleRows
     .map((items, index) => {
-      const rowClass = items.length > 1 ? "lines" : "line";
+      const rowClass = items.length > 1 ? ' class="lines"'
+        : index === 0 && items[0]?.unitMerge?.cols > 1 ? ' class="firstRow"' : "";
       const cells = items.map((item, key) => {
         const value = escapeHtml(item.value);
         const colspan = Number(item.unitMerge?.cols || 1);
@@ -369,13 +378,13 @@ function buildPcSpecificationHtml(language, image, titleOverride) {
         if (index === 0 && key === 1 && items.length > 2) {
           return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="160">${value}</td>`;
         }
-        if (language.rows[0]?.length > 3 && index === 0) {
-          const width = parseInt(660 / (language.rows[0].length - 2) * colspan, 10);
+        if (visibleRows[0]?.length > 3 && index === 0) {
+          const width = parseInt(660 / (visibleRows[0].length - 2) * colspan, 10);
           return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}" width="${width}">${value}</td>`;
         }
         return `<td class="tdline3" colspan="${colspan}" rowspan="${rowspan}">${value}</td>`;
       }).join("");
-      return `<tr class="${rowClass}">${cells}</tr>`;
+      return `<tr${rowClass}>${cells}</tr>`;
     })
     .join("\n");
 
@@ -385,18 +394,15 @@ function buildPcSpecificationHtml(language, image, titleOverride) {
     "    </div>"
   ] : [];
   return [
-    '<div class="pc-content">',
-    '  <div class="p960">',
+    '<div class="p960">',
     ...imageMarkup,
-    `    <div class="pro-title">${escapeHtml(titleOverride || language.title || "Specifications")}</div>`,
-    '    <table class="pro_infobox">',
-    "      <tbody>",
+    `  <div class="pro-title">${escapeHtml(titleOverride || language.title || "Specifications")}</div>`,
+    '  <table class="pro_infobox">',
+    "    <tbody>",
     rows,
-    "      </tbody>",
-    "    </table>",
-    "  </div>",
-    "</div>",
-    "<style> td{word-break: normal !important}</style>"
+    "    </tbody>",
+    "  </table>",
+    "</div>"
   ].join("\n");
 }
 
