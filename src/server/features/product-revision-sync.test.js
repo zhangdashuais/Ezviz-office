@@ -6,6 +6,8 @@ const {
   parseSpecificationWorkbook,
   resolveWorkbookLanguage,
   buildPcSpecificationHtml,
+  specificationVisibleContent,
+  normalizeSpecificationLayout,
   readDetailFromPcView,
   revisionPreviewStatus,
   isSpecificationLanguageOnly,
@@ -609,6 +611,36 @@ test("Europe-drive Specification skips OK status and keeps the reference table s
   assert.match(html, /<tr class="firstRow"><th class="title" colspan="2" rowspan="1">Specificații<\/th><\/tr>/);
   assert.match(html, /<tr class="lines"><th[^>]*>Model<\/th><td[^>]*>CS-HP8<\/td><\/tr>/);
   assert.match(html, /<tr><th class="title"[^>]*>Parametrii camerei<\/th><\/tr>/);
+});
+
+test("Specification content check ignores wrapper styling but detects changed translations", () => {
+  const oldHtml = '<div class="pc-content"><div class="p960"><div class="pro-title">Specifiche</div>'
+    + '<table class="pro_infobox"><tr class="line"><th>Modello</th><td>CS-HP8</td></tr>'
+    + '<tr class="line"><th>Camera</th></tr></table></div></div>';
+  const newHtml = '<div class="p960"><div class="pro-title">Specifiche</div>'
+    + '<table class="pro_infobox"><tr class="firstRow"><th>Modello</th><td>CS-HP8</td></tr>'
+    + '<tr><th>Camera</th></tr></table></div>';
+  assert.equal(specificationVisibleContent(oldHtml), specificationVisibleContent(newHtml));
+  assert.notEqual(specificationVisibleContent(oldHtml),
+    specificationVisibleContent(newHtml.replace("CS-HP8", "CS-HP8 Pro")));
+});
+
+test("Specification layout repair preserves current translation and image", () => {
+  const oldHtml = '<div class="pc-content"><div class="p960">'
+    + '<img class="pro-img__src" src="https://cdn.example/hp8.jpg" alt="HP8">'
+    + '<div class="pro-title">Traduction vérifiée</div><table class="pro_infobox">'
+    + '<tr class="line"><th class="title" colspan="2">Traduction vérifiée</th></tr>'
+    + '<tr class="lines"><th>Modèle</th><td>Texte corrigé</td></tr>'
+    + '<tr class="line"><th class="title" colspan="2">Caméra</th></tr>'
+    + '</table></div></div><style> td{word-break: normal !important}</style>';
+  const result = normalizeSpecificationLayout(oldHtml);
+  assert.match(result.value, /^<div class="p960">/);
+  assert.match(result.value, /<tr class="firstRow">/);
+  assert.match(result.value, /<tr><th class="title" colspan="2">Caméra<\/th><\/tr>/);
+  assert.doesNotMatch(result.value, /pc-content|<style>|<tr class="line">/);
+  assert.match(result.value, /Texte corrigé/);
+  assert.equal(specificationVisibleContent(result.value), specificationVisibleContent(oldHtml));
+  assert.throws(() => normalizeSpecificationLayout("<div>unsupported</div>"), /p960/);
 });
 
 test("maps the Specification title to the selected target site", () => {

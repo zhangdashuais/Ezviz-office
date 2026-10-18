@@ -5,9 +5,34 @@ const {
   shopAccountLooksCompatible,
   shopAccountLooksLikeConcreteLogin,
   isShopBackendUrl,
+  recoverShopBackendPage,
   createShopAccountIdentityVerifier,
   createBrowserAuth
 } = require("./browser-auth");
+
+test("shop login recovers from a legacy dashboard redirect to the public /cn page", async () => {
+  const visited = [];
+  const page = {
+    currentUrl: "https://www.ezviz.com/cn/",
+    url() { return this.currentUrl; },
+    async goto(url) { visited.push(url); this.currentUrl = "https://new-eu-shop.ezvizlife.com/templates/list"; },
+    async waitForTimeout() {}
+  };
+  await recoverShopBackendPage(page, "www.ezviz.com/de", [], () => {});
+  assert.deepEqual(visited, ["https://new-shop.ezvizlife.com/templates/list"]);
+  assert.equal(isShopBackendUrl(page.url()), true);
+});
+
+test("shop login keeps the Latin America regional fallback", async () => {
+  const visited = [];
+  const page = {
+    url() { return "https://www.ezviz.com/cn/"; },
+    async goto(url) { visited.push(url); },
+    async waitForTimeout() {}
+  };
+  await recoverShopBackendPage(page, "www.ezviz.com/la", [], () => {});
+  assert.deepEqual(visited, ["https://new-sa-shop.ezvizlife.com/templates/list"]);
+});
 
 test("shop backend URL accepts legacy, global, and regional production hosts only", () => {
   assert.equal(isShopBackendUrl("https://shop.ezvizlife.com/templates/index"), true);

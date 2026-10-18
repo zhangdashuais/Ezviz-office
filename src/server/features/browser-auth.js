@@ -66,6 +66,17 @@ function shopAccountLooksLikeConcreteLogin(accountText) {
 
 const LEGACY_SHOP_ROOT_URL = "https://shop.ezvizlife.com/";
 
+async function recoverShopBackendPage(page, credentialDomain, logs, logLine) {
+  if (isShopBackendUrl(page.url())) return page;
+  const fallbackUrl = /\/la(?:\/|$)/i.test(credentialDomain || "")
+    ? "https://new-sa-shop.ezvizlife.com/templates/list"
+    : "https://new-shop.ezvizlife.com/templates/list";
+  logLine(logs, "旧版商城入口跳转到了 " + page.url() + "，尝试新版后台：" + fallbackUrl);
+  await page.goto(fallbackUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(5000);
+  return page;
+}
+
 function createShopAccountIdentityVerifier() {
   const aliasesByAccount = new Map();
 
@@ -435,12 +446,7 @@ function createBrowserAuth(deps) {
     await backendPage.goto(SHOP_DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await backendPage.waitForTimeout(5000);
 
-    if (!isShopBackendUrl(backendPage.url()) && /\/la(?:\/|$)/i.test(payload.credentialDomain || "")) {
-      const regionalDashboardUrl = "https://new-sa-shop.ezvizlife.com/templates/list";
-      logLine(logs, "旧版商城入口不可用，改用拉美新版后台：" + regionalDashboardUrl);
-      await backendPage.goto(regionalDashboardUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-      await backendPage.waitForTimeout(5000);
-    }
+    await recoverShopBackendPage(backendPage, payload.credentialDomain, logs, logLine);
 
     const backendHasPassword = await backendPage.locator('input[type="password"]').first().isVisible().catch(() => false);
     if (/usauth\.ezvizlife\.com|signin|login/i.test(backendPage.url()) || backendHasPassword) {
@@ -486,6 +492,7 @@ module.exports = {
   shopAccountLooksCompatible,
   shopAccountLooksLikeConcreteLogin,
   isShopBackendUrl,
+  recoverShopBackendPage,
   createShopAccountIdentityVerifier,
   createBrowserAuth
 };

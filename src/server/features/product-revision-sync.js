@@ -406,6 +406,46 @@ function buildPcSpecificationHtml(language, image, titleOverride) {
   ].join("\n");
 }
 
+function specificationVisibleContent(html) {
+  const $ = cheerio.load(String(html || ""));
+  const clean = (value) => String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  return JSON.stringify({
+    title: clean($(".pro-title").first().text()),
+    rows: $("table.pro_infobox tr").map((_, row) =>
+      [$(row).find("th, td").map((__, cell) => clean($(cell).text())).get()]
+    ).get()
+  });
+}
+
+function normalizeSpecificationLayout(source) {
+  const original = String(source || "");
+  const $ = cheerio.load(original);
+  const container = $(".p960").first();
+  const table = container.find("table.pro_infobox").first();
+  if (!container.length || !table.length) {
+    throw new Error("Specification 不是可识别的 p960 表格结构，未修改。 ");
+  }
+  const originalContent = specificationVisibleContent(original);
+  const originalImage = extractSpecificationImage(original);
+  const rows = table.find("tr");
+  let changedRows = 0;
+  rows.each((index, row) => {
+    const element = $(row);
+    if (element.children().length !== 1 || element.children("th.title").length !== 1) return;
+    const desiredClass = index === 0 ? "firstRow" : "";
+    if ((element.attr("class") || "") === desiredClass) return;
+    if (desiredClass) element.attr("class", desiredClass);
+    else element.removeAttr("class");
+    changedRows += 1;
+  });
+  const html = $.html(container);
+  if (specificationVisibleContent(html) !== originalContent
+    || JSON.stringify(extractSpecificationImage(html)) !== JSON.stringify(originalImage)) {
+    throw new Error("Specification 样式修复会改变文字或图片，已停止。 ");
+  }
+  return { value: html, changedRows };
+}
+
 function parseTargets(value) {
   let parsed = value;
   if (typeof parsed === "string") {
@@ -738,17 +778,20 @@ function validateDirectRevision(body) {
   }
   const fieldLabel = revisionType === "detail" ? "Detail" : "Specification";
   operations = operations.map((item, index) => {
-    const type = item?.type === "delete-frame-rate"
+    const type = item?.type === "normalize-spec-layout" ? "normalize-spec-layout"
+      : item?.type === "delete-frame-rate"
       ? "delete-frame-rate"
       : item?.type === "sanitize-wifi6" ? "sanitize-wifi6"
       : item?.type === "delete" ? "delete" : item?.type === "replace" ? "replace" : "";
     const targetText = String(item?.targetText ?? "");
     const replacementText = type === "replace" ? String(item?.replacementText ?? "") : "";
     if (!type) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 操作类型无效。`);
-    if ((type === "delete-frame-rate" || type === "sanitize-wifi6") && revisionType !== "specification") {
+    if ((type === "delete-frame-rate" || type === "sanitize-wifi6" || type === "normalize-spec-layout")
+      && revisionType !== "specification") {
       throw new Error("该操作只允许用于 Specification。");
     }
-    if (type !== "delete-frame-rate" && type !== "sanitize-wifi6" && !targetText) {
+    if (type !== "delete-frame-rate" && type !== "sanitize-wifi6"
+      && type !== "normalize-spec-layout" && !targetText) {
       throw new Error(`第 ${index + 1} 条 ${fieldLabel} 操作缺少目标内容。`);
     }
     if (type === "replace" && !replacementText) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 替换操作缺少替换内容。`);
@@ -772,6 +815,12 @@ function validateDirectRevision(body) {
 function applyContentOperations(source, operations, fieldLabel = "Specification") {
   let value = source;
   const results = operations.map((operation) => {
+    if (operation.type === "normalize-spec-layout") {
+      const normalized = normalizeSpecificationLayout(value);
+      const changed = normalized.value !== value;
+      value = normalized.value;
+      return { ...operation, matchCount: changed ? 1 : 0, changedRows: normalized.changedRows };
+    }
     if (operation.type === "delete-frame-rate") {
       const matchCount = value.match(MAX_FRAME_RATE_DELETE_PATTERN)?.length || 0;
       if (!matchCount) throw new Error(`${fieldLabel} 中未找到目标内容，已停止操作。`);
@@ -2050,6 +2099,10 @@ function createProductRevisionSyncFeature(deps) {
           localeHeader: desired.language.header,
           detailChanged,
           specificationChanged,
+          specificationTextMatches: current
+            ? specificationVisibleContent(current.detail.specifications)
+              === specificationVisibleContent(desired.specifications)
+            : null,
           specificationFieldNameChanged,
           currentSpecificationFieldName,
           desiredSpecificationFieldName,
@@ -2760,6 +2813,8 @@ module.exports = {
   parseSpecificationWorkbook,
   resolveWorkbookLanguage,
   buildPcSpecificationHtml,
+  specificationVisibleContent,
+  normalizeSpecificationLayout,
   parseTargets,
   validateRevisionRequest,
   readDetailFromPcView,
