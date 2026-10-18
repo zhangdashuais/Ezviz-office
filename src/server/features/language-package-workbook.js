@@ -249,6 +249,33 @@ function readLanguagePackage(input, langCode) {
   };
 }
 
+function languagePackageImportDatasheet(packageInfo) {
+  const translationHeader = "Imported translation";
+  const sections = packageInfo.sections.filter((section) =>
+    section.sheetName.toLowerCase() !== "sheet1");
+  if (!sections.length) {
+    throw new Error("导入语言包没有可用的 Sheet2 数据；非修订操作不能修改 Sheet1。");
+  }
+  const rows = [];
+  sections.forEach((section) => {
+    const sheet = packageInfo.workbook.Sheets[section.sheetName];
+    for (let row = section.firstDataRow; row <= section.lastDataRow; row += 1) {
+      const key = normalize(cellValue(sheet, row, section.keyColumn));
+      const source = normalize(cellValue(sheet, row, section.sourceColumn));
+      const translation = String(cellValue(sheet, row, section.targetColumn) ?? "");
+      if (!key && !source && !normalize(translation)) continue;
+      rows.push({ key, source, rowNumber: row + 1,
+        translations: { [translationHeader]: translation } });
+    }
+  });
+  return {
+    sheetName: sections.map((section) => section.sheetName).join(", "),
+    fingerprint: packageInfo.fingerprint,
+    headers: [translationHeader],
+    rows
+  };
+}
+
 function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader, options = {}) {
   if (!parsedDatasheet.headers.includes(translationHeader)) {
     throw new Error(`语言包 Datasheet 译文列不存在：${translationHeader}`);
@@ -444,6 +471,11 @@ function selectAppendSection(packageInfo, plan) {
   if (!packageInfo.sections.length) {
     throw new Error("语言包中没有可追加新字段的工作表。");
   }
+  if (plan.appendSheetName) {
+    const selected = packageInfo.sections.find((section) => section.sheetName === plan.appendSheetName);
+    if (!selected) throw new Error(`语言包中不存在追加目标工作表：${plan.appendSheetName}`);
+    return selected;
+  }
   const counts = new Map();
   plan.updates.forEach((update) => {
     counts.set(update.sheetName, (counts.get(update.sheetName) || 0) + 1);
@@ -464,12 +496,29 @@ function assertPlanPreservesSheet(packageInfo, plan, sheetName) {
   }
 }
 
+function planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader) {
+  const plan = planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader,
+    { fillBlankOnly: true });
+  assertSafePlan(plan);
+  if (plan.newFields.length && selectAppendSection(packageInfo, plan).sheetName === "Sheet1") {
+    const sheet2 = packageInfo.sections.find((section) => section.sheetName === "Sheet2");
+    if (!sheet2) throw new Error("当前语言包缺少 Sheet2，新字段不能在不修改 Sheet1 的情况下追加。");
+    plan.appendSheetName = sheet2.sheetName;
+  }
+  assertPlanPreservesSheet(packageInfo, plan, "Sheet1");
+  return plan;
+}
+
 function sheetCellSnapshot(sheet) {
   return JSON.stringify({
     ref: sheet["!ref"] || "",
     cells: Object.keys(sheet).filter((address) => !address.startsWith("!"))
       .sort().map((address) => [address, sheet[address]?.t, sheet[address]?.v, sheet[address]?.f])
   });
+}
+
+function languagePackageSheetSnapshot(packageInfo, sheetName) {
+  return sheetCellSnapshot(packageInfo.workbook.Sheets[sheetName] || {});
 }
 
 function writeUpdatedLanguagePackage(packageInfo, plan, outputPath, options = {}) {
@@ -667,8 +716,11 @@ module.exports = {
   workbookContentFingerprint,
   workbookContentFingerprintForGlobalRebase,
   readLanguagePackage,
+  languagePackageImportDatasheet,
   planLanguagePackageUpdates,
+  planPublishingLanguagePackageUpdates,
   languagePackageKeySnapshot,
+  languagePackageSheetSnapshot,
   assertSafePlan,
   assertPlanPreservesSheet,
   writeUpdatedLanguagePackage,

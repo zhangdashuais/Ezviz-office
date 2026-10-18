@@ -706,6 +706,7 @@
 
         <div class="card">
           <h3>上传数据</h3>
+          <p class="desc">先下载站点当前总语言包，仅补齐空译文；新 Key 有英文原文和译文时才追加。已有译文及 Sheet1 保持不变，上传后回读验证。</p>
           <div class="form-grid">
             <label>语言代码</label>
             <input id="languageCodeInput" type="text" placeholder="例如 en-US；留空时从文件名自动识别">
@@ -719,7 +720,7 @@
 
         <div class="card">
           <h3>按单产品 Datasheet 更新站点语言包</h3>
-          <p class="desc">上传结构类似 Datasheet 的单产品语言表，按字段 Key 将所选语种写入对应站点当前语言包。先预览，确认后才会上传并回读验证。</p>
+          <p class="desc">上传结构类似 Datasheet 的单产品语言表，先下载站点当前包，再按 Key 补齐空译文；已有译文和 Sheet1 不改，新 Key 有英文原文及译文时追加。先预览，确认后上传并回读验证。</p>
           <div class="form-grid">
             <label for="languageDatasheetInput">单产品 Datasheet</label>
             <input id="languageDatasheetInput" type="file" accept=".xls,.xlsx">
@@ -733,7 +734,7 @@
             <button id="languageDatasheetSubmitBtn" type="button" disabled>确认并上传</button>
           </div>
           <div id="languageDatasheetStatus" class="status">请先选择站点并上传单产品 Datasheet。</div>
-          <textarea id="languageDatasheetOutput" placeholder="字段匹配、覆盖、新增、跳过和站点回读结果会显示在这里..."></textarea>
+          <textarea id="languageDatasheetOutput" placeholder="字段匹配、填补空译文、新增、跳过和站点回读结果会显示在这里..."></textarea>
         </div>
 
         <div id="languageStatus" class="status">请先加载站点。</div>

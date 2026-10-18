@@ -8,6 +8,7 @@ const {
   resolveDatasheetLanguage,
   readLanguagePackage,
   planLanguagePackageUpdates,
+  planPublishingLanguagePackageUpdates,
   languagePackageKeySnapshot,
   assertSafePlan,
   assertPlanPreservesSheet,
@@ -1750,12 +1751,9 @@ function createProductRevisionSyncFeature(deps) {
     const cacheKey = `${target.site.siteCode}\n${translationHeader}`;
     const cached = options.sharedLanguagePackages?.get(cacheKey);
     if (cached) {
-      const plan = planLanguagePackageUpdates(
-        cached.packageInfo,
-        parsedDatasheet,
-        translationHeader,
-        { fillBlankOnly: options.publishing === true }
-      );
+      const plan = options.publishing
+        ? planPublishingLanguagePackageUpdates(cached.packageInfo, parsedDatasheet, translationHeader)
+        : planLanguagePackageUpdates(cached.packageInfo, parsedDatasheet, translationHeader);
       if (options.publishing) assertPlanPreservesSheet(cached.packageInfo, plan, "Sheet1");
       logLine(logs, `${target.site.name} 复用本批次已下载的语言包，合并当前产品译文。`);
       return {
@@ -1774,12 +1772,9 @@ function createProductRevisionSyncFeature(deps) {
     );
     try {
       const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
-      const plan = planLanguagePackageUpdates(
-        packageInfo,
-        parsedDatasheet,
-        translationHeader,
-        { fillBlankOnly: options.publishing === true }
-      );
+      const plan = options.publishing
+        ? planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader)
+        : planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader);
       if (options.publishing) assertPlanPreservesSheet(packageInfo, plan, "Sheet1");
       options.sharedLanguagePackages?.set(cacheKey, {
         packageInfo,
@@ -2179,11 +2174,8 @@ function createProductRevisionSyncFeature(deps) {
         const verificationInputs = [];
         for (const entry of targetDatasheets) {
           try {
-            const plan = planLanguagePackageUpdates(
-              packageInfo,
-              entry.parsed,
-              entry.translationHeader,
-              { fillBlankOnly: true }
+            const plan = planPublishingLanguagePackageUpdates(
+              packageInfo, entry.parsed, entry.translationHeader
             );
             assertSafePlan(plan);
             assertPlanPreservesSheet(packageInfo, plan, "Sheet1");

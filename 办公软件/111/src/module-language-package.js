@@ -122,7 +122,11 @@
     if (result.langCode) lines.push("语言代码：" + result.langCode);
     if (result.fileName) lines.push("文件：" + result.fileName);
     if (result.uploadUrl) lines.push("上传接口：" + result.uploadUrl);
-    if (result.status) lines.push("接口状态：" + result.status);
+    if (result.status) lines.push("处理状态：" + result.status);
+    if (result.plan) lines.push("填补空译文 " + result.plan.changedCellCount
+      + "，新增 " + result.plan.appendedFieldCount
+      + "，保留已有译文 " + result.plan.preservedExistingCount);
+    (result.plan?.inputWarnings || []).forEach((warning) => lines.push("提示：" + warning.message));
     if (result.response) lines.push("接口返回：" + (typeof result.response === "string" ? result.response : JSON.stringify(result.response)));
     if (result.currentUrl) lines.push("后台页面：" + result.currentUrl);
     lines.push("");
@@ -133,8 +137,8 @@
 
   async function uploadLanguagePackage() {
     el.upload.disabled = true;
-    setStatus("正在上传语言包，请不要关闭自动打开的后台浏览器...");
-    writeOutput("语言包上传执行中。系统会复用或登录商城后台，然后直接提交 /language/upload。");
+    setStatus("正在合并并上传语言包，请不要关闭自动打开的后台浏览器...");
+    writeOutput("语言包处理中：先下载当前包，只补空译文及可安全新增的字段，上传后回读验证。");
     try {
       const response = await fetch(serviceBase + "/api/language-package/upload", {
         method: "POST",
@@ -315,7 +319,6 @@
     const formData = new FormData();
     formData.append("datasheet", file, file.name);
     formData.append("targets", JSON.stringify(targets));
-    formData.append("skipMissingFields", "true");
     formData.append("shopUsername", el.username.value.trim());
     formData.append("shopPassword", el.password.value);
     if (submit) {
@@ -347,14 +350,13 @@
       if (item.rollback) lines.push("  回滚：" + item.rollback);
       if (plan.translationHeader) lines.push("  译文列：" + plan.translationHeader);
       if (item.plan) {
-        lines.push("  覆盖 " + plan.changedCellCount + "，新增 " + plan.appendedFieldCount
+        lines.push("  填补空译文 " + plan.changedCellCount + "，新增 " + plan.appendedFieldCount
+          + "，已有译文保留 " + (plan.preservedExistingCount || 0)
           + "，不变 " + plan.unchangedCellCount + "，空译文跳过 " + plan.skippedBlankCount);
-        if (plan.skippedMissingFieldCount) {
-          lines.push("  站点缺失 Key 跳过 " + plan.skippedMissingFieldCount + "（不安全追加）。");
-        }
         if (plan.sourceMismatches?.length) {
           lines.push("  提醒：" + plan.sourceMismatches.length + " 个字段英文原文与站点语言包不同，Key 匹配结果已保留。");
         }
+        (plan.inputWarnings || []).forEach((warning) => lines.push("  提示：" + warning.message));
       }
       lines.push("");
     });

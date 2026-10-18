@@ -8,8 +8,13 @@ const {
 const {
   parseLanguageDatasheet,
   readLanguagePackage,
+  languagePackageImportDatasheet,
   planLanguagePackageUpdates,
+  planPublishingLanguagePackageUpdates,
+  languagePackageKeySnapshot,
+  languagePackageSheetSnapshot,
   workbookContentFingerprintForGlobalRebase,
+  writeUpdatedLanguagePackage,
   writeUpdatedLanguagePackageNative
 } = require("./language-package-workbook");
 const {
@@ -597,6 +602,7 @@ async function verifyDirectLanguageUpload(page, uiResult, fileInfo, logs) {
 }
 
 async function roundTripLanguagePackage(body, logs) {
+  throw new Error("语言包原样回传诊断已停用；请使用安全合并上传入口，避免覆盖已有译文。");
   const session = await prepareLanguagePage(body, logs);
   const rowInfo = await findLanguageRow(session.page, session.site.siteCode);
   logLine(logs, "选中语言行：" + rowInfo.rowText);
@@ -698,6 +704,7 @@ async function uploadLanguagePackageForPage(page, fileInfo, logs) {
 }
 
 async function probeLanguagePackageUpload(page, filePath, logs) {
+  throw new Error("语言包上传探测会原样提交文件，已停用；请使用安全合并上传入口。");
   if (!filePath || !fs.existsSync(filePath)) {
     throw new Error("语言包文件不存在：" + filePath);
   }
@@ -847,6 +854,8 @@ async function submitLanguagePackageToBackend(body, files, logs) {
   if (!langCode) {
     throw new Error("请填写语言代码，例如 en-US；也可以用 en-US.xlsx 这种文件名自动识别。");
   }
+  const imported = readLanguagePackage(file.path, langCode);
+  const importDatasheet = languagePackageImportDatasheet(imported);
 
   const context = await getShopContext();
   const page = await getOpenPage(context);
@@ -857,47 +866,65 @@ async function submitLanguagePackageToBackend(body, files, logs) {
     credentialGroup: "Website"
   }, logs);
 
-  logLine(logs, "进入 Language Management 建立语言后台登录态。");
-  await backendPage.goto("https://shop.ezvizlife.com/language/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await backendPage.waitForTimeout(2500);
-
-  const fileBuffer = fs.readFileSync(file.path);
-  logLine(logs, "直接提交语言包上传接口：/language/upload，lang_code=" + langCode);
-  const response = await backendPage.request.post("https://shop.ezvizlife.com/language/upload", {
-    multipart: {
-      lang_code: langCode,
-      file: {
-        name: path.basename(file.originalname || file.filename || file.path),
-        mimeType: /\.xlsx$/i.test(file.originalname || file.filename || "") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/vnd.ms-excel",
-        buffer: fileBuffer
-      }
-    },
-    timeout: 60000
-  });
-
-  const responseText = await response.text().catch(() => "");
-  let responseJson = null;
+  let downloaded = null;
+  let verification = null;
+  let uploaded = false;
   try {
-    responseJson = JSON.parse(responseText);
-  } catch {}
-  if (!response.ok()) {
-    throw new Error("语言包上传接口返回异常：" + response.status() + " " + responseText.slice(0, 300));
+    downloaded = await downloadCurrentLanguagePackageForPage(backendPage, site, logs);
+    if (downloaded.langCode.toLowerCase() !== langCode.toLowerCase()) {
+      throw new Error(`语言代码不匹配：选择 ${langCode}，后台当前包为 ${downloaded.langCode}。`);
+    }
+    const current = readLanguagePackage(downloaded.filePath, downloaded.langCode);
+    const plan = planPublishingLanguagePackageUpdates(current, importDatasheet, "Imported translation");
+    const summary = summarizeDatasheetPlan(plan);
+    if (!plan.changedCellCount && !plan.newFields.length) {
+      return { mode: "safe-merge", status: "no-change", site, langCode, plan: summary };
+    }
+    const runDir = path.resolve("outputs", "language-package-import", new Date().toISOString().replace(/[:.]/g, "-"));
+    const extension = path.extname(downloaded.fileName).toLowerCase() || ".xlsx";
+    const outputPath = path.join(runDir, `${site.siteCode}-merged${extension}`);
+    const generated = writeUpdatedLanguagePackage(current, plan, outputPath, { preserveSheets: ["Sheet1"] });
+    const expected = readLanguagePackage(generated.filePath, downloaded.langCode);
+    const originalSheet1 = languagePackageSheetSnapshot(current, "Sheet1");
+    const keys = [...new Set([...plan.updates, ...plan.newFields].map((item) => item.key))];
+    const expectedValues = languagePackageKeySnapshot(expected, keys);
+    const uploadedResult = await uploadLanguagePackageForPage(backendPage, {
+      ...generated, fileName: downloaded.fileName, langCode: downloaded.langCode
+    }, logs);
+    uploaded = true;
+    const readback = await waitForLanguagePackageReadback({
+      download: () => downloadCurrentLanguagePackageForPage(backendPage, site, logs),
+      inspect: (item) => {
+        const info = readLanguagePackage(item.filePath, item.langCode);
+        return { info, values: languagePackageKeySnapshot(info, keys),
+          sheet1: languagePackageSheetSnapshot(info, "Sheet1") };
+      },
+      isComplete: ({ values, sheet1 }) => JSON.stringify(values) === JSON.stringify(expectedValues)
+        && sheet1 === originalSheet1,
+      cleanup: (item) => fs.rmSync(item.filePath, { force: true }),
+      pause: () => backendPage.waitForTimeout(3000)
+    });
+    verification = readback.downloaded;
+    if (JSON.stringify(readback.inspection.values) !== JSON.stringify(expectedValues)
+      || readback.inspection.sheet1 !== originalSheet1) {
+      throw new Error("上传后回读与预期不符（字段或 Sheet1 发生变化）。");
+    }
+    return { mode: "safe-merge", status: "updated", site, langCode,
+      fileName: generated.fileName, plan: summary, upload: uploadedResult,
+      verifiedFingerprint: readback.inspection.info.contentFingerprint };
+  } catch (error) {
+    if (uploaded && downloaded?.filePath) {
+      try {
+        await uploadLanguagePackageForPage(backendPage, downloaded, logs);
+      } catch (rollbackError) {
+        error.message += `；回滚失败：${rollbackError.message}`;
+      }
+    }
+    throw error;
+  } finally {
+    if (downloaded?.filePath) fs.rmSync(downloaded.filePath, { force: true });
+    if (verification?.filePath) fs.rmSync(verification.filePath, { force: true });
   }
-
-  logLine(logs, "语言包上传接口返回状态：" + response.status());
-  await backendPage.goto("https://shop.ezvizlife.com/language/index", { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await backendPage.waitForTimeout(1500);
-
-  return {
-    mode: "direct-post",
-    site,
-    langCode,
-    fileName: file.originalname || file.filename,
-    uploadUrl: "https://shop.ezvizlife.com/language/upload",
-    status: response.status(),
-    response: responseJson || responseText.slice(0, 1000),
-    currentUrl: backendPage.url()
-  };
 }
 
 function requestedSites(config, body) {
@@ -964,11 +991,13 @@ function summarizeDatasheetPlan(plan) {
     matchedFieldCount: plan.matchedFieldCount,
     changedCellCount: plan.changedCellCount,
     unchangedCellCount: plan.unchangedCellCount,
+    preservedExistingCount: plan.preservedExistingCount,
     appendedFieldCount: plan.newFields.length,
     skippedMissingFieldCount: plan.skippedMissingFields?.length || 0,
     skippedBlankCount: plan.skippedBlankCount,
     missing: plan.missing,
     sourceMismatches: plan.sourceMismatches,
+    inputWarnings: plan.inputWarnings,
     sourceChangedCellCount: plan.sourceChangedCellCount,
     updates: plan.updates.slice(0, 100).map((item) => ({
       key: item.key,
@@ -1017,7 +1046,6 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
   const targets = globalFirst(parseDatasheetTargets(body, enabledSites, parsedDatasheet));
   const approvedSites = submit ? approvedDatasheetSiteCodes(body, targets) : null;
   const fingerprints = expectedFingerprints(body);
-  const skipMissingFields = /^(1|true|yes)$/i.test(String(body?.skipMissingFields || ""));
   const results = [];
   const runDir = path.resolve(
     "outputs",
@@ -1025,7 +1053,6 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
     new Date().toISOString().replace(/[:.]/g, "-")
   );
   if (submit) fs.mkdirSync(runDir, { recursive: true });
-  let globalPropagationRows = null;
 
   for (const target of targets) {
     let downloaded = null;
@@ -1053,63 +1080,16 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         target.languagePackageHeader
       );
       let packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
-      let automaticallyRebased = false;
-      if (submit && target.site.siteCode !== "hq" && globalPropagationRows) {
-        const maximumAttempts = 5;
-        for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
-          if (hasGlobalSourcePropagation(
-            packageInfo,
-            globalPropagationRows,
-            target.languagePackageHeader
-          )) {
-            automaticallyRebased = true;
-            logLine(logs, `${target.site.name} 已检测到本批次 Global 英文原文同步，自动刷新预览基线。`);
-            break;
-          }
-          if (attempt === maximumAttempts) {
-            throw new Error("等待本批次 Global 英文原文同步超时，未上传本站点；请稍后重试。");
-          }
-          fs.rmSync(downloaded.filePath, { force: true });
-          downloaded = null;
-          await session.page.waitForTimeout(2000);
-          downloaded = await downloadCurrentLanguagePackageForPage(
-            session.page,
-            target.site,
-            logs,
-            target.languagePackageHeader
-          );
-          packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
-        }
-      }
       originalFingerprint = packageInfo.contentFingerprint;
-      let targetDatasheet = parsedDatasheet;
-      let plan = planLanguagePackageUpdates(
+      const originalSheet1 = languagePackageSheetSnapshot(packageInfo, "Sheet1");
+      const targetDatasheet = parsedDatasheet;
+      const plan = planPublishingLanguagePackageUpdates(
         packageInfo,
         targetDatasheet,
         target.languagePackageHeader
       );
-      if (skipMissingFields && plan.missing.length) {
-        const missingKeys = new Set(plan.missing.map((item) => item.key));
-        const skippedMissingFields = plan.missing;
-        targetDatasheet = {
-          ...parsedDatasheet,
-          rows: parsedDatasheet.rows.filter((row) => !missingKeys.has(row.key))
-        };
-        plan = planLanguagePackageUpdates(
-          packageInfo,
-          targetDatasheet,
-          target.languagePackageHeader
-        );
-        plan.skippedMissingFields = skippedMissingFields;
-      }
       const changed = plan.changedCellCount + plan.newFields.length;
-      const plannedGlobalProbe = target.site.siteCode === "hq"
-        ? buildGlobalPropagationProbe(parsedDatasheet, plan)
-        : null;
-      if (!submit && plannedGlobalProbe) globalPropagationRows = plannedGlobalProbe;
-      const comparisonFingerprint = target.site.siteCode !== "hq" && globalPropagationRows
-        ? workbookContentFingerprintForGlobalRebase(packageInfo, globalPropagationRows)
-        : packageInfo.contentFingerprint;
+      const comparisonFingerprint = packageInfo.contentFingerprint;
       if (!submit || !changed) {
         results.push({
           status: changed ? "ready" : "no-change",
@@ -1126,16 +1106,9 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       const extension = path.extname(downloaded.fileName).toLowerCase() || ".xlsx";
       const originalPath = path.join(runDir, `${target.site.siteCode}-before${extension}`);
       const modifiedPath = path.join(runDir, `${target.site.siteCode}-after${extension}`);
-      const syncSource = target.site.siteCode === "hq"
-        && target.languagePackageHeader === ENGLISH_SOURCE_HEADER;
       fs.copyFileSync(downloaded.filePath, originalPath);
-      const generated = writeUpdatedLanguagePackageNative(
-        downloaded.filePath,
-        packageInfo,
-        targetDatasheet,
-        plan,
-        modifiedPath,
-        { syncSource }
+      const generated = writeUpdatedLanguagePackage(
+        packageInfo, plan, modifiedPath, { preserveSheets: ["Sheet1"] }
       );
       await uploadLanguagePackageForPage(session.page, {
         ...generated,
@@ -1154,16 +1127,16 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
           const info = readLanguagePackage(file.filePath, file.langCode);
           return {
             info,
-            plan: planLanguagePackageUpdates(
+            sheet1: languagePackageSheetSnapshot(info, "Sheet1"),
+            plan: planPublishingLanguagePackageUpdates(
               info,
               targetDatasheet,
               target.languagePackageHeader
             )
           };
         },
-        isComplete: ({ plan: currentPlan }) => !currentPlan.changedCellCount
-          && !currentPlan.missing.length
-          && !(syncSource && currentPlan.sourceChangedCellCount),
+        isComplete: ({ plan: currentPlan, sheet1 }) => !currentPlan.changedCellCount
+          && !currentPlan.missing.length && sheet1 === originalSheet1,
         cleanup: (file) => fs.rmSync(file.filePath, { force: true }),
         pause: () => session.page.waitForTimeout(3000),
         onRetry: (attempt) => logLine(
@@ -1175,8 +1148,8 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       const verifiedInfo = readback.inspection.info;
       const verifiedPlan = readback.inspection.plan;
       if (verifiedPlan.changedCellCount || verifiedPlan.missing.length
-        || (syncSource && verifiedPlan.sourceChangedCellCount)) {
-        throw new Error("上传后回读仍有未更新字段。");
+        || readback.inspection.sheet1 !== originalSheet1) {
+        throw new Error("上传后回读与预期不符（字段或 Sheet1 发生变化）。");
       }
       results.push({
         status: "updated",
@@ -1184,12 +1157,8 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         fingerprint: packageInfo.contentFingerprint,
         verifiedFingerprint: verifiedInfo.contentFingerprint,
         plan: summarizeDatasheetPlan(plan),
-        sourceSynced: syncSource,
-        automaticallyRebased
+        sourceSynced: false
       });
-      if (target.site.siteCode === "hq") {
-        globalPropagationRows = plannedGlobalProbe;
-      }
     } catch (error) {
       let rollback = null;
       if (submit && uploaded && downloaded?.filePath) {

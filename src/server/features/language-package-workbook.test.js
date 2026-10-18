@@ -9,7 +9,9 @@ const {
   yellowPublishingDependency,
   resolveDatasheetLanguage,
   readLanguagePackage,
+  languagePackageImportDatasheet,
   planLanguagePackageUpdates,
+  planPublishingLanguagePackageUpdates,
   languagePackageKeySnapshot,
   assertSafePlan,
   assertPlanPreservesSheet,
@@ -342,6 +344,50 @@ test("product publishing preserves Sheet1 and updates only Sheet2", () => {
   } finally {
     fs.rmSync(outputDirectory, { recursive: true, force: true });
   }
+});
+
+test("full-package import follows publishing rules and appends only to Sheet2", () => {
+  const heading = ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"];
+  const makePackage = (sheet2Rows, sheet1Translation) => {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+      heading, ["common", "C1", "system_copy", "System source", sheet1Translation]
+    ]), "Sheet1");
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([heading, ...sheet2Rows]), "Sheet2");
+    return readLanguagePackage(XLSX.write(book, { type: "buffer", bookType: "biff8" }), "es-ES");
+  };
+  const current = makePackage([
+    ["goods", "G1", "existing", "Existing source", "Correcto"],
+    ["goods", "G2", "empty", "Empty source", ""]
+  ], "Original");
+  const incoming = makePackage([
+    ["goods", "G1", "existing", "Existing source", "Incorrecto"],
+    ["goods", "G2", "empty", "Empty source", "Lleno"],
+    ["goods", "G3", "new_key", "New source", "Nuevo"],
+    ["goods", "G4", "missing_source", "", "No append"]
+  ], "Changed");
+  const datasheet = languagePackageImportDatasheet(incoming);
+  const plan = planPublishingLanguagePackageUpdates(current, datasheet, "Imported translation");
+  assert.equal(plan.changedCellCount, 1);
+  assert.deepEqual(plan.newFields.map((field) => field.key), ["new_key"]);
+  assert.equal(plan.preservedExistingCount, 1);
+  assert.ok(plan.inputWarnings.some((warning) => warning.type === "missing-source"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ezviz-import-safe-"));
+  try {
+    const output = path.join(dir, "merged.xlsx");
+    writeUpdatedLanguagePackage(current, plan, output, { preserveSheets: ["Sheet1"] });
+    const result = readLanguagePackage(output, "es-ES");
+    assert.equal(result.workbook.Sheets.Sheet1.E2.v, "Original");
+    assert.equal(result.workbook.Sheets.Sheet2.E2.v, "Correcto");
+    assert.equal(result.workbook.Sheets.Sheet2.E3.v, "Lleno");
+    assert.equal(result.workbook.Sheets.Sheet2.C4.v, "new_key");
+    assert.equal(result.workbook.Sheets.Sheet2.C5, undefined);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  const newOnly = { ...datasheet, rows: datasheet.rows.filter((row) => row.key === "new_key") };
+  assert.equal(planPublishingLanguagePackageUpdates(current, newOnly, "Imported translation")
+    .appendSheetName, "Sheet2");
 });
 
 test("publishing a later product preserves translations filled by an earlier batch", () => {
