@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   hasCombinedPublishingSheets,
   productNameFromCombinedWorkbook,
+  isOfficeTemporaryWorkbook,
   publishingWorkbookInfo,
   publishingProductMatchKey
 } = require("../../../办公软件/111/src/product-publishing-input-rules");
@@ -32,6 +33,10 @@ test("parses batch workbook type and product name from the filename", () => {
     kind: "datasheet", productName: "Spectra"
   });
   assert.deepEqual(publishingWorkbookInfo("readme.txt"), { kind: "", productName: "" });
+  assert.equal(isOfficeTemporaryWorkbook("Products/Alarm Light Camera/~$Alarm Light Camera Datasheet.xlsx"), true);
+  assert.deepEqual(publishingWorkbookInfo("Products/~$Alarm Light Camera Datasheet.xlsx"), {
+    kind: "", productName: ""
+  });
   assert.equal(
     publishingProductMatchKey("CB90 Dual 3K Kit"),
     publishingProductMatchKey("CB90 Dual Kit 3K")

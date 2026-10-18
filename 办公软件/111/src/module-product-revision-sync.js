@@ -451,6 +451,7 @@
     const groups = new Map();
     const files = [...folderInput.files];
     for (const file of files) {
+      if (window.productPublishingInputRules.isOfficeTemporaryWorkbook(file.name)) continue;
       if (!/\.xlsx?$/i.test(file.name)) continue;
       if (await isCombinedPublishingWorkbook(file)) {
         const productName = window.productPublishingInputRules

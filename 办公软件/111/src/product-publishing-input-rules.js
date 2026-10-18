@@ -16,9 +16,16 @@
       .replace(/[\s_-]+$/g, "").trim();
   }
 
+  function isOfficeTemporaryWorkbook(fileName) {
+    const name = String(fileName || "").split(/[\\/]/).pop() || "";
+    return name.startsWith("~$");
+  }
+
   function publishingWorkbookInfo(fileName) {
     const name = String(fileName || "").split(/[\\/]/).pop() || "";
-    if (!/\.xlsx?$/i.test(name)) return { kind: "", productName: "" };
+    if (isOfficeTemporaryWorkbook(name) || !/\.xlsx?$/i.test(name)) {
+      return { kind: "", productName: "" };
+    }
     const base = name.replace(/\.[^.]+$/, "");
     const marker = /datasheet/i.exec(base) || /spec(?:ification)?s?/i.exec(base);
     if (!marker) return { kind: "", productName: "" };
@@ -41,6 +48,7 @@
   return {
     hasCombinedPublishingSheets,
     productNameFromCombinedWorkbook,
+    isOfficeTemporaryWorkbook,
     publishingWorkbookInfo,
     publishingProductMatchKey
   };

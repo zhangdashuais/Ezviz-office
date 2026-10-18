@@ -30,6 +30,7 @@ test("recognizes Datasheet and Specifications files in a selected folder", () =>
   assert.equal(fileKind("Products/CP8/CP8 Datasheet.xlsx"), "datasheet");
   assert.equal(fileKind("Products/CP8/CP8 Specifications.xlsx"), "specification");
   assert.equal(fileKind("Products/readme.txt"), "");
+  assert.equal(fileKind("Products/Alarm Light Camera/~$Alarm Light Camera Datasheet.xlsx"), "");
   assert.equal(productNameFromPath("Products/CP8/CP8 Datasheet.xlsx"), "CP8");
   assert.equal(productNameFromPath("Products/DL50/DL50FVS Plus(5085)_datasheet.xlsx"), "DL50FVS Plus(5085)");
   assert.equal(productNameFromPath("Products/DL50/DL50FVS Plus(5085)_spec.xlsx"), "DL50FVS Plus(5085)");
@@ -48,6 +49,22 @@ test("pairs workbooks by the normalized product name in each filename", () => {
   ]);
   assert.equal(products.length, 1);
   assert.equal(products[0].productName, "CB90 Dual 3K Kit");
+});
+
+test("ignores Office lock files in an uploaded product folder", () => {
+  const files = [
+    { originalname: "0000__Alarm Light Camera Datasheet.xlsx", path: "datasheet" },
+    { originalname: "0001__~$Alarm Light Camera Datasheet.xlsx", path: "lock" },
+    { originalname: "0002__Alarm Light Camera specification.xlsx", path: "specification" }
+  ];
+  const manifest = files.map((file) => ({
+    uploadName: file.originalname,
+    relativePath: `Alarm Light Camera/${file.originalname.slice(6)}`
+  }));
+  const products = groupProductFiles(files, manifest);
+  assert.equal(products.length, 1);
+  assert.equal(products[0].files.datasheet.path, "datasheet");
+  assert.equal(products[0].files.specification.path, "specification");
 });
 
 test("pairs regional suffixes and reordered product words", () => {
