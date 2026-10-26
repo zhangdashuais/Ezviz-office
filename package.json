@@ -18,6 +18,7 @@
     "cheerio": "^1.2.0",
     "express": "^5.2.1",
     "multer": "^2.2.0",
+    "parse5": "^7.3.0",
     "pdfjs-dist": "^6.2.108",
     "playwright": "^1.61.1",
     "tesseract.js": "^7.0.0",
