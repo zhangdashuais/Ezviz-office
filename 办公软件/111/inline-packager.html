@@ -16,6 +16,7 @@
         <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
         <div class="nav-item" data-target="tab-asset-upload">图片 / SVG 上传</div>
         <div class="nav-item" data-target="tab-ai-badge">图片 AI 标志</div>
+        <div class="nav-item" data-target="tab-html-ai-badge">HTML Section AI 标志</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
       </div>
     </div>
@@ -145,6 +146,30 @@
         <div class="card">
           <h3>预览</h3>
           <canvas id="aiBadgeCanvas" style="max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc;"></canvas>
+        </div>
+      </div>
+
+      <div id="tab-html-ai-badge" class="tab-content">
+        <div class="card">
+          <h3>HTML Section AI 标志</h3>
+          <p class="desc">对 HTML 中除最后一个 <code>&lt;section&gt;</code> 外的每个 Section 右下角添加 AI GENERATED 标识。末尾纯文字说明区会跳过。支持上传 HTML 文件或直接粘贴代码；再次处理已打标代码时不会重复添加。</p>
+          <div class="form-grid">
+            <label for="htmlAiBadgeFile">HTML 文件</label>
+            <input id="htmlAiBadgeFile" type="file" accept=".html,.htm,.txt,text/html,text/plain">
+            <label for="htmlAiBadgeText">标志文案</label>
+            <input id="htmlAiBadgeText" type="text" value="AI GENERATED" maxlength="80">
+          </div>
+          <label for="htmlAiBadgeSource" style="display: block; margin-top: 16px;">HTML 源代码</label>
+          <textarea id="htmlAiBadgeSource" spellcheck="false" placeholder="上传 HTML 文件后会自动填入；也可以直接粘贴 HTML 代码。" style="min-height: 180px;"></textarea>
+          <div class="row" style="margin-top: 16px; margin-bottom: 0;">
+            <button id="htmlAiBadgeRun" type="button">给 Section 打标</button>
+            <button id="htmlAiBadgeDownload" type="button" disabled>下载打标后 HTML</button>
+          </div>
+        </div>
+        <div id="htmlAiBadgeStatus" class="status">请选择文件或粘贴 HTML。</div>
+        <div class="card">
+          <h3>处理结果</h3>
+          <textarea id="htmlAiBadgeOutput" readonly spellcheck="false" placeholder="打标后的 HTML 将显示在这里。" style="min-height: 260px;"></textarea>
         </div>
       </div>
 
@@ -1104,6 +1129,7 @@
   <script src="src/module-inline.js"></script>
   <script src="src/module-asset-upload.js?v=20260924-1"></script>
   <script src="src/module-ai-badge.js?v=20260911-2"></script>
+  <script src="src/module-html-ai-badge.js?v=20261026-1"></script>
   <script src="src/module-pdf-upload.js?v=20260924-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
