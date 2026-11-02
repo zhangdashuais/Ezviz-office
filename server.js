@@ -862,7 +862,7 @@ registerSpecificationTranslationRoutes(app, {
   getCampaignSites
 });
 
-registerEcadminPlatformRoutes(app, { ecadminPlatformFeature, logLine });
+registerEcadminPlatformRoutes(app, { ecadminPlatformFeature, logLine, upload, fs });
 registerEzvizSiteAuditRoutes(app, { feature: ezvizSiteAuditFeature, scheduler: ezvizSiteAuditScheduler });
 registerGa4Routes(app, { feature: ga4Feature });
 

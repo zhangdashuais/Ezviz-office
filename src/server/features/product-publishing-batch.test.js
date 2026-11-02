@@ -195,11 +195,12 @@ test("batch submit uploads one merged language package before publishing product
     logLine() {},
     revisionFeature: {
       async submitPublishingLanguagePackageBatch(body, entries, fingerprints) {
-        calls.push(["language", body.productName, entries.map((entry) => entry.productName), fingerprints]);
+        calls.push(["language", body.productName, body.forceTranslationOverwrite,
+          entries.map((entry) => entry.productName), fingerprints]);
         return { results: [{ status: "completed", site: { siteCode: "fr" } }] };
       },
       async submitPublishingWithoutLanguagePackage(body) {
-        calls.push(["product", body.productName]);
+        calls.push(["product", body.productName, body.forceTranslationOverwrite]);
         return { failedCount: 0 };
       }
     }
@@ -217,6 +218,7 @@ test("batch submit uploads one merged language package before publishing product
     { uploadName: files[3].originalname, relativePath: "Products/HP8/HP8 Specifications.xlsx" }
   ]);
   const preview = (productName) => ({
+    forceTranslationOverwrite: true,
     workbook: { fingerprint: `${productName}-spec` },
     languageDatasheet: { fingerprint: `${productName}-data` },
     results: [{
@@ -228,13 +230,14 @@ test("batch submit uploads one merged language package before publishing product
   });
   await feature.submit({
     batchManifest,
+    forceTranslationOverwrite: "1",
     targetsJson: JSON.stringify([{ siteCode: "fr" }]),
     expectedBatchPreviews: JSON.stringify({ CP8: preview("CP8"), HP8: preview("HP8") })
   }, files, []);
   assert.deepEqual(calls, [
-    ["language", "CP8", ["CP8", "HP8"], { fr: "fr-package" }],
-    ["product", "CP8"],
-    ["product", "HP8"]
+    ["language", "CP8", "1", ["CP8", "HP8"], { fr: "fr-package" }],
+    ["product", "CP8", "1"],
+    ["product", "HP8", "1"]
   ]);
 });
 

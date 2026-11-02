@@ -108,3 +108,27 @@ test("local upload files are selected from the matching product folder", (t) => 
   assert.equal(files.highResImage.originalname, "高清图.png");
   assert.equal(files.allFiles.length, 3);
 });
+
+test("overseas video upload returns the verified MP4 address", async () => {
+  const calls = [];
+  const page = {
+    async waitForResponse(predicate) {
+      assert.equal(predicate({ request: () => ({ method: () => "POST" }), url: () => "https://fs.ezvizlife.com/upload.php" }), true);
+      return {
+        ok: () => true,
+        async json() { return { status: true, size: 2123737, full_url: "https://mfs.ezvizlife.com/mall/test.mp4" }; }
+      };
+    },
+    async waitForEvent() { return { async setFiles(filePath) { calls.push(filePath); } }; },
+    getByRole() { return { first() { return { async click() { calls.push("click"); } }; } }; },
+    async close() { calls.push("close"); }
+  };
+  const feature = createEcadminPlatformFeature({
+    async getContext() { return { async newPage() { return page; } }; },
+    async ensureLoggedIn(_page, url) { assert.match(url, /MallUploadVideoListOvs/); }
+  });
+  const result = await feature.uploadVideo({ originalname: "H.264 - HP5.mp4", path: "C:/test.mp4", size: 2123737 });
+  assert.equal(result.url, "https://mfs.ezvizlife.com/mall/test.mp4");
+  assert.deepEqual(calls, ["click", "C:/test.mp4", "close"]);
+  await assert.rejects(() => feature.uploadVideo({ originalname: "test.mov", path: "C:/test.mov", size: 1 }), /MP4/);
+});

@@ -19,6 +19,7 @@ const {
 } = require("./language-package-workbook");
 const {
   generateLocalI18nDatasheet,
+  generateTextTranslationWorkbook,
   readLocalI18nPathDefaults,
   saveLocalI18nPathDefaults
 } = require("./local-i18n-datasheet");
@@ -1330,6 +1331,7 @@ async function reviseHg24004(body, logs, submit = false) {
     previewHg24004: (body, logs) => reviseHg24004(body, logs, false),
     submitHg24004: (body, logs) => reviseHg24004(body, logs, true),
     generateLocalI18nDatasheet: (body) => generateLocalI18nDatasheet(body || {}),
+    generateTextTranslationWorkbook: (body) => generateTextTranslationWorkbook(body || {}),
     readLocalI18nPathDefaults,
     saveLocalI18nPathDefaults
   };

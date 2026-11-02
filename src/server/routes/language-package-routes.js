@@ -35,6 +35,20 @@ function registerLanguagePackageRoutes(app, deps) {
     }
   });
 
+  app.post("/api/language-package/text-translation-workbook", (req, res) => {
+    let result;
+    try {
+      result = languagePackageFeature.generateTextTranslationWorkbook(req.body || {});
+      res.download(result.outputFile, result.fileName, (error) => {
+        fs.rmSync(result.outputDir, { recursive: true, force: true });
+        if (error && !res.headersSent) res.status(500).json({ ok: false, error: error.message || String(error) });
+      });
+    } catch (error) {
+      if (result?.outputDir) fs.rmSync(result.outputDir, { recursive: true, force: true });
+      res.status(400).json({ ok: false, error: error.message || String(error) });
+    }
+  });
+
   app.post("/api/language-package/upload", upload.fields([
     { name: "languagePackage", maxCount: 1 }
   ]), async (req, res) => {

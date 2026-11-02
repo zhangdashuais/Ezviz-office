@@ -26,6 +26,10 @@ function normalize(value) {
   return String(value == null ? "" : value).replace(/\s+/g, " ").trim();
 }
 
+function forceTranslationOverwrite(body) {
+  return ["1", "true", "on"].includes(normalize(body?.forceTranslationOverwrite).toLowerCase());
+}
+
 function parseManifest(value) {
   let manifest = value;
   if (typeof manifest === "string") {
@@ -176,6 +180,7 @@ function createProductPublishingBatchFeature(deps) {
     }
     return {
       mode: "product-publishing-batch-preview",
+      forceTranslationOverwrite: forceTranslationOverwrite(body),
       productCount: products.length,
       readyCount: results.filter((item) => ["ready", "partial"].includes(item.status)).length,
       partialCount: results.filter((item) => item.status === "partial").length,
@@ -194,6 +199,11 @@ function createProductPublishingBatchFeature(deps) {
       expected = JSON.parse(String(body?.expectedBatchPreviews || "{}"));
     } catch {
       throw new Error("批量预览校验信息格式不正确，请重新预览。");
+    }
+    const overwriteExisting = forceTranslationOverwrite(body);
+    if (products.some((product) => forceTranslationOverwrite(expected[product.productName])
+      !== overwriteExisting)) {
+      throw new Error("强制覆盖译文选项与预览时不一致，请重新预览。");
     }
     const expectedLanguagePackageFingerprints = {};
     products.forEach((product) => {
@@ -285,6 +295,7 @@ function createProductPublishingBatchFeature(deps) {
     }
     return {
       mode: "product-publishing-batch-submit",
+      forceTranslationOverwrite: overwriteExisting,
       productCount: products.length,
       completedCount: results.filter((item) => item.status === "completed").length,
       partialCount: results.filter((item) => item.status === "partial").length,
@@ -302,6 +313,7 @@ function createProductPublishingBatchFeature(deps) {
 module.exports = {
   MAX_BATCH_PRODUCTS,
   isClosedBrowserError,
+  forceTranslationOverwrite,
   fileKind,
   productNameFromPath,
   uploadSequence,

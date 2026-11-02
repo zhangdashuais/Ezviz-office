@@ -4,6 +4,7 @@ const path = require("path");
 const XLSX = require("xlsx");
 const cheerio = require("cheerio");
 const { isStatusRow } = require("../../../办公软件/111/src/language-column-filter-rules");
+const { publishingSheetName } = require("../../../办公软件/111/src/product-publishing-input-rules");
 const {
   parseLanguageDatasheet,
   resolveDatasheetLanguage,
@@ -271,10 +272,10 @@ function getCellValue(sheet, row, column) {
 function parseSpecificationWorkbook(input) {
   const buffer = Buffer.isBuffer(input) ? input : fs.readFileSync(input);
   const workbook = XLSX.read(buffer, { type: "buffer", cellText: true });
-  const sheetName = workbook.SheetNames[0];
+  const sheetName = publishingSheetName(workbook.SheetNames, "specification");
   if (!sheetName) throw new Error("Specification Excel 中没有工作表。");
   const sheet = workbook.Sheets[sheetName];
-  if (!sheet?.["!ref"]) throw new Error("Specification Excel 的第一个工作表为空。");
+  if (!sheet?.["!ref"]) throw new Error(`Specification Excel 的 ${sheetName} 工作表为空。`);
   const range = XLSX.utils.decode_range(sheet["!ref"]);
   const mergeMap = new Map();
   const mergedCells = new Set();
@@ -606,6 +607,10 @@ function isSpecificationOnly(body) {
 
 function isLanguagePackageOnly(body) {
   return normalize(body?.updateScope).toLowerCase() === "language-only";
+}
+
+function isForceTranslationOverwrite(body) {
+  return ["1", "true", "on"].includes(normalize(body?.forceTranslationOverwrite).toLowerCase());
 }
 
 function usesPublishingLanguageRules(body, publishing = false) {
@@ -1776,7 +1781,9 @@ function createProductRevisionSyncFeature(deps) {
 
   const parseExpectedCopySourceFingerprints = parseExpectedLanguagePackageFingerprints;
 
-  async function checkPublishingLanguageDependencies(session, target, parsedDatasheet, logs, cache) {
+  async function checkPublishingLanguageDependencies(
+    session, target, parsedDatasheet, logs, cache, forceOverwriteExisting = false
+  ) {
     const checks = [];
     for (const dependency of parsedDatasheet?.dependencies || []) {
       const cacheKey = `${target.site.siteCode}\n${normalize(dependency.productName).toLowerCase()}`;
@@ -1790,7 +1797,9 @@ function createProductRevisionSyncFeature(deps) {
       }
       logLine(logs, `${target.site.name} 语言包依赖 ${dependency.productName}：`
         + `${exists ? "后台产品已存在" : "后台产品不存在"}；`
-        + `后续 ${dependency.keys.length} 个字段只填空译文或追加缺失字段，非空译文不覆盖。`);
+        + `后续 ${dependency.keys.length} 个字段${forceOverwriteExisting
+          ? "按 Datasheet 强制覆盖已有译文"
+          : "只填空译文或追加缺失字段，非空译文不覆盖"}。`);
       checks.push({ productName: dependency.productName, exists,
         markerRow: dependency.markerRow, fieldCount: dependency.keys.length });
     }
@@ -1800,7 +1809,8 @@ function createProductRevisionSyncFeature(deps) {
   async function prepareLanguagePackage(session, target, parsedDatasheet, logs, options = {}) {
     const dependencyChecks = options.publishing
       ? await checkPublishingLanguageDependencies(
-        session, target, parsedDatasheet, logs, options.sharedDependencyChecks
+          session, target, parsedDatasheet, logs, options.sharedDependencyChecks,
+          options.forceOverwriteExisting
       ) : [];
     const translationHeader = resolveDatasheetLanguage(
       parsedDatasheet,
@@ -1811,7 +1821,9 @@ function createProductRevisionSyncFeature(deps) {
     const cached = options.sharedLanguagePackages?.get(cacheKey);
     if (cached) {
       const plan = options.publishing
-        ? planPublishingLanguagePackageUpdates(cached.packageInfo, parsedDatasheet, translationHeader)
+        ? planPublishingLanguagePackageUpdates(cached.packageInfo, parsedDatasheet, translationHeader, {
+            forceOverwriteExisting: options.forceOverwriteExisting
+          })
         : planLanguagePackageUpdates(cached.packageInfo, parsedDatasheet, translationHeader);
       if (options.publishing) assertPlanPreservesSheet(cached.packageInfo, plan, "Sheet1");
       logLine(logs, `${target.site.name} 复用本批次已下载的语言包，合并当前产品译文。`);
@@ -1832,7 +1844,9 @@ function createProductRevisionSyncFeature(deps) {
     try {
       const packageInfo = readLanguagePackage(downloaded.filePath, downloaded.langCode);
       const plan = options.publishing
-        ? planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader)
+        ? planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader, {
+            forceOverwriteExisting: options.forceOverwriteExisting
+          })
         : planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader);
       if (options.publishing) assertPlanPreservesSheet(packageInfo, plan, "Sheet1");
       options.sharedLanguagePackages?.set(cacheKey, {
@@ -1907,6 +1921,7 @@ function createProductRevisionSyncFeature(deps) {
 
   async function preview(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
+    const forceOverwriteExisting = publishing && isForceTranslationOverwrite(body);
     const publishingLanguageRules = usesPublishingLanguageRules(body, publishing);
     const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
     const specificationOnly = !publishing && isSpecificationOnly(body);
@@ -2069,7 +2084,7 @@ function createProductRevisionSyncFeature(deps) {
             parsedDatasheet,
             logs,
             { publishing: publishingLanguageRules, sharedLanguagePackages: options.sharedLanguagePackages,
-              sharedDependencyChecks: options.sharedDependencyChecks }
+              sharedDependencyChecks: options.sharedDependencyChecks, forceOverwriteExisting }
           );
         }
         const languagePackageSummary = languagePackage
@@ -2137,6 +2152,7 @@ function createProductRevisionSyncFeature(deps) {
 
     return {
       mode: publishing ? "product-publishing-preview" : "product-revision-sync-preview",
+      forceTranslationOverwrite: forceOverwriteExisting,
       productName: request.productName,
       updateScope: normalize(body?.updateScope),
       source: publishing || targetOnly ? null : {
@@ -2170,6 +2186,7 @@ function createProductRevisionSyncFeature(deps) {
   }
 
   async function submitPublishingLanguagePackageBatch(body, datasheetFiles, expectedFingerprints, logs) {
+    const forceOverwriteExisting = isForceTranslationOverwrite(body);
     const sites = getCampaignSites(readCampaignConfig()).filter((site) => site.enabled !== false);
     const batchProductName = normalize(datasheetFiles?.[0]?.productName);
     const request = validateRevisionRequest(
@@ -2211,7 +2228,7 @@ function createProductRevisionSyncFeature(deps) {
         const session = await prepareSiteSession(target.site, body, logs);
         for (const entry of targetDatasheets) {
           await checkPublishingLanguageDependencies(
-            session, target, entry.parsed, logs, dependencyChecksCache
+            session, target, entry.parsed, logs, dependencyChecksCache, forceOverwriteExisting
           );
         }
         const targetHeaders = [...new Set(
@@ -2239,7 +2256,7 @@ function createProductRevisionSyncFeature(deps) {
         for (const entry of targetDatasheets) {
           try {
             const plan = planPublishingLanguagePackageUpdates(
-              packageInfo, entry.parsed, entry.translationHeader
+              packageInfo, entry.parsed, entry.translationHeader, { forceOverwriteExisting }
             );
             assertSafePlan(plan);
             assertPlanPreservesSheet(packageInfo, plan, "Sheet1");
@@ -2296,7 +2313,7 @@ function createProductRevisionSyncFeature(deps) {
         }
         logLine(logs, generated
           ? `${target.site.name} 批量语言包已一次上传并回读核验通过；预检警告 ${warnings.length} 个。`
-          : `${target.site.name} 语言包无空译文需要填写，已有译文保持不变；预检警告 ${warnings.length} 个。`);
+          : `${target.site.name} 语言包没有需要${forceOverwriteExisting ? "覆盖" : "填空"}的译文；预检警告 ${warnings.length} 个。`);
         results.push({ status: "completed", site: target.site, changedCellCount,
           preservedExistingCount, preservedExisting, warnings });
       } catch (error) {
@@ -2313,6 +2330,7 @@ function createProductRevisionSyncFeature(deps) {
       }
     }
     return {
+      forceTranslationOverwrite: forceOverwriteExisting,
       results,
       warnings: results.flatMap((item) => item.warnings || [])
     };
@@ -2320,6 +2338,7 @@ function createProductRevisionSyncFeature(deps) {
 
   async function submit(body, excelFile, languageDatasheetFile, logs, options = {}) {
     const publishing = options.publishing === true;
+    const forceOverwriteExisting = publishing && isForceTranslationOverwrite(body);
     const publishingLanguageRules = usesPublishingLanguageRules(body, publishing);
     const skipLanguagePackage = options.skipLanguagePackage === true;
     const specificationLanguageOnly = !publishing && isSpecificationLanguageOnly(body);
@@ -2386,7 +2405,7 @@ function createProductRevisionSyncFeature(deps) {
         const session = await prepareSiteSession(target.site, body, logs);
         if (publishing && !skipLanguagePackage) {
           languagePackage = await prepareLanguagePackage(
-            session, target, parsedDatasheet, logs, { publishing: true }
+            session, target, parsedDatasheet, logs, { publishing: true, forceOverwriteExisting }
           );
           const expectedPackageFingerprint = normalize(
             expectedLanguagePackageFingerprints[target.site.siteCode]
@@ -2822,6 +2841,7 @@ module.exports = {
   isSpecificationLanguageOnly,
   isSpecificationOnly,
   isLanguagePackageOnly,
+  isForceTranslationOverwrite,
   usesPublishingLanguageRules,
   effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,

@@ -1,4 +1,5 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const childProcess = require("child_process");
 const XLSX = require("xlsx");
@@ -9,6 +10,7 @@ const HTML_ROOT = "D:\\代码存放\\产品代码\\ezviz";
 const PRODUCT_ROOT = "D:\\产品";
 const DOWNLOADS_ROOT = "C:\\Users\\zhangtianle7\\Downloads";
 const DEFAULT_TEMPLATE_PATH = "D:\\产品\\HB90 Dual 3K Kit\\upload\\HB90 Dual 3K Kit datasheet.xlsx";
+const HEADER_STYLE_REFERENCE_PATH = "D:\\产品\\HB90f Triple Kit\\upload\\HB90f Triple Kit datasheet.xlsx";
 const PATH_CONFIG_FILE = path.resolve(__dirname, "../../../runtime/local-i18n-paths.json");
 const YELLOW = "FFFF00";
 const PATH_KEYS = ["htmlFile", "productFile", "globalFile", "templateFile", "outputDir", "outputFile"];
@@ -19,6 +21,14 @@ function text(value) {
 
 function token(value) {
   return text(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function workbookProductName(file, fallback) {
+  return text(path.basename(file || "", path.extname(file || "")).replace(/[\s_-]+datasheet(?:[\s._-].*)?$/i, "")) || fallback;
+}
+
+function isListPlaceholder(key) {
+  return /^(?:goods\.)?list$/i.test(text(key));
 }
 
 function copy(value) {
@@ -258,19 +268,60 @@ function recoverRowsFromHtmlBackup(htmlFile, html, productName, productData) {
 
 function extractHtmlKeys(html, entries) {
   const candidates = new Set();
+  const explicitTokens = new Map();
   const quoted = /["'`]([a-z][a-z0-9_]{2,})["'`]/gi;
   let match;
   while ((match = quoted.exec(html))) candidates.add(match[1].toLowerCase());
   const dotted = /\bgoods\.([a-z][a-z0-9_]{2,})\b/gi;
   while ((match = dotted.exec(html))) candidates.add(match[1].toLowerCase());
-  return [...candidates].map((key) => entries.get(key)).filter(Boolean);
+  const tokens = /\{\{t\(\s*(?:['"]|&#39;)goods\.([^'"\s)]+)(?:['"]|&#39;)\s*\)\}\}/gi;
+  while ((match = tokens.exec(html))) {
+    candidates.add(match[1].toLowerCase());
+    explicitTokens.set(match[1].toLowerCase(), match[1]);
+  }
+  return [...candidates].map((key) => entries.get(key) || (explicitTokens.has(key) ? { key: explicitTokens.get(key), source: "" } : null)).filter(Boolean);
 }
 
-function extractNewProductRows(html, productName, productKey, productData, globalEntries) {
-  const sourceEntries = [...productData.rows.values()].map((entry) => ({
+function rekeyUnmatchedHtmlTokens(html, htmlKeys, referenceRows, productData, productKey, globalEntries, generatedRows) {
+  const prefix = `${productKey.toUpperCase()}_`;
+  const reserved = new Set([...productData.rows.keys(), ...globalEntries.keys(), ...generatedRows.map((entry) => entry.key.toLowerCase())]);
+  const sourceKeys = new Map();
+  [...generatedRows, ...htmlKeys.filter((entry) => entry.key.toUpperCase().startsWith(prefix))].forEach((entry) => {
+    const source = i18nRules.normalize(entry.source);
+    if (source && !referenceRows.has(entry.key.toLowerCase())) sourceKeys.set(source, entry.key);
+  });
+  const keyMap = new Map();
+  const rows = [];
+  let index = 0;
+  htmlKeys.forEach((entry) => {
+    const oldKey = entry.key.toLowerCase();
+    if (isListPlaceholder(entry.key) || referenceRows.has(oldKey) || entry.key.toUpperCase().startsWith(prefix)) return;
+    const source = i18nRules.normalize(entry.source);
+    let key = source && sourceKeys.get(source);
+    if (!key) {
+      do { key = `${prefix}${++index}`; } while (reserved.has(key.toLowerCase()));
+      reserved.add(key.toLowerCase());
+      if (source) sourceKeys.set(source, key);
+      rows.push({ key, source: entry.source });
+    }
+    keyMap.set(oldKey, key);
+  });
+  const token = /(\{\{t\(\s*(?:['"]|&#39;)goods\.)([^'"\s)]+?)((?:['"]|&#39;)\s*\)\}\})/gi;
+  let replacementCount = 0;
+  const updatedHtml = html.replace(token, (full, start, key, end) => {
+    const replacement = keyMap.get(key.toLowerCase());
+    if (!replacement) return full;
+    replacementCount += 1;
+    return `${start}${replacement}${end}`;
+  });
+  return { rows, keyMap, updatedHtml, replacementCount };
+}
+
+function extractNewProductRows(html, productName, productKey, productData, globalEntries, referenceRows = productData.rows) {
+  const sourceEntries = [...referenceRows.values()].map((entry) => ({
     key: entry.key,
     source: entry.values[productData.headers[0]] || ""
-  })).concat([...globalEntries.values()]);
+  }));
   const sourceIndex = i18nRules.buildSourceKeyIndex(sourceEntries).bySource;
   const reused = new Map();
   const newSources = new Map();
@@ -345,14 +396,13 @@ function backupAndWriteHtml(htmlFile, html) {
   return backupFile;
 }
 
-function buildWorkbook({ productName, productKey, productData, globalEntries, htmlKeys, newProductRows, templateFile }) {
+function buildWorkbook({ productName, referenceProductName, productData, globalEntries, htmlKeys, newProductRows, templateFile, translationRows = productData.rows }) {
   const template = XLSX.readFile(templateFile, { cellStyles: true });
   const templateSheet = template.Sheets[template.SheetNames.find((name) => /datasheet/i.test(name)) || template.SheetNames[0]];
   const headers = productData.headers;
   const productRows = newProductRows;
   const seen = new Set(productRows.map((entry) => entry.key.toLowerCase()));
-  const foreignRows = htmlKeys.filter((entry) => !seen.has(entry.key.toLowerCase()));
-  const outputRows = [...productRows, ...foreignRows];
+  const foreignRows = htmlKeys.filter((entry) => !isListPlaceholder(entry.key) && !seen.has(entry.key.toLowerCase()));
   if (!productRows.length && !foreignRows.length) throw new Error("未在总语言包或 HTML 中识别到可生成的 i18n 字段。");
 
   const sheet = {};
@@ -362,10 +412,11 @@ function buildWorkbook({ productName, productKey, productData, globalEntries, ht
   });
   const addRow = (entry, rowIndex, yellow = false) => {
     const productRow = productData.rows.get(entry.key.toLowerCase());
+    const translatedRow = translationRows.get(entry.key.toLowerCase());
     const globalSource = globalEntries.get(entry.key.toLowerCase())?.source;
     const items = [entry.key, ...headers.map((header, index) => index === 0
       ? (globalSource || productRow?.values[header] || entry.source)
-      : (productRow?.values[header] || ""))];
+      : (translatedRow?.values[header] || ""))];
     items.forEach((item, column) => {
       const sourceCell = cell(templateSheet, 1, Math.min(column, 29));
       const style = copy(sourceCell?.s) || {};
@@ -376,7 +427,7 @@ function buildWorkbook({ productName, productKey, productData, globalEntries, ht
   let row = 1;
   productRows.forEach((entry) => addRow(entry, row++));
   if (foreignRows.length) {
-    const note = `If you have proofread ${productKey.toUpperCase()} then no need to review the following strings.`;
+    const note = `If you have proofread ${referenceProductName || productName} then no need to review the following strings.`;
     headers.forEach((_, column) => {
       const sourceCell = cell(templateSheet, 222, Math.min(column, 29)) || cell(templateSheet, 1, Math.min(column, 29));
       const style = copy(sourceCell?.s) || {};
@@ -417,6 +468,7 @@ function generateLocalI18nDatasheet(input = {}) {
   fs.mkdirSync(destination, { recursive: true });
   let outputFile = configuredOutputFile ? path.normalize(configuredOutputFile) : path.join(destination, `${cleanName} datasheet.xlsx`);
   const productData = initializeProductData(productFile, templateFile);
+  const referenceRows = new Map(productData.rows);
   mergeGeneratedOutputHistory(productData, destination, cleanName, outputFile);
   if (fs.existsSync(outputFile)) {
     const previousOutput = parseProductDatasheet(outputFile);
@@ -428,51 +480,65 @@ function generateLocalI18nDatasheet(input = {}) {
     key: entry.key,
     source: entry.values[productData.headers[0]] || ""
   }));
-  globalEntries.forEach((entry, key) => knownEntries.set(key, entry));
   const html = fs.readFileSync(htmlFile, "utf8");
   const htmlKeys = extractHtmlKeys(html, knownEntries);
-  const extracted = extractNewProductRows(html, cleanName, productKey, productData, globalEntries);
-  const productPrefix = `${productKey.toUpperCase()}_`;
+  const extracted = extractNewProductRows(html, cleanName, productKey, productData, globalEntries, referenceRows);
+  const convertedHtml = replaceHtmlText(html, extracted.replacements);
+  const rekeyed = rekeyUnmatchedHtmlTokens(convertedHtml, htmlKeys, referenceRows, productData, productKey, globalEntries, extracted.newRows);
   const currentProductRows = new Map(extracted.newRows.concat(
-    htmlKeys.concat(extracted.reusedRows).filter((entry) => entry.key.toUpperCase().startsWith(productPrefix))
+    htmlKeys.filter((entry) => !isListPlaceholder(entry.key) && !referenceRows.has(entry.key.toLowerCase()) && !rekeyed.keyMap.has(entry.key.toLowerCase())),
+    rekeyed.rows
   ).map((entry) => [entry.key.toLowerCase(), entry]));
+  const currentPrefix = `${productKey.toLowerCase()}_`;
+  const translationRows = new Map(referenceRows);
+  productData.rows.forEach((entry, key) => {
+    if (!translationRows.has(key) && key.startsWith(currentPrefix)) translationRows.set(key, entry);
+  });
   const reusedKeys = new Map(htmlKeys.concat(extracted.reusedRows)
-    .filter((entry) => !entry.key.toUpperCase().startsWith(productPrefix))
+    .filter((entry) => referenceRows.has(entry.key.toLowerCase()))
     .map((entry) => [entry.key.toLowerCase(), entry]));
   const { workbook, ...stats } = buildWorkbook({
     productName: cleanName,
-    productKey,
+    referenceProductName: workbookProductName(productFile, cleanName),
     productData,
-    globalEntries,
+    globalEntries: new Map(),
+    translationRows,
     htmlKeys: [...reusedKeys.values()],
     newProductRows: [...currentProductRows.values()].sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true })),
     templateFile
   });
+  const headerStyleSnapshot = path.join(os.tmpdir(), `local-i18n-header-style-${process.pid}-${Date.now()}.xlsx`);
+  fs.copyFileSync(fs.existsSync(HEADER_STYLE_REFERENCE_PATH) ? HEADER_STYLE_REFERENCE_PATH : templateFile, headerStyleSnapshot);
+  let styleResult;
   try {
-    XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
-  } catch (error) {
-    if (configuredOutputFile && ['EBUSY', 'EPERM'].includes(error.code)) {
-      throw new Error(`最终保存文件正在被占用，请关闭 Excel 后重试：${outputFile}`);
+    try {
+      XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
+    } catch (error) {
+      if (configuredOutputFile && ['EBUSY', 'EPERM'].includes(error.code)) {
+        throw new Error(`最终保存文件正在被占用，请关闭 Excel 后重试：${outputFile}`);
+      }
+      if (!['EBUSY', 'EPERM'].includes(error.code)) throw error;
+      outputFile = path.join(destination, `${cleanName} datasheet.updated.xlsx`);
+      XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
     }
-    if (!['EBUSY', 'EPERM'].includes(error.code)) throw error;
-    outputFile = path.join(destination, `${cleanName} datasheet.updated.xlsx`);
-    XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
+    styleResult = childProcess.spawnSync(
+      process.env.PYTHON || "python",
+      [path.join(__dirname, "local-i18n-datasheet-style.py"), templateFile, outputFile, headerStyleSnapshot],
+      { encoding: "utf8" }
+    );
+  } finally {
+    fs.rmSync(headerStyleSnapshot, { force: true });
   }
-  const styleResult = childProcess.spawnSync(
-    process.env.PYTHON || "python",
-    [path.join(__dirname, "local-i18n-datasheet-style.py"), templateFile, outputFile],
-    { encoding: "utf8" }
-  );
   if (styleResult.error || styleResult.status !== 0) {
     throw new Error(`Datasheet 样式处理失败：${styleResult.stderr || styleResult.error?.message || "Python 未返回成功状态"}`);
   }
-  const updatedHtml = replaceHtmlText(html, extracted.replacements);
+  const updatedHtml = rekeyed.updatedHtml;
   const backupFile = updatedHtml === html ? "" : backupAndWriteHtml(htmlFile, updatedHtml);
   return {
     outputFile,
     htmlFile,
     htmlBackupFile: backupFile,
-    htmlReplacementCount: extracted.replacements.length,
+    htmlReplacementCount: extracted.replacements.length + rekeyed.replacementCount,
     globalFile,
     productFile,
     templateFile,
@@ -481,12 +547,55 @@ function generateLocalI18nDatasheet(input = {}) {
   };
 }
 
+function generateTextTranslationWorkbook(input = {}) {
+  const cleanRows = (rows) => (Array.isArray(rows) ? rows : [])
+    .filter((item) => !isListPlaceholder(item?.key))
+    .slice(0, 50000);
+  const sheetDefinitions = [
+    ["新语言包字段", ["字段名", "英文原文"], cleanRows(input.generatedRows), (item) => [text(item.key), text(item.value)], [48, 90]],
+    ["产品包复用字段", ["字段名", "单产品语言包英文原文"], cleanRows(input.alignedRows), (item) => [text(item.key), text(item.value)], [48, 90]],
+    ["已有字段原文", ["字段名", "总语言包英文原文", "匹配状态"], cleanRows(input.existingRows), (item) => [text(item.key), text(item.value), item.matched ? "已匹配" : "总语言包未找到"], [48, 90, 20]]
+  ].filter(([, , rows]) => rows.length);
+  if (!sheetDefinitions.length) throw new Error("没有可导出的语言字段。");
+
+  const workbook = XLSX.utils.book_new();
+  sheetDefinitions.forEach(([name, headers, rows, mapRow, widths]) => {
+    const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows.map(mapRow)]);
+    sheet["!cols"] = widths.map((wch) => ({ wch }));
+    sheet["!autofilter"] = { ref: XLSX.utils.encode_range({ r: 0, c: 0 }, { r: rows.length, c: headers.length - 1 }) };
+    XLSX.utils.book_append_sheet(workbook, sheet, name);
+  });
+
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "text-translation-workbook-"));
+  const prefix = text(input.prefix || "language-package").replace(/^goods\./i, "").replace(/[\\/:*?"<>|]/g, "-") || "language-package";
+  const fileName = `${prefix}.语言字段结果.xlsx`;
+  const outputFile = path.join(folder, fileName);
+  try {
+    XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
+    const styleResult = childProcess.spawnSync(
+      process.env.PYTHON || "python",
+      [path.join(__dirname, "local-i18n-datasheet-style.py"), DEFAULT_TEMPLATE_PATH, outputFile, HEADER_STYLE_REFERENCE_PATH],
+      { encoding: "utf8" }
+    );
+    if (styleResult.error || styleResult.status !== 0) {
+      throw new Error(`文字翻译 Excel 样式处理失败：${styleResult.stderr || styleResult.error?.message || "Python 未返回成功状态"}`);
+    }
+    return { outputFile, fileName, outputDir: folder };
+  } catch (error) {
+    fs.rmSync(folder, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 module.exports = {
   generateLocalI18nDatasheet,
+  generateTextTranslationWorkbook,
   findProductWorkbook,
   initializeProductData,
   parseGlobalPackage,
   buildWorkbook,
+  workbookProductName,
+  isListPlaceholder,
   extractNewProductRows,
   replaceHtmlText,
   isProductNameOnlyText,

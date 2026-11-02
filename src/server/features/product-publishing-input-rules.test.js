@@ -2,6 +2,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   hasCombinedPublishingSheets,
+  publishingSheetName,
+  readyPublishingHeaders,
   productNameFromCombinedWorkbook,
   isOfficeTemporaryWorkbook,
   publishingWorkbookInfo,
@@ -16,6 +18,17 @@ test("detects and names a combined Europe-drive publishing workbook", () => {
   assert.equal(
     productNameFromCombinedWorkbook("CB90f Triple Kit 3K - Website.xlsx"),
     "CB90f Triple Kit 3K"
+  );
+  assert.equal(publishingSheetName(["Datasheet", "Specifications"], "specification"), "Specifications");
+  assert.equal(publishingSheetName(["Specifications", "Datasheet"], "datasheet"), "Datasheet");
+  assert.equal(publishingSheetName(["Sheet1"], "datasheet"), "Sheet1");
+  assert.deepEqual(
+    readyPublishingHeaders(["English", "German", "French"], ["OK", "Pending", "ok"]),
+    ["English", "French"]
+  );
+  assert.deepEqual(
+    readyPublishingHeaders(["English", "German"], ["Specifications", "Spezifikationen"]),
+    ["English", "German"]
   );
 });
 

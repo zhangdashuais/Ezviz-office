@@ -9,6 +9,20 @@
       && names.some((name) => /^(spec|specification)s?$/.test(name));
   }
 
+  function publishingSheetName(sheetNames, kind) {
+    const pattern = kind === "datasheet" ? /^datasheet$/i : /^(spec|specification)s?$/i;
+    return (sheetNames || []).find((name) => pattern.test(String(name || "").trim()))
+      || (sheetNames || [])[0];
+  }
+
+  function readyPublishingHeaders(headers, statuses) {
+    const values = Array.from(headers || []);
+    const state = Array.from(statuses || [], (value) => String(value || "").trim());
+    return state.some((value) => /^ok$/i.test(value))
+      ? values.filter((_header, index) => /^ok$/i.test(state[index] || ""))
+      : values;
+  }
+
   function productNameFromCombinedWorkbook(fileName) {
     return String(fileName || "").replace(/\.[^.]+$/, "")
       .replace(/(?:网站翻译表|website\s*translation(?:\s*table)?|translation\s*table)/ig, " ")
@@ -47,6 +61,8 @@
 
   return {
     hasCombinedPublishingSheets,
+    publishingSheetName,
+    readyPublishingHeaders,
     productNameFromCombinedWorkbook,
     isOfficeTemporaryWorkbook,
     publishingWorkbookInfo,

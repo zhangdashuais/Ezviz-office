@@ -13,6 +13,7 @@ const {
   isSpecificationLanguageOnly,
   isSpecificationOnly,
   isLanguagePackageOnly,
+  isForceTranslationOverwrite,
   usesPublishingLanguageRules,
   effectiveProductDescriptionForScope,
   normalizeInternationalImageUrl,
@@ -611,6 +612,29 @@ test("Europe-drive Specification skips OK status and keeps the reference table s
   assert.match(html, /<tr class="firstRow"><th class="title" colspan="2" rowspan="1">Specificații<\/th><\/tr>/);
   assert.match(html, /<tr class="lines"><th[^>]*>Model<\/th><td[^>]*>CS-HP8<\/td><\/tr>/);
   assert.match(html, /<tr><th class="title"[^>]*>Parametrii camerei<\/th><\/tr>/);
+});
+
+test("product publishing recognizes the force translation overwrite option", () => {
+  assert.equal(isForceTranslationOverwrite({ forceTranslationOverwrite: "1" }), true);
+  assert.equal(isForceTranslationOverwrite({ forceTranslationOverwrite: "true" }), true);
+  assert.equal(isForceTranslationOverwrite({ forceTranslationOverwrite: "0" }), false);
+  assert.equal(isForceTranslationOverwrite({}), false);
+});
+
+test("Specification parser selects the Specification sheet from a combined Europe-drive workbook", () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Key", "English (Source)", "German"],
+    ["goods.title", "Camera", "Kamera"]
+  ]), "Datasheet");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["English", "", "German", ""],
+    ["Specifications", "", "Technische Daten", ""],
+    ["Model", "CS-HP8", "Modell", "CS-HP8"]
+  ]), "Specifications");
+  const parsed = parseSpecificationWorkbook(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+  assert.equal(parsed.sheetName, "Specifications");
+  assert.deepEqual(parsed.languages.map((language) => language.header), ["English", "German"]);
 });
 
 test("Specification content check ignores wrapper styling but detects changed translations", () => {

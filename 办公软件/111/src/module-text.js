@@ -2,6 +2,7 @@
  * 模块 2：文字/语言包转换逻辑
  */
 (function() {
+  const serviceBase = location.origin && location.origin !== 'null' ? location.origin : 'http://localhost:3217';
   const textFileInput = document.getElementById('textFileInput');
   const textProcessBtn = document.getElementById('textProcessBtn');
   const textDownloadBtn = document.getElementById('textDownloadBtn');
@@ -18,12 +19,14 @@
   const productLangExcelParseBtn = document.getElementById('productLangExcelParseBtn');
   const langExcelInput = document.getElementById('langExcelInput');
   const langExcelParseBtn = document.getElementById('langExcelParseBtn');
+  const globalSheetName = document.body?.dataset?.globalLanguageSheet || '';
 
   let convertedCount = 0;
   let alignedCount = 0;
   let existingCount = 0;
   const existingValueMap = new Map();
   const productLanguageKeys = new Set();
+  const productKeySources = new Map();
   let productSourceIndex = new Map();
   let productDuplicateSources = new Set();
 
@@ -79,13 +82,14 @@
       ? `${hasDoctype ? '<!DOCTYPE html>\n' : ''}${doc.documentElement.outerHTML}`
       : window.i18nConversionRules.preserveStylesheetLinks(htmlText, doc.body.innerHTML);
     currentProcessedHtml = currentProcessedHtml.replace(/\{\{t\(['"]([^'"]+)['"]\)\}\}/g, '{{t(&#39;$1&#39;)}}');
+    currentProcessedHtml = window.EzvizInlineOutput.ensureMarker(currentProcessedHtml);
     
     textOutput.value = currentProcessedHtml;
     textPreviewFrame.srcdoc = currentProcessedHtml;
     textDownloadBtn.disabled = false;
     updateExcelDownloadState();
     const existingSummary = existingResult.total
-      ? `；已有字段 ${existingResult.total} 个，总语言包匹配 ${existingResult.resolved} 个${existingResult.missing ? `，缺失 ${existingResult.missing} 个` : ''}`
+      ? `；HTML 原有字段 ${existingResult.total} 个，单产品包复用 ${existingResult.resolved} 个，归入新字段 ${existingResult.missing} 个（无英文原文的字段需人工补充）`
       : '；HTML 中没有已有语言字段';
     const alignmentSummary = productSourceIndex.size
       ? `复用单产品语言包字段 ${conversion.alignedCount} 个，生成新字段 ${conversion.newCount} 个`
@@ -105,42 +109,42 @@
   });
 
   if (langExcelDownloadBtn) {
-    langExcelDownloadBtn.addEventListener('click', () => {
+    langExcelDownloadBtn.addEventListener('click', async () => {
       if (!generatedLanguageRows.length && !alignedLanguageRows.length && !existingLanguageRows.length) return;
       if (!window.XLSX) {
         updateStatus('缺少表格生成库，请检查 XLSX 脚本是否加载。', 'warn');
         return;
       }
-      const workbook = window.XLSX.utils.book_new();
-      if (generatedLanguageRows.length) {
-        appendWorkbookSheet(workbook, '新语言包字段', [
-          ['字段名', '英文原文'],
-          ...generatedLanguageRows.map(item => [item.key, item.value])
-        ], [{ wch: 48 }, { wch: 90 }]);
-      }
-      if (alignedLanguageRows.length) {
-        appendWorkbookSheet(workbook, '产品包复用字段', [
-          ['字段名', '单产品语言包英文原文'],
-          ...alignedLanguageRows.map(item => [item.key, item.value])
-        ], [{ wch: 48 }, { wch: 90 }]);
-      }
-      if (existingLanguageRows.length) {
-        appendWorkbookSheet(workbook, '已有字段原文', [
-          ['字段名', '总语言包英文原文', '匹配状态'],
-          ...existingLanguageRows.map(item => [item.key, item.value, item.matched ? '已匹配' : '总语言包未找到'])
-        ], [{ wch: 48 }, { wch: 90 }, { wch: 20 }]);
-      }
       const prefixName = String(langPrefixInput.value || 'language-package')
         .trim().replace(/^goods\./i, '').replace(/[\\/:*?"<>|]/g, '-');
-      window.XLSX.writeFile(workbook, `${prefixName || 'language-package'}.语言字段结果.xlsx`);
+      langExcelDownloadBtn.disabled = true;
+      try {
+        const response = await fetch(serviceBase + '/api/language-package/text-translation-workbook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prefix: prefixName,
+            generatedRows: generatedLanguageRows,
+            alignedRows: alignedLanguageRows,
+            existingRows: existingLanguageRows
+          })
+        });
+        if (!response.ok) {
+          const failure = await response.json().catch(() => ({}));
+          throw new Error(failure.error || `HTTP ${response.status}`);
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${prefixName || 'language-package'}.语言字段结果.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        updateStatus(`字段结果 Excel 生成失败：${error.message || error}`, 'warn');
+      } finally {
+        updateExcelDownloadState();
+      }
     });
-  }
-
-  function appendWorkbookSheet(workbook, name, rows, columns) {
-    const sheet = window.XLSX.utils.aoa_to_sheet(rows);
-    sheet['!cols'] = columns;
-    sheet['!autofilter'] = { ref: window.XLSX.utils.encode_range({ r: 0, c: 0 }, { r: rows.length - 1, c: rows[0].length - 1 }) };
-    window.XLSX.utils.book_append_sheet(workbook, sheet, name);
   }
 
   function updateExcelDownloadState() {
@@ -293,20 +297,30 @@
   }
 
   function renderExistingTable(keys) {
-    const tbody = document.querySelector('#existingLangTable tbody');
-    tbody.innerHTML = '';
+    document.querySelector('#existingLangTable tbody').innerHTML = '';
+    const newBody = document.querySelector('#langTable tbody');
+    const alignedBody = document.querySelector('#alignedLangTable tbody');
     let resolved = 0;
     existingLanguageRows = [];
 
     keys.forEach(key => {
-      const value = resolveExistingValue(key);
-      if (value) resolved += 1;
+      if (/^(?:goods\.)?list$/i.test(String(key || '').trim())) return;
       const normalizedKey = normalizeLangKey(key)?.full || String(key || '');
-      existingLanguageRows.push({ key: normalizedKey, value, matched: !!value });
-      const tr = createLanguageRow(normalizedKey, value || '总语言包中未找到', !value);
-      tbody.appendChild(tr);
+      const source = productKeySources.get(normalizedKey.toLowerCase()) || '';
+      if (productLanguageKeys.has(normalizedKey.toLowerCase())) {
+        resolved += 1;
+        if (!alignedLanguageRows.some(row => row.key.toLowerCase() === normalizedKey.toLowerCase())) {
+          alignedLanguageRows.push({ key: normalizedKey, value: source });
+          alignedBody?.appendChild(createLanguageRow(normalizedKey, source));
+        }
+      } else if (!generatedLanguageRows.some(row => row.key.toLowerCase() === normalizedKey.toLowerCase())) {
+        generatedLanguageRows.push({ key: normalizedKey, value: '' });
+        newBody?.appendChild(createLanguageRow(normalizedKey, '单产品包无此字段；请补充英文原文', true));
+      }
     });
-    existingCount = keys.length;
+    existingCount = 0;
+    convertedCount = generatedLanguageRows.length;
+    alignedCount = alignedLanguageRows.length;
     return { total: keys.length, resolved, missing: keys.length - resolved };
   }
 
@@ -371,7 +385,9 @@
   }
 
   function extractExistingI18nKeys(htmlText) {
-    const pattern = /\{\{t\(\s*(?:['"]|&#39;)(goods\.[^'"]+?)(?:['"]|&#39;)\s*\)\}\}/g;
+    const pattern = globalSheetName
+      ? /\{\{t\(\s*(?:['"]|&#39;)([\w-]+\.[^'"]+?)(?:['"]|&#39;)\s*\)\}\}/g
+      : /\{\{t\(\s*(?:['"]|&#39;)(goods\.[^'"]+?)(?:['"]|&#39;)\s*\)\}\}/g;
     const keys = new Set();
     let match;
 
@@ -383,7 +399,11 @@
   }
 
   async function parseLanguageTable(file) {
-    const parsed = await readLanguageTableEntries(file);
+    const parsed = await readLanguageTableEntries(
+      file,
+      window.i18nConversionRules.detectLanguageTableLayout,
+      globalSheetName ? { sheetName: globalSheetName, useCategoryPrefix: true } : {}
+    );
     existingValueMap.clear();
     parsed.entries.forEach(({ key, source }) => {
       const normalized = normalizeLangKey(key);
@@ -392,7 +412,7 @@
       existingValueMap.set(normalized.short, source);
     });
     return {
-      parsedCount: existingValueMap.size / 2,
+      parsedCount: new Set(parsed.entries.map(({ key }) => normalizeLangKey(key)?.full).filter(Boolean)).size,
       recognizedSheetCount: parsed.recognizedSheetCount
     };
   }
@@ -405,9 +425,13 @@
     const indexed = window.i18nConversionRules.buildSourceKeyIndex(parsed.entries);
     productSourceIndex = new Map();
     productLanguageKeys.clear();
+    productKeySources.clear();
     parsed.entries.forEach(entry => {
       const normalizedKey = normalizeLangKey(entry.key)?.full;
-      if (normalizedKey) productLanguageKeys.add(normalizedKey);
+      if (normalizedKey) {
+        productLanguageKeys.add(normalizedKey.toLowerCase());
+        productKeySources.set(normalizedKey.toLowerCase(), entry.source);
+      }
     });
     indexed.bySource.forEach((entry, source) => {
       const normalizedKey = normalizeLangKey(entry.key)?.full;
@@ -427,13 +451,18 @@
 
   async function readLanguageTableEntries(
     file,
-    detectLayout = window.i18nConversionRules.detectLanguageTableLayout
+    detectLayout = window.i18nConversionRules.detectLanguageTableLayout,
+    options = {}
   ) {
     const data = await readFileAsArrayBuffer(file);
     const workbook = window.XLSX.read(data, { type: 'array' });
     const entries = [];
     let recognizedSheetCount = 0;
-    workbook.SheetNames.forEach(sheetName => {
+    if (options.sheetName && !workbook.Sheets[options.sheetName]) {
+      throw new Error(`总语言包缺少 ${options.sheetName} 工作表`);
+    }
+    const sheetNames = options.sheetName ? [options.sheetName] : workbook.SheetNames;
+    sheetNames.forEach(sheetName => {
       const sheet = workbook.Sheets[sheetName];
       const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       let layout;
@@ -446,8 +475,9 @@
       rows.slice(layout.firstDataRow).forEach(row => {
         const rawKey = String(row[layout.keyColumn] || '').trim();
         const source = String(row[layout.sourceColumn] || '').trim();
-        if (!rawKey || !source) return;
-        entries.push({ key: rawKey, source });
+        const category = options.useCategoryPrefix ? String(row[0] || '').trim() : '';
+        if (!rawKey || !source || (options.useCategoryPrefix && !category)) return;
+        entries.push({ key: category && !rawKey.includes('.') ? `${category}.${rawKey}` : rawKey, source });
       });
     });
     if (!entries.length) {
@@ -466,15 +496,9 @@
 
     if (!key) return null;
 
-    const full = key.startsWith('goods.') ? key : `goods.${key}`;
+    const full = key.includes('.') ? key : `goods.${key}`;
     const short = key.replace(/^goods\./, '');
     return { full, short };
-  }
-
-  function resolveExistingValue(fullKey) {
-    if (!fullKey) return '';
-    const shortKey = fullKey.replace(/^goods\./, '');
-    return existingValueMap.get(fullKey) || existingValueMap.get(shortKey) || '';
   }
 
   function readFileAsArrayBuffer(file) {
