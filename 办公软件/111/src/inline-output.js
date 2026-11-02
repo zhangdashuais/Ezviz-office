@@ -105,12 +105,18 @@
     return requiredListItemStyle;
   }
 
-  function wrap(content, headContent, options = {}) {
-    const bodyContent = `${marker}\n${content}`;
-    const body = options.includeBody ? `<body>\n${bodyContent}\n</body>` : bodyContent;
-    const head = options.includeHead ? `<head>\n${headContent}\n</head>` : "";
-    return [head, body].filter(Boolean).join("\n");
+  function ensureMarker(content) {
+    const withoutMarker = String(content || "")
+      .replace(/<!--\s*product detail webflow\s*-->/gi, "")
+      .trimStart();
+    return `${marker}\n${withoutMarker}`;
   }
 
-  return { normalizeNumberedClasses, appendRequiredCss, requiredListItemStyleValue, wrap };
+  function wrap(content, headContent, options = {}) {
+    const body = options.includeBody ? `<body>\n${content}\n</body>` : content;
+    const head = options.includeHead ? `<head>\n${headContent}\n</head>` : "";
+    return ensureMarker([head, body].filter(Boolean).join("\n"));
+  }
+
+  return { normalizeNumberedClasses, appendRequiredCss, requiredListItemStyleValue, ensureMarker, wrap };
 });

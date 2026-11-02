@@ -101,18 +101,18 @@ WTB 登录后固定跳转 `https://shop.ezvizlife.com/goods/index`，在旧版�
 | POST | `/api/specification/preview` | 预览，不提交 |
 | POST | `/api/specification/submit` | 写产品后台 |
 | POST | `/api/product-publishing/preview` | 在目标站读取国际产品复制源并预览上架，不提交 |
-| POST | `/api/product-publishing/submit` | 单站先按预览指纹核对语言包，按 Key 仅填空译文；已有译文保留并列入人工校对清单，预检通过后复制/更新产品并回读 |
+| POST | `/api/product-publishing/submit` | 单站先按预览指纹核对语言包；默认按 Key 仅填空译文，`forceTranslationOverwrite=1` 时覆盖已有目标译文；预检通过后复制/更新产品并回读 |
 | POST | `/api/product-publishing/batch-preview` | 多产品、逐目标站预览上架；目标站已有同名产品时跳过复制，改为只预览资料/语言包更新，不提交 |
-| POST | `/api/product-publishing/batch-submit` | 逐站合并语言包，仅填空译文并回读；已有译文保留并列入人工校对清单；仅对语言包通过且该产品预览通过的站点继续复制/更新 |
+| POST | `/api/product-publishing/batch-submit` | 逐站合并语言包并回读；默认仅填空译文，`forceTranslationOverwrite=1` 时覆盖已有目标译文；仅对语言包通过且该产品预览通过的站点继续复制/更新 |
 
-产品上架的语言包必须保持 `Sheet1` 不变：预览时若待写单元格或新字段会落入 `Sheet1`，直接停止；生成后还要逐格比对 `Sheet1`，不一致不得上传。
+产品上架的“强制覆盖已有译文”默认关闭；批量上架页面先预览现有译文与候选译文的对比，再在结果区显示此选项。切换选项自动重新预览，预览、提交必须使用相同的 `forceTranslationOverwrite` 值。无论是否开启，英文源列和语言包 `Sheet1` 都必须保持不变：预览时若待写单元格或新字段会落入 `Sheet1`，直接停止；生成后还要逐格比对 `Sheet1`，不一致不得上传。
 | POST | `/api/product-empty-link/preview` | 国际站产品空链接只读预览：读取参考产品配置并检查新产品重名 |
 | POST | `/api/product-empty-link/submit` | 按预览指纹通过 Manual Add 原生新增接口创建国际站产品，写入 PC/移动端占位详情、固定关闭 Searchable 并逐条回读 |
 
 `/api/campaign/shop-login-check` 携带 `targetUrl=/goods/int-goods-list` 与 `inspectIntGoodsCopy=true` 时可只读检查国际产品复制列表；快照返回 `goods_id` 等列表字段。响应未包含 `isSearchable` 时，不得据此推断 Detail 开关状态。
 
 产品上架与修订写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列。后台自定义字段名 `vm.pcView.customs[n].name`（Custom Page Name 输入框）使用官网 tab 固定文案，HTML 顶部 Specification 标题使用规格内容标题；未知站点回退到工作簿标题。Custom Page Name 固定映射包括：荷兰/比利时 `Specificaties`，德国 `Technische Daten`，法国 `Spécifications`，西班牙/拉美/阿根廷 `Especificaciones`，意大利 `Specifiche`，捷克 `Technické údaje`，泰国 `รายละเอียด`。
-已上架产品可分开执行：`updateScope=specification-only` 仅接收 `specExcel`，只更新 Specification 内容和 Custom Page Name；`updateScope=language-only` 仅接收 `languageDatasheet`，只更新语言包。只有语言包模式要求 Datasheet；两种模式都不修改 Overview 或 Product Description。
+已上架产品的 `updateScope=specification-only` 仅接收 `specExcel`，只更新 Specification 内容和 Custom Page Name。界面上的“只改语言包”直接跳转独立的 `/api/language-package/datasheet-*` 流程，不读取产品 Detail/Spec；旧 `updateScope=language-only` 接口保留兼容，不再作为界面入口。
 上述产品预览、提交和回读均固定从旧版 `https://shop.ezvizlife.com/goods/index` 查找产品；登录落到区域新版后台时必须切回旧版列表，不能在可能返回 404 的 `new-<区域>-shop.ezvizlife.com/goods/index` 搜索。
 保存产品资料前会自动把空的 Ads Additional Information → Product Title 补为当前产品名称；已有值不覆盖。
 | POST | `/api/language-package/upload` | 上传语言包 |
@@ -125,8 +125,11 @@ WTB 登录后固定跳转 `https://shop.ezvizlife.com/goods/index`，在旧版�
 | POST | `/api/language-package/hg2-400-4-preview` | 逐站下载语言包并预览 `HG2_400_4` E 列秒数删除，不上传 |
 | POST | `/api/language-package/hg2-400-4-submit` | 按预览指纹逐站修改、上传并重新下载回读；失败时回滚原包 |
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |
+| POST | `/api/ecadmin/upload-video` | 单个 MP4 上传到 UMP 视频上传-海外所用的文件服务；需 ecadmin 登录态，成功返回 MFS 地址 |
 | POST | `/api/assets/upload-image` | 上传图片 |
 | POST | `/api/doc-upload` | 使用文件服务 `service/attach` 动态 token 批量上传 PDF，并为成功文件返回多个独立的 `<li><a target="_blank" ...></a></li>` 标签；链接文字为文件名去掉 `.pdf`，不包含外层 `<ul>` |
+
+视频上传页面实测先 `POST https://ecadmin-api.ys7.com/common/ovs-file-token`，再将 `app=mall`、`flag=file`、`tl=mp4`、`adapt=1`、`appid=ecadmin-api`、临时 `token` 和文件发送至 `POST https://fs.ezvizlife.com/upload.php`。项目通过原页面上传控件发起这两步，不存储 token 或签名；仅接受成功响应中的 `https://mfs.ezvizlife.com/mall/*.mp4`。上传是正式写操作，页面无对应删除入口，勿将实验文件当作可自动回滚的临时记录。
 
 产品修订分为两种：同一产品跨国家修订继续使用 Specifications 与 Datasheet 同步；多个不同产品的相同部分修订可同时选择多个站点，对 Detail 或 Specification 执行同一条精确删除/替换，或只把 Specification 的 Custom Page Name 输入框修成站点固定文案。后者按国家 × 产品逐项预览、保存和回读，单项失败不影响其他任务，一次最多 50 个产品。产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
 

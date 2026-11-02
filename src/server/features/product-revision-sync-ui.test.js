@@ -12,9 +12,25 @@ const script = fs.readFileSync(
   "utf8"
 );
 
-test("product revision offers separate Specification-only and language-only modes", () => {
+test("language-only selection opens the standalone Datasheet workflow", () => {
   assert.match(html, /value="specification-only">只改 Specification/);
   assert.match(html, /value="language-only">只改语言包/);
-  assert.match(script, /!isLanguageOnly\(\) && !file/);
-  assert.match(script, /!isSpecificationOnly\(\) && !languageDatasheet/);
+  assert.match(html, /id="languageDatasheetInput"/);
+  assert.match(script, /if \(isLanguageOnly\(\)\) \{[\s\S]*tab-language-package/);
+  assert.match(script, /document\.getElementById\("languageDatasheetInput"\)\?\.focus\(\)/);
+});
+
+test("batch publishing only renders sites whose Specification language is ready", () => {
+  assert.match(script, /workbookHeaders\(product\.files\.specification, "specification", true\)/);
+  assert.match(script, /!isBatchPublishing\(\)[\s\S]*autoLanguageHeader\(site\.siteCode, specificationHeaders\)/);
+});
+
+test("batch publishing exposes force translation overwrite and includes it in the request signature", () => {
+  assert.match(html, /id="revisionForceTranslationOverwrite" type="checkbox"/);
+  assert.ok(html.indexOf('id="revisionForceTranslationOverwriteLabel"')
+    > html.indexOf('id="revisionSyncOutput"'));
+  assert.match(script, /forceTranslationOverwrite: forceTranslationOverwriteInput\.checked/);
+  assert.match(script, /form\.append\("forceTranslationOverwrite", forceTranslationOverwriteInput\.checked \? "1" : "0"\)/);
+  assert.match(script, /forceTranslationOverwriteInput\.addEventListener\("change", \(\) => previewButton\.click\(\)\)/);
+  assert.match(script, /if \(isBatchPublishing\(\)\) forceTranslationOverwriteLabel\.hidden = false/);
 });

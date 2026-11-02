@@ -129,6 +129,22 @@ test("parses language Datasheet and resolves a target language", () => {
   );
 });
 
+test("Datasheet parser selects the Datasheet sheet from a combined Europe-drive workbook", () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["English", "", "German", ""],
+    ["Specifications", "", "Technische Daten", ""]
+  ]), "Specifications");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Key", "English (Source)", "German"],
+    ["goods.title", "Camera", "Kamera"]
+  ]), "Datasheet");
+  const parsed = parseLanguageDatasheet(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+  assert.equal(parsed.sheetName, "Datasheet");
+  assert.deepEqual(parsed.headers, ["German"]);
+  assert.equal(parsed.rows[0].key, "goods.title");
+});
+
 test("only validates the selected language column and reports usable row issues", () => {
   const parsed = parseLanguageDatasheet(workbookBuffer([
     ["Field", "Source", "Spanish", "French"],
@@ -293,6 +309,33 @@ test("publishing fills blank translations but preserves populated keys and misma
   assert.deepEqual(publishing.sourceMismatches.map((item) => item.key), [
     "different_source", "different_source_filled"
   ]);
+  const forcedDatasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["reviewed", "Same source", "Máquina"],
+    ["empty", "Same source", "Nuevo"],
+    ["different_source", "Changed source", "Cambio"],
+    ["different_source_filled", "Changed source", "Cambio 2"]
+  ]));
+  const forcedWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(forcedWorkbook, XLSX.utils.aoa_to_sheet([["protected"]]), "Sheet1");
+  XLSX.utils.book_append_sheet(forcedWorkbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "reviewed", "Same source", "Revisado"],
+    ["goods", "G2", "empty", "Same source", ""],
+    ["goods", "G3", "different_source", "Old source", ""],
+    ["goods", "G4", "different_source_filled", "Old source", "Revisado también"]
+  ]), "Sheet2");
+  const forcedPackage = readLanguagePackage(
+    XLSX.write(forcedWorkbook, { type: "buffer", bookType: "xlsx" }), "es-ES"
+  );
+  const forced = planPublishingLanguagePackageUpdates(forcedPackage, forcedDatasheet, "Spanish", {
+    forceOverwriteExisting: true
+  });
+  assert.deepEqual(forced.updates.map((item) => item.key), [
+    "reviewed", "empty", "different_source", "different_source_filled"
+  ]);
+  assert.equal(forced.preservedExistingCount, 0);
+  assert.equal(forced.sourceChangedCellCount, 0);
   const revision = planLanguagePackageUpdates(current, datasheet, "Spanish");
   assert.ok(revision.updates.some((item) => item.key === "reviewed"));
   assert.ok(revision.sourceUpdates.some((item) => item.key === "different_source"));

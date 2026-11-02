@@ -3,6 +3,7 @@ const childProcess = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
+const { publishingSheetName } = require("../../../办公软件/111/src/product-publishing-input-rules");
 
 function normalize(value) {
   return String(value == null ? "" : value)
@@ -36,10 +37,10 @@ function yellowPublishingDependency(cell) {
 function parseLanguageDatasheet(input) {
   const buffer = readInputBuffer(input);
   const workbook = XLSX.read(buffer, { type: "buffer", cellText: true, cellStyles: true });
-  const sheetName = workbook.SheetNames[0];
+  const sheetName = publishingSheetName(workbook.SheetNames, "datasheet");
   if (!sheetName) throw new Error("语言包 Datasheet 中没有工作表。");
   const sheet = workbook.Sheets[sheetName];
-  if (!sheet?.["!ref"]) throw new Error("语言包 Datasheet 的第一个工作表为空。");
+  if (!sheet?.["!ref"]) throw new Error(`语言包 Datasheet 的 ${sheetName} 工作表为空。`);
   const range = XLSX.utils.decode_range(sheet["!ref"]);
   const headers = [];
   for (let column = range.s.c + 2; column <= range.e.c; column += 1) {
@@ -400,7 +401,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
         else updates.push(item);
         return;
       }
-      if (!sourceMatches) {
+      if (!sourceMatches && !options.preserveSource) {
         sourceUpdates.push({ ...candidate, key: entry.key, source: entry.source });
       }
       const item = { ...candidate, key: entry.key, translation,
@@ -496,9 +497,9 @@ function assertPlanPreservesSheet(packageInfo, plan, sheetName) {
   }
 }
 
-function planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader) {
+function planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader, options = {}) {
   const plan = planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader,
-    { fillBlankOnly: true });
+    { fillBlankOnly: options.forceOverwriteExisting !== true, preserveSource: true });
   assertSafePlan(plan);
   if (plan.newFields.length && selectAppendSection(packageInfo, plan).sheetName === "Sheet1") {
     const sheet2 = packageInfo.sections.find((section) => section.sheetName === "Sheet2");

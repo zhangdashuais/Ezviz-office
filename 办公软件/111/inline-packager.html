@@ -15,6 +15,7 @@
       <div class="nav-items-wrapper">
         <div class="nav-item active" data-target="tab-inline">一键内联打包</div>
         <div class="nav-item" data-target="tab-asset-upload">图片 / SVG 上传</div>
+        <div class="nav-item" data-target="tab-video-upload">视频上传-海外</div>
         <div class="nav-item" data-target="tab-ai-badge">图片 AI 标志</div>
         <div class="nav-item" data-target="tab-html-ai-badge">HTML Section AI 标志</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
@@ -147,6 +148,20 @@
           <h3>预览</h3>
           <canvas id="aiBadgeCanvas" style="max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc;"></canvas>
         </div>
+        <div class="card">
+          <h3>网页 HTML 打标</h3>
+          <p class="desc">为页面内每个 section 的右下角添加同款 AI 标识，单独的 img 不打标。保留原网页结构与图片文件，生成的代码可复制或下载。</p>
+          <label for="aiBadgeHtmlFile">上传 HTML 文件（也可直接粘贴）</label>
+          <input id="aiBadgeHtmlFile" type="file" accept=".html,.htm,.txt,text/html,text/plain">
+          <label for="aiBadgeHtmlSource">原始 HTML</label>
+          <textarea id="aiBadgeHtmlSource" placeholder="在这里粘贴包含 section 的网页代码..."></textarea>
+          <div class="row">
+            <button id="aiBadgeHtmlRunBtn" type="button">生成网页 AI 标识代码</button>
+            <button id="aiBadgeHtmlDownload" type="button" disabled>下载 HTML</button>
+          </div>
+          <label for="aiBadgeHtmlOutput">生成结果</label>
+          <textarea id="aiBadgeHtmlOutput" readonly placeholder="打标后的 HTML 会显示在这里..."></textarea>
+        </div>
       </div>
 
       <div id="tab-html-ai-badge" class="tab-content">
@@ -192,6 +207,26 @@
         <div class="card">
           <h3>上传结果</h3>
           <textarea id="assetUploadOutput" readonly placeholder="生成的 CDN 地址会显示在这里..."></textarea>
+        </div>
+      </div>
+
+      <div id="tab-video-upload" class="tab-content">
+        <div class="card">
+          <h3>视频上传-海外</h3>
+          <p class="desc">复用统一管理平台的登录态上传 MP4，成功后返回视频地址。上传会写入正式文件服务。</p>
+          <div class="form-grid">
+            <label for="ecVideoFile">选择视频</label>
+            <input id="ecVideoFile" type="file" accept=".mp4,video/mp4">
+          </div>
+          <div class="row" style="margin-top: 16px; margin-bottom: 0;">
+            <button id="ecVideoUploadBtn" type="button">上传视频</button>
+            <button id="ecVideoCopyBtn" type="button" disabled>复制地址</button>
+          </div>
+        </div>
+        <div id="ecVideoStatus" class="status">请选择 MP4 文件。</div>
+        <div class="card">
+          <label for="ecVideoUrl">视频地址</label>
+          <textarea id="ecVideoUrl" readonly placeholder="上传成功后显示 MFS 视频地址..."></textarea>
         </div>
       </div>
 
@@ -503,7 +538,7 @@
               <option value="revision">修订已上架产品（源站同步）</option>
               <option value="content-sync">一键同步 Details</option>
               <option value="specification-only">只改 Specification</option>
-              <option value="language-only">只改语言包</option>
+              <option value="language-only">只改语言包（使用单产品 Datasheet 功能）</option>
               <option value="common">多产品相同内容修订</option>
               <option value="delist">产品下架（关闭搜索与上架时间）</option>
             </select>
@@ -549,6 +584,7 @@
           <h3>预览与执行结果</h3>
           <button id="revisionSyncReviewDownload" type="button" hidden>下载已有译文人工校对清单 CSV</button>
           <textarea id="revisionSyncOutput" placeholder="源站点图片信息、Detail / Specification / 语言包变更项和回读结果会显示在这里..."></textarea>
+          <label id="revisionForceTranslationOverwriteLabel" class="check-row" hidden><input id="revisionForceTranslationOverwrite" type="checkbox"> 已查看译文对比，强制覆盖目标站已有译文（切换后自动重新预览）</label>
         </div>
         </div>
         <div id="revisionCommonPartPanel" role="tabpanel" hidden>
@@ -1124,11 +1160,11 @@
 
   <script src="src/ui.js"></script>
   <script src="src/css-scope.js?v=20260821-1"></script>
-  <script src="src/inline-output.js?v=20260928-3"></script>
+  <script src="src/inline-output.js?v=20261026-1"></script>
   <script src="src/module-task-progress.js?v=20261015-1"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-asset-upload.js?v=20260924-1"></script>
-  <script src="src/module-ai-badge.js?v=20260911-2"></script>
+  <script src="src/module-ai-badge.js?v=20261019-3"></script>
   <script src="src/module-html-ai-badge.js?v=20261026-1"></script>
   <script src="src/module-pdf-upload.js?v=20260924-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1140,13 +1176,14 @@
   <script src="src/module-spec-excel-build.js"></script>
   <script src="src/module-language-column-filter.js?v=20260814-1"></script>
   <script src="src/i18n-conversion-rules.js?v=20261013-3"></script>
-  <script src="src/module-text.js?v=20260930-1"></script>
+  <script src="src/module-text.js?v=20261102-2"></script>
   <script src="src/module-ecadmin-platform.js"></script>
+  <script src="src/module-ecadmin-video.js?v=20261027-1"></script>
   <script src="src/module-language-package.js?v=20260911-1"></script>
-  <script src="src/product-publishing-input-rules.js?v=20260923-2"></script>
+  <script src="src/product-publishing-input-rules.js?v=20261019-2"></script>
   <script src="src/module-product-empty-link.js?v=20261008-1"></script>
   <script src="src/module-product-availability.js?v=20261015-1"></script>
-  <script src="src/module-product-revision-sync.js?v=20261017-2"></script>
+  <script src="src/module-product-revision-sync.js?v=20261019-4"></script>
   <script src="src/module-product-direct-revision.js?v=20260825-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>

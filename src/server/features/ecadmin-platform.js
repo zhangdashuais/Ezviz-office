@@ -56,6 +56,39 @@ function createEcadminPlatformFeature(deps) {
     return { productFolder, uploadFolder, datasheet, highResImage, specExcel, allFiles };
   }
 
+  async function uploadVideo(file) {
+    if (!file?.path || !/\.mp4$/i.test(file.originalname || "")) throw new Error("请选择 MP4 视频文件。");
+    if (!file.size || file.size > 500 * 1024 * 1024) throw new Error("视频必须大于 0 且不超过 500 MB。");
+    const context = await getContext();
+    const page = await context.newPage();
+    try {
+      await ensureLoggedIn(page,
+        "https://ecadmin.ys7.com/#/app-mall-next/MallOperate/MallSystem/MallUploadVideoOvs/MallUploadVideoListOvs",
+        {}, []);
+      const uploadResponse = page.waitForResponse(
+        (response) => response.request().method() === "POST"
+          && response.url() === "https://fs.ezvizlife.com/upload.php",
+        { timeout: 180000 }
+      );
+      const chooser = page.waitForEvent("filechooser");
+      await page.getByRole("button", { name: "上传视频" }).first().click();
+      await (await chooser).setFiles(file.path);
+      const response = await uploadResponse;
+      const payload = await response.json().catch(() => null);
+      if (!response.ok() || payload?.status !== true || Number(payload.size) !== file.size) {
+        throw new Error(payload?.message || payload?.msg || "视频上传未成功返回。");
+      }
+      const url = new URL(String(payload.full_url || ""));
+      if (url.protocol !== "https:" || url.hostname !== "mfs.ezvizlife.com"
+        || !/^\/mall\/.+\.mp4$/i.test(url.pathname)) {
+        throw new Error("视频服务未返回预期的 MP4 地址。");
+      }
+      return { fileName: file.originalname, size: file.size, url: url.href };
+    } finally {
+      await page.close();
+    }
+  }
+
 async function createDownloadInfo(page, payload, files, logs) {
   const createUrl = "https://ecadmin.ys7.com/#/app-support/Support/SupportOvs/SupportDownloadCenter/SupportDownloadInfo/SupportDownloadInfoCreate";
   await ensureLoggedIn(page, createUrl, payload, logs);
@@ -287,7 +320,7 @@ async function updateProductImage(page, payload, file, logs) {
     return result;
   }
 
-  return { runEcadminPlatform, inspectLocalFiles };
+  return { runEcadminPlatform, inspectLocalFiles, uploadVideo };
 }
 
 module.exports = {

@@ -18,6 +18,8 @@
   const reviewDownloadButton = document.getElementById("revisionSyncReviewDownload");
   const folderInput = document.getElementById("revisionSyncFolder");
   const europeDriveCheckbox = document.getElementById("revisionSyncEuropeDrive");
+  const forceTranslationOverwriteInput = document.getElementById("revisionForceTranslationOverwrite");
+  const forceTranslationOverwriteLabel = document.getElementById("revisionForceTranslationOverwriteLabel");
   const folderLabel = document.getElementById("revisionSyncFolderLabel");
   const folderGroup = document.getElementById("revisionSyncFolderGroup");
   const productNameLabel = document.getElementById("revisionSyncProductNameLabel");
@@ -43,6 +45,7 @@
     || !targetsElement
     || !selectMatchedButton || !clearTargetsButton || !selectedCountElement || !previewButton
     || !submitButton || !statusElement || !outputElement || !folderInput || !europeDriveCheckbox || !folderGroup
+    || !forceTranslationOverwriteInput || !forceTranslationOverwriteLabel
     || !folderLabel || !productNameLabel || !excelLabel || !languageDatasheetLabel
     || !delistLabel || !delistProductsInput || !sourceSiteLabel || !languageHelp
     || !targetsHeading || !targetsHelp || !revisionModeTabs || !sameProductTab || !commonPartTab
@@ -111,12 +114,16 @@
     }[character]));
   }
 
-  function invalidatePreview() {
+  function invalidatePreview(keepOverwriteChoice = false) {
     validatedPreview = null;
     validatedSignature = "";
     submitButton.disabled = true;
     reviewRows = [];
     if (reviewDownloadButton) reviewDownloadButton.hidden = true;
+    if (keepOverwriteChoice !== true) {
+      forceTranslationOverwriteInput.checked = false;
+      forceTranslationOverwriteLabel.hidden = true;
+    }
   }
 
   function collectPublishingReviewRows(result) {
@@ -251,7 +258,9 @@
     const targetSites = sites.filter((site) =>
       site.enabled !== false
       && (!usesSourceSite() || site.siteCode !== sourceCode)
-      && (!isContentSync() || site.siteCode !== "hq"));
+      && (!isContentSync() || site.siteCode !== "hq")
+      && (!isBatchPublishing()
+        || Boolean(autoLanguageHeader(site.siteCode, specificationHeaders))));
     const missingRequiredHeaders = isSpecificationOnly()
       ? !specificationHeaders.length
       : isLanguageOnly()
@@ -380,16 +389,21 @@
     renderTargets();
   }
 
-  async function workbookHeaders(file, kind) {
+  async function workbookHeaders(file, kind, onlyReady = false) {
     if (!window.XLSX) throw new Error("Excel 解析库尚未加载，请刷新页面后重试。");
     const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const sheetName = window.productPublishingInputRules.publishingSheetName(
+      workbook.SheetNames,
+      kind
+    );
+    const sheet = workbook.Sheets[sheetName];
     if (!sheet?.["!ref"]) throw new Error(`${file.webkitRelativePath || file.name} 的工作表为空。`);
     const range = XLSX.utils.decode_range(sheet["!ref"]);
     if (kind === "datasheet" && range.e.c < range.s.c + 2) {
       throw new Error("语言包 Datasheet 至少需要字段名、原文和一种译文三列。");
     }
     const headers = [];
+    const statuses = [];
     const specification = kind === "specification";
     for (let column = range.s.c + (specification ? 0 : 2);
       column <= range.e.c; column += specification ? 2 : 1) {
@@ -397,9 +411,17 @@
         .map((c) => sheet[XLSX.utils.encode_cell({ r: range.s.r, c })]);
       const cell = cells.find((item) => item?.w != null || item?.v != null);
       const header = String(cell?.w ?? cell?.v ?? "").trim();
-      if (header) headers.push(header);
+      if (header) {
+        headers.push(header);
+        const statusCells = [column, ...(specification ? [column + 1] : [])]
+          .map((c) => sheet[XLSX.utils.encode_cell({ r: range.s.r + 1, c })]);
+        const status = statusCells.find((item) => item?.w != null || item?.v != null);
+        statuses.push(String(status?.w ?? status?.v ?? "").trim());
+      }
     }
-    return headers;
+    return onlyReady
+      ? window.productPublishingInputRules.readyPublishingHeaders(headers, statuses)
+      : headers;
   }
 
   function batchFileKind(file) {
@@ -484,7 +506,7 @@
     const specHeaderSets = [];
     const datasheetHeaderSets = [];
     for (const product of batchProducts) {
-      specHeaderSets.push(await workbookHeaders(product.files.specification, "specification"));
+      specHeaderSets.push(await workbookHeaders(product.files.specification, "specification", true));
       datasheetHeaderSets.push(await workbookHeaders(product.files.datasheet, "datasheet"));
     }
     specificationHeaders = specHeaderSets[0].filter((header) =>
@@ -530,6 +552,7 @@
         ? [languageDatasheet.name, languageDatasheet.size, languageDatasheet.lastModified]
         : null,
       combinedWorkbookDetection: true,
+      forceTranslationOverwrite: forceTranslationOverwriteInput.checked,
       folder: batchProducts.map((product) => [
         product.productName,
         product.files.specification.name,
@@ -554,6 +577,7 @@
     if (isLanguageOnly()) form.append("updateScope", "language-only");
     if (isBatchPublishing()) {
       if (!batchProducts.length) throw new Error("请选择并解析待上架产品文件夹。");
+      form.append("forceTranslationOverwrite", forceTranslationOverwriteInput.checked ? "1" : "0");
       const manifest = [];
       let index = 0;
       batchProducts.forEach((product) => {
@@ -834,6 +858,7 @@
     const result = data.result;
     const lines = [
       "批量产品上架预览（尚未复制或保存）",
+      `语言包策略：${result.forceTranslationOverwrite ? "强制覆盖已有译文" : "只填空译文，保留已有译文"}`,
       `产品：${result.productCount}，可执行：${result.readyCount}，部分失败：${result.partialCount}，失败：${result.failedCount}`,
       ""
     ];
@@ -862,13 +887,19 @@
             lines.push(`      Product Description：${siteResult.desiredProductDescription}`);
           }
           if (siteResult.languagePackage) lines.push(
-            `      语言包：填入 ${siteResult.languagePackage.changedCellCount + siteResult.languagePackage.appendedFieldCount} 个；`
-            + `已有译文保留 ${siteResult.languagePackage.preservedExistingCount || 0} 个：`
-            + (siteResult.languagePackage.preservedExisting || []).slice(0, 20).map((entry) => entry.key).join("、")
+            `      语言包：${result.forceTranslationOverwrite ? "将更新" : "填入"} `
+            + `${siteResult.languagePackage.changedCellCount + siteResult.languagePackage.appendedFieldCount} 个；`
+            + (result.forceTranslationOverwrite
+              ? "已有译文按 Datasheet 候选值覆盖"
+              : `已有译文保留 ${siteResult.languagePackage.preservedExistingCount || 0} 个：`
+                + (siteResult.languagePackage.preservedExisting || []).slice(0, 20)
+                  .map((entry) => entry.key).join("、"))
           );
           (siteResult.languagePackage?.dependencyChecks || []).forEach((dependency) => lines.push(
             `      黄色行依赖：${dependency.productName} 在后台${dependency.exists ? "已存在" : "不存在"}；`
-            + `后续 ${dependency.fieldCount} 个字段仅补空译文或缺失字段。`
+            + `后续 ${dependency.fieldCount} 个字段${result.forceTranslationOverwrite
+              ? "按 Datasheet 强制覆盖已有译文"
+              : "仅补空译文或缺失字段"}。`
           ));
           (siteResult.warnings || []).slice(0, 3).forEach((warning) => {
             lines.push(`      警告：${warning.message}`);
@@ -883,6 +914,7 @@
     const result = data.result;
     const lines = [
       "批量产品上架执行结果",
+      `语言包策略：${result.forceTranslationOverwrite ? "强制覆盖已有译文" : "只填空译文，保留已有译文"}`,
       `产品：${result.productCount}，完成：${result.completedCount}，部分失败：${result.partialCount}，失败：${result.failedCount}`,
       ...(result.warnings?.length
         ? [`警告：${result.warnings.slice(0, 5).map((item) => item.message).join("；")}`]
@@ -974,12 +1006,12 @@
     selectedCountElement.hidden = common;
     syncHeading.textContent = "后台产品资料操作";
     syncDescription.textContent = ({
-      "publish-batch": "从本地文件夹识别多个产品，逐站执行国际站复制、Product Description 翻译、Overview/Specification 和语言包更新。",
+      "publish-batch": "从本地文件夹识别多个产品，只显示 Specification 状态为 OK 的站点，再逐站执行国际站复制、Product Description 翻译、Overview/Specification 和语言包更新。",
       revision: "将一个源站点中已有产品的 Product Description、Detail、Specification 和语言包同步到多个已存在该产品的目标站点。只修订，不复制新产品。",
       "content-sync": "以国际站同名产品为源，一键同步目标站点的 PC Details Overview；不修改 Specifications、语言包、Product Description 或其他配置，产品不存在时跳过。",
       "specification-language": "只修改目标站点已有产品的 Specification 文案、Specification 输入框名称、Product Description 和语言包；不使用源站，不改 Overview。",
-      "specification-only": "只修改目标站点已有产品的 Specification 内容和输入框名称；只需上传 Specification Excel。",
-      "language-only": "只修改目标站点当前语言包；按修订规则更新译文，不套用产品上架的只填空值规则；不改产品 Details、Specification 或 Product Description。",
+      "specification-only": "只修改目标站点已有产品的 Specification 内容和输入框名称；可上传普通 Specification Excel 或欧洲云盘双工作表 Excel。",
+      "language-only": "只修改目标站点当前语言包；可上传普通 Datasheet 或欧洲云盘双工作表 Excel，系统自动读取 Datasheet 工作表。",
       common: "在下方表单中选择多个站点和多个产品，对 Detail 或 Specification 执行同一条精确删除/替换；不操作语言包。",
       delist: "只关闭 Searchable，并将 Type of listing 设为 No Set Uptime。"
     })[currentMode()] || "选择操作类型后，页面只显示该流程需要的字段。所有写操作都必须先预览。";
@@ -1050,20 +1082,29 @@
           : "确认并执行同步";
     renderTargets();
     setStatus(({
-      "publish-batch": "批量上架模式：选择资料文件夹，预览确认后逐产品、逐站点执行；目标站已有同名产品时跳过复制，只更新 Specification / Product Description / 语言包。",
+      "publish-batch": "批量上架模式：选择资料文件夹后只显示所有产品 Specification 状态均为 OK 的站点；目标站已有同名产品时跳过复制，只更新 Specification / Product Description / 语言包。",
       revision: "修订同步模式：选择源站、目标站和两份 Excel，只修改目标站点已经存在的产品。",
       "content-sync": "一键同步模式：填写产品名并选择目标站点，不需要 Excel；产品不存在的站点自动跳过。",
       "specification-language": "文案更新模式：不读取源站，只更新目标站已有产品的 Specification / Product Description / 语言包。",
-      "specification-only": "Specification 模式：只上传 Specification Excel，只更新目标站已有产品的 Specification。",
-      "language-only": "语言包模式：只上传 Datasheet，只更新目标站当前语言包。",
+      "specification-only": "Specification 模式：上传普通 Specification Excel 或欧洲云盘双工作表 Excel，系统自动读取 Spec / Specification 工作表。",
+      "language-only": "语言包模式：上传普通 Datasheet 或欧洲云盘双工作表 Excel，系统自动读取 Datasheet 工作表。",
       common: "多产品相同内容修订：请使用下方表单填写站点、产品和替换/删除内容。",
       delist: "下架模式：只关闭 Searchable，并将 Type of listing 设为 No Set Uptime。"
     })[currentMode()] || "请选择操作类型。");
   }
-  operationSelect.addEventListener("change", updateModeUi);
+  operationSelect.addEventListener("change", () => {
+    if (isLanguageOnly()) {
+      operationSelect.value = "publish-batch";
+      document.querySelector('.nav-item[data-target="tab-language-package"]')?.click();
+      document.getElementById("languageDatasheetInput")?.focus();
+      return;
+    }
+    updateModeUi();
+  });
   sameProductTab.addEventListener("click", () => showRevisionPanel("same"));
   commonPartTab.addEventListener("click", () => showRevisionPanel("common"));
   productNameInput.addEventListener("input", invalidatePreview);
+  forceTranslationOverwriteInput.addEventListener("change", () => previewButton.click());
   delistProductsInput.addEventListener("input", invalidatePreview);
   folderInput.addEventListener("change", async () => {
     invalidatePreview();
@@ -1115,8 +1156,9 @@
   });
 
   previewButton.addEventListener("click", async () => {
-    invalidatePreview();
+    invalidatePreview(true);
     previewButton.disabled = true;
+    forceTranslationOverwriteInput.disabled = true;
     try {
       const request = buildForm();
       setStatus("正在执行只读预览，不会复制或保存产品...");
@@ -1125,12 +1167,14 @@
       validatedPreview = data.result;
       validatedSignature = request.signature;
       submitButton.disabled = !data.result.readyCount;
+      if (isBatchPublishing()) forceTranslationOverwriteLabel.hidden = false;
       setStatus(`预览完成：待执行 ${data.result.readyCount}，跳过 ${data.result.skippedCount || 0}，失败 ${data.result.failedCount}。`,
         data.result.failedCount ? "warn" : "ok");
     } catch (error) {
       showRequestError("预览", error);
     } finally {
       previewButton.disabled = false;
+      forceTranslationOverwriteInput.disabled = false;
     }
   });
 
@@ -1191,7 +1235,7 @@
       return;
     }
     const confirmed = window.confirm(isBatchPublishing()
-      ? `将批量处理 ${validatedPreview.productCount} 个产品：未上架的先复制，已存在同名产品的跳过复制并只更新 Specification / Product Description / 语言包。确认继续？`
+      ? `将批量处理 ${validatedPreview.productCount} 个产品：未上架的先复制，已存在同名产品的跳过复制并只更新 Specification / Product Description / 语言包；语言包${forceTranslationOverwriteInput.checked ? "会强制覆盖已有译文" : "只填空译文"}。确认继续？`
       : isDelisting()
         ? `将执行 ${validatedPreview.readyCount} 项下架：取消 Searchable，并把 Type of listing 改为 No Set Uptime。确认继续？`
         : isContentSync()

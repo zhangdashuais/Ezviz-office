@@ -1,5 +1,16 @@
 function registerEcadminPlatformRoutes(app, deps) {
-  const { ecadminPlatformFeature, logLine } = deps;
+  const { ecadminPlatformFeature, logLine, upload, fs } = deps;
+
+  app.post("/api/ecadmin/upload-video", upload.single("file"), async (req, res) => {
+    try {
+      const result = await ecadminPlatformFeature.uploadVideo(req.file);
+      res.json({ ok: true, result });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error?.message || String(error) });
+    } finally {
+      if (req.file?.path) await fs.promises.unlink(req.file.path).catch(() => {});
+    }
+  });
 
   app.post("/api/ecadmin/local-files", (req, res) => {
     try {

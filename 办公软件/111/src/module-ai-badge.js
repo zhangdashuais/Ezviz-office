@@ -1,4 +1,56 @@
 (function() {
+  function createAiBadgeHtml(source, label = "AI GENERATED") {
+    const html = String(source || "");
+    if (!html.trim()) throw new Error("请粘贴或上传网页 HTML。");
+    if (html.includes("data-ezviz-ai-badge-code")) return html;
+    const lastStyleEnd = html.toLowerCase().lastIndexOf("</style>");
+    const contentStart = lastStyleEnd < 0 ? 0 : lastStyleEnd + 8;
+    const rootMatch = /<(div|main|article|section)\b/i.exec(html.slice(contentStart));
+    if (!rootMatch) throw new Error("没有找到网页内容容器（div、main、article 或 section）。");
+    const scope = `ezviz-ai-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const rootEnd = contentStart + rootMatch.index + rootMatch[0].length;
+    const scopedHtml = html.slice(0, rootEnd) + ` data-ezviz-ai-scope="${scope}"` + html.slice(rootEnd);
+    const safeLabel = JSON.stringify(String(label || "AI GENERATED").trim() || "AI GENERATED")
+      .replace(/</g, "\\u003c");
+    const badgeCode = `\n<style data-ezviz-ai-badge-code>
+.ezviz-ai-badge-layer{position:fixed;inset:0;z-index:9999;pointer-events:none}
+.ezviz-ai-badge-chip{position:absolute;padding:5px 8px;border:1px solid rgba(255,255,255,.22);border-radius:5px;background:rgba(0,0,0,.58);color:#fff;font:700 12px/1 Arial,sans-serif;white-space:nowrap;box-sizing:border-box}
+</style>
+<script data-ezviz-ai-badge-code>(function(){
+  var root=document.querySelector('[data-ezviz-ai-scope="${scope}"]');
+  if(!root)return;
+  var layer=document.createElement('div');layer.className='ezviz-ai-badge-layer';document.body.appendChild(layer);
+  var items=[];
+  [root].concat(Array.from(root.querySelectorAll('section'))).forEach(function(el){
+    if(!el.matches('section'))return;
+    var badge=document.createElement('span');badge.className='ezviz-ai-badge-chip';badge.textContent=${safeLabel};badge.setAttribute('aria-hidden','true');layer.appendChild(badge);
+    items.push({el:el,badge:badge});
+  });
+  var queued=false;
+  function update(){queued=false;items.forEach(function(item){
+    var el=item.el,style=getComputedStyle(el),rect=el.getBoundingClientRect();
+    var visible=el.isConnected&&style.visibility!=='hidden'&&style.display!=='none'&&rect.width>0&&rect.height>0;
+    var x=rect.right-10,y=rect.bottom-10;
+    visible=visible&&x>0&&x<innerWidth&&y>0&&y<innerHeight;
+    item.badge.hidden=!visible;
+    if(visible){item.badge.style.left=x+'px';item.badge.style.top=y+'px';item.badge.style.transform='translate(-100%,-100%)';}
+  });}
+  function schedule(){if(!queued){queued=true;requestAnimationFrame(update);}
+  }
+  window.addEventListener('scroll',schedule,true);window.addEventListener('resize',schedule);
+  window.addEventListener('load',schedule);document.addEventListener('load',schedule,true);
+  document.addEventListener('click',schedule,true);
+  if(typeof ResizeObserver==='function'){var observer=new ResizeObserver(schedule);items.forEach(function(item){observer.observe(item.el);});}
+  schedule();
+})();<\/script>`;
+    const bodyClose = /<\/body\s*>/i.exec(scopedHtml);
+    return bodyClose
+      ? scopedHtml.slice(0, bodyClose.index) + badgeCode + scopedHtml.slice(bodyClose.index)
+      : scopedHtml + badgeCode;
+  }
+
+  if (typeof module !== "undefined" && module.exports) module.exports = { createAiBadgeHtml };
+  if (typeof document === "undefined") return;
   const input = document.getElementById("aiBadgeImageInput");
   const textInput = document.getElementById("aiBadgeTextInput");
   const runBtn = document.getElementById("aiBadgeRunBtn");
@@ -7,6 +59,11 @@
   const canvas = document.getElementById("aiBadgeCanvas");
   const dropZone = document.getElementById("aiBadgeDropZone");
   const list = document.getElementById("aiBadgeList");
+  const htmlFileInput = document.getElementById("aiBadgeHtmlFile");
+  const htmlSource = document.getElementById("aiBadgeHtmlSource");
+  const htmlRunButton = document.getElementById("aiBadgeHtmlRunBtn");
+  const htmlOutput = document.getElementById("aiBadgeHtmlOutput");
+  const htmlDownload = document.getElementById("aiBadgeHtmlDownload");
   if (!input || !textInput || !runBtn || !clearBtn || !status || !canvas || !dropZone || !list) return;
 
   const ctx = canvas.getContext("2d");
@@ -234,6 +291,28 @@
     });
   });
   dropZone.addEventListener("drop", (event) => addFiles(event.dataTransfer?.files || []));
+
+  htmlFileInput?.addEventListener("change", async () => {
+    if (htmlFileInput.files?.[0]) htmlSource.value = await htmlFileInput.files[0].text();
+  });
+  htmlRunButton?.addEventListener("click", () => {
+    try {
+      htmlOutput.value = createAiBadgeHtml(htmlSource.value, textInput.value);
+      htmlDownload.disabled = false;
+      setStatus("网页 AI 标识代码已生成。每个 section 右下角会显示标识，单独图片不打标。", "ok");
+    } catch (error) {
+      htmlDownload.disabled = true;
+      setStatus(error.message || "网页代码处理失败。", "warn");
+    }
+  });
+  htmlDownload?.addEventListener("click", () => {
+    const url = URL.createObjectURL(new Blob([htmlOutput.value], { type: "text/html;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileStem(htmlFileInput.files?.[0]?.name || "product-detail")}-ai-badged.html`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
 
   renderList();
 })();

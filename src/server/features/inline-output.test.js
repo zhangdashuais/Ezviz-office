@@ -5,6 +5,7 @@ const {
   normalizeNumberedClasses,
   appendRequiredCss,
   requiredListItemStyleValue,
+  ensureMarker,
   wrap
 } = require("../../../办公软件/111/src/inline-output.js");
 
@@ -26,7 +27,18 @@ test("wraps inline output with optional head and body tags", () => {
   assert.equal(wrap(fragment, link), `<!-- product detail webflow -->\n${fragment}`);
   assert.equal(
     wrap(fragment, link, { includeHead: true, includeBody: true }),
-    `<head>\n${link}\n</head>\n<body>\n<!-- product detail webflow -->\n${fragment}\n</body>`
+    `<!-- product detail webflow -->\n<head>\n${link}\n</head>\n<body>\n${fragment}\n</body>`
+  );
+});
+
+test("keeps one detail marker at the very start of converted HTML", () => {
+  const link = '<link rel="stylesheet" href="webflow.css">';
+  const fragment = `${link}\n<section>Detail</section>`;
+  assert.equal(ensureMarker(fragment), `<!-- product detail webflow -->\n${fragment}`);
+  assert.equal(ensureMarker(ensureMarker(fragment)), `<!-- product detail webflow -->\n${fragment}`);
+  assert.equal(
+    ensureMarker(`<!DOCTYPE html>\n<html><body>${fragment}</body></html>`),
+    `<!-- product detail webflow -->\n<!DOCTYPE html>\n<html><body>${fragment}</body></html>`
   );
 });
 
