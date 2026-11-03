@@ -46,6 +46,7 @@ const { registerTextComparisonRoutes } = require("./src/server/routes/text-compa
 const { createGa4Connection } = require("./src/server/features/ga4-connection");
 const { registerGa4Routes } = require("./src/server/routes/ga4-routes");
 const { registerHtmlAiBadgeRoutes } = require("./src/server/routes/html-ai-badge-routes");
+const { registerBlogAiBadgeRoutes } = require("./src/server/routes/blog-ai-badge-routes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3217);
@@ -851,6 +852,7 @@ registerTextComparisonRoutes(app, {
 });
 registerAssetUploadRoutes(app, { upload });
 registerHtmlAiBadgeRoutes(app);
+registerBlogAiBadgeRoutes(app);
 
 registerSpecificationTranslationRoutes(app, {
   upload,

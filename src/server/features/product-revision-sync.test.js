@@ -252,6 +252,18 @@ test("content sync fingerprint only tracks goods id and Details", () => {
   assert.notEqual(contentSyncFingerprint(first), contentSyncFingerprint(detailChange));
 });
 
+test("content sync can compare Overview when a local custom field name is unknown", () => {
+  const detail = readDetailFromPcView({
+    summary: "<p>Overview</p>",
+    customs: [{ name: "تحديد", value: "Local specifications" }]
+  });
+  assert.equal(detail.overview, "<p>Overview</p>");
+  assert.equal(detail.specificationsFound, false);
+  assert.equal(contentSyncFingerprint({ goodsId: "123", detail }), contentSyncFingerprint({
+    goodsId: "123", detail: { overview: "<p>Overview</p>" }
+  }));
+});
+
 test("product availability matching ignores case and whitespace only", () => {
   assert.equal(
     normalizeProductAvailabilityName(" H8C  Pro 2K (new) "),

@@ -18,6 +18,7 @@
         <div class="nav-item" data-target="tab-video-upload">视频上传-海外</div>
         <div class="nav-item" data-target="tab-ai-badge">图片 AI 标志</div>
         <div class="nav-item" data-target="tab-html-ai-badge">HTML Section AI 标志</div>
+        <div class="nav-item" data-target="tab-blog-ai-badge">Blog 图片 AI 标志</div>
         <div class="nav-item" data-target="tab-text">i18n 语言转换</div>
       </div>
     </div>
@@ -185,6 +186,30 @@
         <div class="card">
           <h3>处理结果</h3>
           <textarea id="htmlAiBadgeOutput" readonly spellcheck="false" placeholder="打标后的 HTML 将显示在这里。" style="min-height: 260px;"></textarea>
+        </div>
+      </div>
+
+      <div id="tab-blog-ai-badge" class="tab-content">
+        <div class="card">
+          <h3>Blog 图片 AI 标志</h3>
+          <p class="desc">给 Blog HTML 中每张图片的右下角添加 AI GENERATED 标识。支持上传 .html/.txt 或粘贴代码；不改图片地址，不依赖脚本，也不会重复打标。</p>
+          <div class="form-grid">
+            <label for="blogAiBadgeFile">Blog HTML 文件</label>
+            <input id="blogAiBadgeFile" type="file" accept=".html,.htm,.txt,text/html,text/plain">
+            <label for="blogAiBadgeText">标识文案</label>
+            <input id="blogAiBadgeText" type="text" value="AI GENERATED" maxlength="80">
+          </div>
+          <label for="blogAiBadgeSource" style="display:block;margin-top:16px;">Blog HTML 源代码</label>
+          <textarea id="blogAiBadgeSource" spellcheck="false" placeholder="上传文件后会自动填入，也可直接粘贴 Blog HTML。" style="min-height:180px;"></textarea>
+          <div class="row" style="margin-top:16px;margin-bottom:0;">
+            <button id="blogAiBadgeRun" type="button">给 Blog 图片打标</button>
+            <button id="blogAiBadgeDownload" type="button" disabled>下载打标后 HTML</button>
+          </div>
+        </div>
+        <div id="blogAiBadgeStatus" class="status">请选择文件或粘贴 Blog HTML。</div>
+        <div class="card">
+          <h3>处理结果</h3>
+          <textarea id="blogAiBadgeOutput" readonly spellcheck="false" placeholder="打标后的 Blog HTML 将显示在这里。" style="min-height:260px;"></textarea>
         </div>
       </div>
 
@@ -1166,6 +1191,7 @@
   <script src="src/module-asset-upload.js?v=20260924-1"></script>
   <script src="src/module-ai-badge.js?v=20261019-3"></script>
   <script src="src/module-html-ai-badge.js?v=20261026-1"></script>
+  <script src="src/module-blog-ai-badge.js?v=20261103-1"></script>
   <script src="src/module-pdf-upload.js?v=20260924-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
