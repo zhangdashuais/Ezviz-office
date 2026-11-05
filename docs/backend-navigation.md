@@ -141,7 +141,7 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 后台产品资料操作页面用同一个操作类型下拉承载文件夹批量上架、源站同步修订、只改 Specification、多产品相同内容修订和产品下架；页面按模式显示必要字段。选择“只改语言包”会跳转至独立的单产品 Datasheet 语言包功能，不再读取产品 Detail/Spec。只改 Specification 可上传欧洲云盘双工作表 Excel 并自动选择 Spec / Specification；独立语言包功能自动读取 Datasheet，普通单工作表文件也兼容。多产品相同部分修订可同时选择多个国家站点，对最多 50 个产品的 Detail 或 Specification 执行同一条精确删除/替换，也可只把 Specification 的 Custom Page Name 输入框修成站点固定文案，并按国家 × 产品逐项预览、保存和回读。直接修订接口可只更新 Basic Information 的 Product Description，或只更新 Specification 自定义字段名；Overview 与 Specification 内容会原样保留。
 
 已上架产品只需更新资料文案和语言包时，`/api/product-revision-sync/preview` 与 `/api/product-revision-sync/submit` 可传 `updateScope=specification-language`。该范围不读取或复制国际站源产品，明确保留目标站当前 Overview 和规格图；Product Description 若在 Datasheet 中存在或能由当前后台文案反查到唯一字段行，则按目标语种更新，缺失时才保留现值；Specification 自定义字段名按官网 tab 固定映射，HTML 顶部标题按规格内容标题映射，正文按目标语言列生成，并按稳定 Key 更新总语言包。新增语言键只追加到与本次既有键匹配最多的语言工作表，避免跨工作表重复。
-产品预览、修订、上架与回读查找产品时固定使用旧版 `https://shop.ezvizlife.com/goods/index`。登录后即使落到区域新版后台，也不在 `new-<区域>-shop.ezvizlife.com/goods/index` 查询，因为部分区域该地址会返回 404。
+产品预览、修订、上架与回读查找产品时从 `https://shop.ezvizlife.com/goods/index` 发起。后台可能重定向到 `new-shop` 或区域新版的 `/goods/index`；最终地址、HTTP 状态及商品列表控件都验证通过才继续。旧版表格行和新版商品卡片均支持查找；真正的 404 或空后台壳仍停止。
 
 # 欧洲分类页与 Support 只读巡查
 
