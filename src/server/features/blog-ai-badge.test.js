@@ -9,6 +9,7 @@ test("blog badges mark each image without changing its source HTML", () => {
   assert.equal((result.html.match(/data-ezviz-blog-ai-image/g) || []).length, 2);
   assert.match(result.html, /<img src="a\.png" style="width:100%"\/>/);
   assert.match(result.html, /<a href="\/x"><span data-ezviz-blog-ai-image/);
+  assert.match(result.html, /transform:scale\(\.75\);transform-origin:right bottom;/);
   assert.doesNotMatch(result.html, /<script|<style/i);
 });
 
