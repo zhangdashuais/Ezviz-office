@@ -12,6 +12,8 @@
 
 “图片 AI 标志”另提供网页 HTML 模式：上传或粘贴代码后生成可复制、下载的 HTML。运行时仅在每个可见 `section` 右下角显示标识，包括没有背景图的区块；单独的 `img` 不打标，也不改原图片文件。
 
+基础工具另有独立的“Blog 图片 AI 标志”：上传或粘贴 Blog HTML 后，通过 `/api/blog-ai-badge` 为每张 `<img>`（或包含图片的 `<picture>`）生成右下角标识，整体尺寸为原来的 75%，结果可下载。仅插入内联 HTML/CSS，不依赖脚本，不修改图片地址；再次处理会替换旧标识而非叠加。
+
 商城 Detail 模板处理可能把内联脚本中相邻的 `}}` 改写为 `;?>`，造成前台脚本语法错误；网页 AI 标志生成器通过分隔闭合花括号规避此问题。旧版生成的 HTML 需要重新生成后替换，单纯刷新前台无效。
 
 ## 菜单结构
@@ -104,7 +106,7 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications，语言表头从实际工作簿读取并由页面选择。目标站已有同名产品时跳过复制，只更新 Specification、Product Description 和语言包，保留 Overview。批量上架先读取 Datasheet 黄色的 `If you have proofread …` 依赖说明，若依赖产品同批次上架则先处理依赖产品；预览和提交均逐站查询依赖产品是否已存在。黄色行后续字段与其他字段一样按 Key 处理：默认只补后台空译文或追加缺失字段，勾选“强制覆盖已有译文”后用 Datasheet 覆盖目标译文列；即使英文原文不匹配也始终保留后台英文源列并提示差异。批量提交逐站合并语言包，一站一次上传；默认保留的已有译文列入人工校对 CSV。预览和提交的 `forceTranslationOverwrite` 值必须一致，否则拒绝执行并要求重新预览。产品上架不允许修改语言包 `Sheet1`：预览阻止写入，生成后逐格比对，不一致不上传。一次上传后最多下载回读 6 次，不重复上传；语言包处理失败的站点不再执行产品复制或保存，其他通过站点可继续。每个产品还须在该站预览通过，才进入产品操作。明确提供 Product Description 时写入目标译文；缺少时首次上架保留国际复制源描述，已存在产品保留目标站当前描述。Detail 规格字段兼容 `Specification/Specifications`、本地化标题与日本站 `仕様`。产品下架仍使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，关闭 `isSearchable` 并设 `whenType=0` 后回读。
 
-无需 Excel 的产品内容同步使用 `/api/product-content-sync/preview` 和 `/api/product-content-sync/submit`。源固定为国际站 `hq`，按同名产品只把 PC Details 的 Overview 原样同步到所选目标站；目标站不存在产品时跳过，不复制产品，也不修改 Specifications、语言包、Product Description、Specification 字段名或其他配置。提交前同时校验源站与目标站 Overview 指纹，保存后回读 Overview，并确认原 Specifications 仍保持不变。
+无需 Excel 的产品内容同步使用 `/api/product-content-sync/preview` 和 `/api/product-content-sync/submit`。源固定为国际站 `hq`，按同名产品只把 PC Details 的 Overview 原样同步到所选目标站；目标站不存在产品时跳过，不复制产品，也不修改 Specifications、语言包、Product Description、Specification 字段名或其他配置。目标站的规格自定义字段名即使未识别，也可只比较和同步 Overview。提交前同时校验源站与目标站 Overview 指纹，保存后回读 Overview，并确认原自定义字段（含 Specifications）仍保持不变。
 
 左侧“后台运营”分组中的独立 Tab“产品上线站点搜索”使用只读接口 `POST /api/product-availability/search`，不再放在“产品资料操作”的流程下拉框中。它访问全部启用站点的官网 `/search?keywords=` 页面，同时读取普通搜索结果和组合产品卡片 `data-jsond` 内全部规格 Tab。按 Unicode NFKC、忽略大小写和所有空格后的完整产品名精确匹配；括号后缀仍参与最终匹配，但会追加一次去后缀搜索以兼容官网检索。单站搜索失败独立记录，不影响其他站点。
 

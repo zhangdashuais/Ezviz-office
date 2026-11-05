@@ -86,6 +86,8 @@ WTB 登录后固定跳转 `https://shop.ezvizlife.com/goods/index`，在旧版�
 
 ## 产品与资料
 
+Blog HTML 图片标识：`POST /api/blog-ai-badge?text=AI%20GENERATED`，请求体为 `text/plain` 的 Blog HTML，返回打标后 HTML 与图片数量。只在本地生成代码，不写商城后台或图片文件；再次处理时替换已有标识，不叠加。
+
 | 方法 | 路径 | 状态 |
 | --- | --- | --- |
 | POST | `/api/product-revision/preview` | 单产品 Detail 整体替换与 Specification 删除/替换预览 |
@@ -93,7 +95,7 @@ WTB 登录后固定跳转 `https://shop.ezvizlife.com/goods/index`，在旧版�
 | POST | `/api/product-revision/common-preview` | 多站点 × 多产品的相同 Detail/Specification 片段删除或替换预览；也支持只按站点固定文案预览 Specification 的 Custom Page Name |
 | POST | `/api/product-revision/common-submit` | 按逐站点、逐产品预览指纹执行相同片段修订或 Specification 输入框名称修订并分别回读 |
 | POST | `/api/product-content-sync/preview` | 以国际站同名产品为源，只读比较所选站点的 PC Details Overview；产品不存在时跳过 |
-| POST | `/api/product-content-sync/submit` | 按源站和目标站预览指纹同步 Overview 并回读；不修改 Specifications、语言包、Product Description 或其他配置 |
+| POST | `/api/product-content-sync/submit` | 按源站和目标站预览指纹同步 Overview 并回读；目标站规格字段名未识别时仍可只处理 Overview，不修改 Specifications、语言包、Product Description 或其他配置，并回读确认全部自定义字段不变 |
 | POST | `/api/product-availability/search` | 逐个搜索全部启用的 EZVIZ 国家官网，读取普通结果及组合产品卡片全部规格 Tab，按忽略大小写和所有空格的产品名精确匹配并返回产品链接；带括号后缀的名称会追加一次去后缀检索以兼容官网搜索；只读，不登录商城后台 |
 | POST | `/api/detail-address-replacement/preview` | 读取多个产品 PC Details，返回旧地址命中路径和次数 |
 | POST | `/api/detail-address-replacement/submit` | 精确替换命中地址，保存后逐产品回读 |

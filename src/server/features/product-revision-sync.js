@@ -1566,7 +1566,9 @@ function createProductRevisionSyncFeature(deps) {
           results.push({ status: "skipped", site: target.site, productName: request.productName });
           continue;
         }
-        const current = await readProductSnapshot(session.page, request.productName, logs);
+        const current = await readProductSnapshot(
+          session.page, request.productName, logs, "", { requireSpecifications: false }
+        );
         const detailChanged = current.detail.overview !== source.snapshot.detail.overview;
         const specificationChanged = false;
         results.push({
@@ -1627,7 +1629,9 @@ function createProductRevisionSyncFeature(deps) {
           results.push({ status: "skipped", site: target.site, productName: request.productName });
           continue;
         }
-        const before = await readProductSnapshot(session.page, request.productName, logs);
+        const before = await readProductSnapshot(
+          session.page, request.productName, logs, "", { requireSpecifications: false }
+        );
         const expectedFingerprint = normalize(expectedTargets[target.site.siteCode]);
         if (!expectedFingerprint) {
           results.push({
@@ -1656,8 +1660,13 @@ function createProductRevisionSyncFeature(deps) {
           currentSpecificationFieldName: before.detail.specificationsFieldName,
           nextSpecificationFieldName: before.detail.specificationsFieldName,
           goodsId: before.goodsId,
+          requireSpecificationField: false,
           fillAdsProductTitle: false
         });
+        if (JSON.stringify(saved.after.pcView.customs || [])
+          !== JSON.stringify(before.pcView.customs || [])) {
+          throw new Error("保存后回读发现目标站的 Specifications/自定义字段发生变化，请人工核查。");
+        }
         results.push({
           status: "completed",
           site: target.site,
