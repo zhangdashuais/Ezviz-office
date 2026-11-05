@@ -115,7 +115,7 @@ Blog HTML 图片标识：`POST /api/blog-ai-badge?text=AI%20GENERATED`，请求�
 
 产品上架与修订写入 Detail → Specification 时，表格行取目标站对应的工作簿译文列。后台自定义字段名 `vm.pcView.customs[n].name`（Custom Page Name 输入框）使用官网 tab 固定文案，HTML 顶部 Specification 标题使用规格内容标题；未知站点回退到工作簿标题。Custom Page Name 固定映射包括：荷兰/比利时 `Specificaties`，德国 `Technische Daten`，法国 `Spécifications`，西班牙/拉美/阿根廷 `Especificaciones`，意大利 `Specifiche`，捷克 `Technické údaje`，泰国 `รายละเอียด`。
 已上架产品的 `updateScope=specification-only` 仅接收 `specExcel`，只更新 Specification 内容和 Custom Page Name。界面上的“只改语言包”直接跳转独立的 `/api/language-package/datasheet-*` 流程，不读取产品 Detail/Spec；旧 `updateScope=language-only` 接口保留兼容，不再作为界面入口。
-上述产品预览、提交和回读均固定从旧版 `https://shop.ezvizlife.com/goods/index` 查找产品；登录落到区域新版后台时必须切回旧版列表，不能在可能返回 404 的 `new-<区域>-shop.ezvizlife.com/goods/index` 搜索。
+上述产品预览、提交和回读均从 `https://shop.ezvizlife.com/goods/index` 发起商品列表导航；如后台重定向到新版 `/goods/index`，必须验证 HTTP 状态和列表控件确实加载后才搜索。旧版表格行与新版商品卡片都可读取；404 或空后台壳必须报错，不得当成产品不存在。
 保存产品资料前会自动把空的 Ads Additional Information → Product Title 补为当前产品名称；已有值不覆盖。
 | POST | `/api/language-package/upload` | 上传语言包 |
 | GET/POST | `/api/language-package/local-i18n-paths` | 读取或保存本机 i18n Datasheet 默认路径 |

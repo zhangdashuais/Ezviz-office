@@ -16,10 +16,25 @@ function shopUrlForPage(_page, pathname) {
 async function openLegacyProductIndex(page, options = {}) {
   const url = shopUrlForPage(page, "/goods/index");
   const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  if (!isLegacyShopPath(page.url(), "/goods/index") || response?.status?.() >= 400) {
+  if (!isShopProductIndexUrl(page.url()) || response?.status?.() >= 400) {
     throw new Error(`产品列表打开失败：${page.url()}，请检查商城后台登录状态。`);
   }
+  await page.locator(".goods-item.ng-scope, .ant-list-items, tr, input[placeholder*='Product']")
+    .first().waitFor({ timeout: 10000 }).catch(() => {
+      throw new Error(`产品列表未加载：${page.url()}，请检查商城后台页面状态。`);
+    });
   await page.waitForTimeout(options.settleMs ?? 1800);
+}
+
+function isShopProductIndexUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === "https:"
+      && /^(?:shop|new-shop|new-[a-z]{2,3}-shop)\.ezvizlife\.com$/i.test(url.hostname)
+      && url.pathname === "/goods/index";
+  } catch {
+    return false;
+  }
 }
 
 function isLegacyShopPath(rawUrl, pathName) {
@@ -92,7 +107,7 @@ function createProductManagement({ logLine, normalizeBool }) {
       productEditCache.delete(cacheKey);
     }
 
-    if (!isLegacyShopPath(page.url(), "/goods/index")) {
+    if (!isShopProductIndexUrl(page.url())) {
       await openLegacyProductIndex(page);
     }
 
@@ -107,8 +122,8 @@ function createProductManagement({ logLine, normalizeBool }) {
           .toLowerCase();
         const normalized = normalizeProductName(name);
         const visible = (el) => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope")].filter(visible);
-        const exact = rows.find((row) => [...row.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name']")]
+        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope, .ant-list-items .ant-card")].filter(visible);
+        const exact = rows.find((row) => [...row.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name'], a, span, div")]
           .some((cell) => normalizeProductName(cell.innerText || cell.textContent || "") === normalized));
         const fuzzy = exactOnly
           ? null
@@ -191,9 +206,9 @@ function createProductManagement({ logLine, normalizeBool }) {
         const visible = (el) => Boolean(
           el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)
         );
-        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope")].filter(visible);
+        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope, .ant-list-items .ant-card")].filter(visible);
         const row = rows.find((candidate) =>
-          [...candidate.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name']")]
+          [...candidate.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name'], a, span, div")]
             .some((cell) => (cell.innerText || cell.textContent || "")
               && normalizeProductName(cell.innerText || cell.textContent || "") === normalized)
         );
@@ -669,6 +684,7 @@ module.exports = {
   INT_GOODS_CATEGORY_PRIORITY,
   INT_GOODS_SOURCE_SITE_VALUE,
   LEGACY_GOODS_INDEX_URL,
+  isShopProductIndexUrl,
   isLegacyShopPath,
   isLegacyShopUrl,
   shopUrlForPage,
