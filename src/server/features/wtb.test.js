@@ -351,3 +351,89 @@ test("WTB reads the authenticated identity from the legacy product index", async
   assert.equal(identity, "fr114514");
   assert.deepEqual(visited, ["https://shop.ezvizlife.com/goods/index"]);
 });
+
+test("WTB accepts the product index after the legacy URL redirects to new-shop", async () => {
+  const visited = [];
+  const page = {
+    currentUrl: "https://new-shop.ezvizlife.com/templates/list",
+    url() { return this.currentUrl; },
+    async goto(url) {
+      visited.push(url);
+      this.currentUrl = "https://new-shop.ezvizlife.com/goods/index";
+    },
+    async waitForTimeout() {},
+    async evaluate() { return "global114514"; }
+  };
+  const feature = createPlanFeature();
+  const identity = await feature._test.readWtbAuthenticatedIdentity(page);
+  assert.equal(identity, "global114514");
+  assert.deepEqual(visited, ["https://shop.ezvizlife.com/goods/index"]);
+});
+
+test("WTB reads the new editor channel API and preserves existing channel metadata", async () => {
+  const feature = createPlanFeature();
+  const page = {
+    url: () => "https://new-shop.ezvizlife.com/goods/edit/351650",
+    request: { async post(url, options) {
+      assert.match(url, /\/goods\/get-where-to-buy$/);
+      assert.deepEqual(options.data, { goodsId: 351650 });
+      return { ok: () => true, status: () => 200, async json() { return {
+        code: 200,
+        data: [{ title: "amazon", hrefUrl: "https://old.example", sort: 5, src: "image.png" }]
+      }; } };
+    } }
+  };
+  const state = await feature._test.readWtbEditorState(page);
+  assert.deepEqual(state.whereToBuy.amazon, {
+    href_url: "https://old.example", sort: 5, src: "image.png"
+  });
+  const update = await feature._test.buildWtbDirectPayload(page, [
+    { platform: "Amazon", url: "https://new.example" }
+  ]);
+  assert.deepEqual(update.payload, {
+    __newShopWtbLinks: [{ platform: "amazon", url: "https://new.example" }],
+    goodsId: "351650"
+  });
+  assert.equal(update.whereToBuy.amazon.sort, 5);
+  assert.equal(update.whereToBuy.amazon.src, "image.png");
+});
+
+test("WTB new editor fills the matched channel and verifies the modify response", async () => {
+  const filled = [];
+  const page = {
+    url: () => "https://new-shop.ezvizlife.com/goods/edit/351650",
+    getByRole(role, options) {
+      assert.match(role, /tab|button/);
+      if (role === "tab") return { async click() {} };
+      assert.match("Submit", options.name);
+      return { async click() {} };
+    },
+    locator(selector) {
+      assert.match(selector, /additional_whereToBuy_/);
+      return {
+        async evaluateAll() { return ["additional_whereToBuy_amazon_url"]; },
+        nth(index) {
+          assert.equal(index, 0);
+          return { async fill(value) { filled.push(value); } };
+        }
+      };
+    },
+    async waitForResponse(predicate) {
+      const response = {
+        url: () => "https://sgpshop-api.ezvizlife.com/goods/modify",
+        request: () => ({ method: () => "POST" }),
+        ok: () => true,
+        status: () => 200,
+        async json() { return { code: 200 }; }
+      };
+      assert.equal(predicate(response), true);
+      return response;
+    }
+  };
+  const result = await createPlanFeature()._test.postWtbDirectUpdate(page, {
+    goodsId: "351650",
+    __newShopWtbLinks: [{ platform: "amazon", url: "https://new.example" }]
+  });
+  assert.deepEqual(filled, ["https://new.example"]);
+  assert.equal(result.backendStatus, 200);
+});

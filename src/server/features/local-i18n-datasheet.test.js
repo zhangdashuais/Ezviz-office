@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const XLSX = require("xlsx");
+const { resolvePython } = require("./python-runtime");
 const {
   generateLocalI18nDatasheet,
   extractNewProductRows,
@@ -41,6 +42,19 @@ test("puts new product copy above the separator and reuses old product copy belo
   assert.equal(
     replaceHtmlText("<p>Brand-new 3K product copy</p><p>Reusable old product copy</p>", result.replacements),
     "<p>{{t(&#39;goods.TY1_G1_3K_1&#39;)}}</p><p>{{t(&#39;goods.TY1_G1_2K_1&#39;)}}</p>"
+  );
+});
+
+test("normalizes HTML indentation in new source copy while replacing the original text", () => {
+  const html = "<p>around the\n                                clock.</p>";
+  const result = extractNewProductRows(
+    html, "Test Kit", "test_kit",
+    { headers: ["English"], rows: new Map() }, new Map()
+  );
+  assert.equal(result.newRows[0].source, "around the clock.");
+  assert.equal(
+    replaceHtmlText(html, result.replacements),
+    "<p>{{t(&#39;goods.TEST_KIT_1&#39;)}}</p>"
   );
 });
 
@@ -195,7 +209,7 @@ test("copies the first-row format from the header reference workbook", (t) => {
   const templateFile = path.join(folder, "template.xlsx");
   const headerFile = path.join(folder, "header.xlsx");
   const outputFile = path.join(folder, "output.xlsx");
-  const fixtureResult = childProcess.spawnSync(process.env.PYTHON || "python", ["-c", [
+  const fixtureResult = childProcess.spawnSync(resolvePython(), ["-c", [
     "from openpyxl import Workbook",
     "from openpyxl.styles import PatternFill",
     `files = [(r'${templateFile}', 'FF0000', 20), (r'${headerFile}', '123456', 36), (r'${outputFile}', '00FF00', 24)]`,
@@ -212,7 +226,7 @@ test("copies the first-row format from the header reference workbook", (t) => {
   assert.equal(fixtureResult.status, 0, fixtureResult.stderr);
 
   const result = childProcess.spawnSync(
-    process.env.PYTHON || "python",
+    resolvePython(),
     [path.join(__dirname, "local-i18n-datasheet-style.py"), templateFile, outputFile, headerFile],
     { encoding: "utf8" }
   );
@@ -225,7 +239,7 @@ test("copies the first-row format from the header reference workbook", (t) => {
 test("generates the text-translation workbook with the reference header and no list row", (t) => {
   const result = generateTextTranslationWorkbook({
     prefix: "HB90f Triple Kit",
-    generatedRows: [{ key: "HB90F_1", value: "New copy" }],
+    generatedRows: [{ key: "HB90F_1", value: "New\n                                copy" }],
     alignedRows: [{ key: "goods.list", value: "List" }, { key: "CB90F_1", value: "Reference copy" }],
     existingRows: [{ key: "list", value: "List", matched: true }]
   });
@@ -237,11 +251,41 @@ test("generates the text-translation workbook with the reference header and no l
   assert.equal(generatedSheet.A1.s.fgColor.theme, 0);
   assert.equal(generatedSheet.A1.s.fgColor.tint, -0.3499862666707358);
   assert.equal(generatedSheet["!rows"][0].hpt, 36);
+  assert.equal(generatedSheet.B2.v, "New copy");
   assert.deepEqual(XLSX.utils.sheet_to_json(alignedSheet, { header: 1 }), [
     ["字段名", "单产品语言包英文原文"],
     ["CB90F_1", "Reference copy"]
   ]);
   assert.equal(workbook.Sheets["已有字段原文"], undefined);
+});
+
+test("text-translation Datasheet keeps the reference language columns and translations", (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "text-translation-reference-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const productWorkbookFile = path.join(folder, "Reference Model datasheet.xlsx");
+  const source = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(source, XLSX.utils.aoa_to_sheet([
+    ["", "English", "French", "Vietnamese"],
+    ["REFERENCE_1", "Existing copy", "Texte validé", "Bản dịch đã duyệt"]
+  ]), "Reference");
+  XLSX.writeFile(source, productWorkbookFile);
+  const result = generateTextTranslationWorkbook({
+    prefix: "NEW_MODEL",
+    productName: "New Model",
+    productWorkbookFile,
+    generatedRows: JSON.stringify([{ key: "goods.NEW_MODEL_1", value: "Fresh copy" }]),
+    alignedRows: JSON.stringify([{ key: "goods.REFERENCE_1", value: "Existing copy" }]),
+    existingRows: "[]"
+  });
+  t.after(() => fs.rmSync(result.outputDir, { recursive: true, force: true }));
+  const workbook = XLSX.readFile(result.outputFile, { cellStyles: true });
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets.Datasheet, { header: 1, defval: "" });
+  assert.equal(workbook.SheetNames[0], "Datasheet");
+  assert.deepEqual(rows[0], ["", "English", "French", "Vietnamese"]);
+  assert.deepEqual(rows[1], ["NEW_MODEL_1", "Fresh copy", "", ""]);
+  assert.match(rows[2][0], /^If you have proofread Reference Model/);
+  assert.deepEqual(rows[3], ["REFERENCE_1", "Existing copy", "Texte validé", "Bản dịch đã duyệt"]);
+  assert.equal(workbook.Sheets.Datasheet.A3.s.fgColor.rgb, "FFFF00");
 });
 
 test("generates a styled local Datasheet end to end without the list row", (t) => {

@@ -1,6 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const { parseProductNames } = require("./product-replacement");
+const {
+  readProductBackendRecord,
+  pcViewFromBackendRecord
+} = require("./product-backend-record");
 
 function countOccurrences(text, target) {
   if (!target) return 0;
@@ -656,7 +660,9 @@ function createDetailAddressReplacementFeature(deps) {
       credentialGroup: "Website"
     }, logs);
     const identity = await page.evaluate(() =>
-      document.querySelector(".clearfix.login-bar")?.innerText
+      document.querySelector("#username > a")?.textContent
+      || document.querySelector('[class*="_username_"]')?.textContent
+      || document.querySelector(".clearfix.login-bar")?.innerText
       || document.querySelector(".login-bar")?.innerText
       || ""
     ).catch(() => "");
@@ -670,6 +676,17 @@ function createDetailAddressReplacementFeature(deps) {
 
   async function readProductPcView(page, productName, logs) {
     const editInfo = await openProductEditorByName(page, productName, logs);
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/edit\//i.test(page.url())) {
+      const record = await readProductBackendRecord(page, { productName });
+      return {
+        editInfo,
+        goodsId: String(record.goods_id),
+        viewModel: { images: JSON.parse(JSON.stringify(record.images || [])) },
+        saveModel: record,
+        pcView: pcViewFromBackendRecord(record),
+        albumModelPaths: []
+      };
+    }
     await page.waitForFunction(() => {
       const element = document.querySelector("#replenish");
       const scope = window.angular && element ? window.angular.element(element).scope() : null;
@@ -710,6 +727,37 @@ function createDetailAddressReplacementFeature(deps) {
   }
 
   async function buildSavePayload(page, operations) {
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/edit\//i.test(page.url())) {
+      const payload = await readProductBackendRecord(page);
+      let pcView = pcViewFromBackendRecord(payload);
+      const replacedCounts = [];
+      for (const operation of operations) {
+        if (operation.type === "replace-album-image" || operation.type === "replace-album-image-ui") {
+          const album = { images: payload.images || [] };
+          const matches = collectAlbumImageMatches(album, operation.targetText, "vm", [],
+            operation.imageIndex, operation.fieldPath);
+          replacedCounts.push(matches.reduce((sum, item) => sum + item.count, 0));
+          payload.images = replaceAlbumImage(album, operation.targetText,
+            operation.replacementText, "vm", operation.imageIndex, operation.fieldPath).images;
+          continue;
+        }
+        const matches = collectDetailAddressMatches(pcView, operation.targetText);
+        replacedCounts.push(matches.reduce((sum, item) => sum + item.count, 0));
+        pcView = replaceDetailAddress(pcView, operation.targetText, operation.replacementText);
+      }
+      payload.summary_intro = pcView.summary;
+      (payload.extra || []).forEach((entry, index) => {
+        entry.name_key = pcView.customs[index]?.name ?? entry.name_key;
+        entry.name_value = pcView.customs[index]?.value ?? entry.name_value;
+      });
+      const payloadText = JSON.stringify(payload);
+      const payloadChecks = operations.map((operation) => ({
+        oldCount: (operation.targetTexts || [operation.targetText])
+          .reduce((sum, target) => sum + (target ? countOccurrences(payloadText, target) : 0), 0),
+        newCount: operation.replacementText ? countOccurrences(payloadText, operation.replacementText) : 0
+      }));
+      return { payload, replacedCounts, payloadChecks };
+    }
     return page.evaluate((operationList) => {
       const scope = window.angular.element(document.querySelector("#replenish")).scope();
       const replacedCounts = [];
@@ -1116,6 +1164,13 @@ function createDetailAddressReplacementFeature(deps) {
   }
 
   async function replaceAlbumUsingUploader(page, operation) {
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/edit\//i.test(page.url())) {
+      const uploaded = await resolveAlbumImageSource(operation);
+      if (!/^https:\/\/mfs\.ezvizlife\.com\//i.test(uploaded?.url || "")) {
+        throw new Error("Product Album 上传未返回有效的 MFS 地址。");
+      }
+      return { thumbnail: { big_img: uploaded.url } };
+    }
     let filePath = operation.imageSource;
     let tempDir = "";
     if (operation.sourceType !== "local-file") {

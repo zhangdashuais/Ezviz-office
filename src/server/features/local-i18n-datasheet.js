@@ -5,6 +5,7 @@ const childProcess = require("child_process");
 const XLSX = require("xlsx");
 const cheerio = require("cheerio");
 const i18nRules = require("../../../办公软件/111/src/i18n-conversion-rules");
+const { resolvePython } = require("./python-runtime");
 
 const HTML_ROOT = "D:\\代码存放\\产品代码\\ezviz";
 const PRODUCT_ROOT = "D:\\产品";
@@ -338,7 +339,7 @@ function extractNewProductRows(html, productName, productKey, productData, globa
     const location = node.sourceCodeLocation;
     if (!location) return;
     const rawNode = html.slice(location.startOffset, location.endOffset);
-    const rawLocation = locateRawHtmlText(rawNode, source);
+    const rawLocation = locateRawHtmlText(rawNode, raw);
     if (!rawLocation) return;
     if (!occurrences.has(normalized)) occurrences.set(normalized, []);
     occurrences.get(normalized).push({
@@ -522,7 +523,7 @@ function generateLocalI18nDatasheet(input = {}) {
       XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
     }
     styleResult = childProcess.spawnSync(
-      process.env.PYTHON || "python",
+      resolvePython(),
       [path.join(__dirname, "local-i18n-datasheet-style.py"), templateFile, outputFile, headerStyleSnapshot],
       { encoding: "utf8" }
     );
@@ -548,17 +549,67 @@ function generateLocalI18nDatasheet(input = {}) {
 }
 
 function generateTextTranslationWorkbook(input = {}) {
-  const cleanRows = (rows) => (Array.isArray(rows) ? rows : [])
+  const parseRows = (rows) => {
+    if (typeof rows !== "string") return rows;
+    try { return JSON.parse(rows); }
+    catch { throw new Error("语言字段数据格式不正确。"); }
+  };
+  const cleanRows = (rows) => (Array.isArray(rows = parseRows(rows)) ? rows : [])
     .filter((item) => !isListPlaceholder(item?.key))
     .slice(0, 50000);
+  const generatedRows = cleanRows(input.generatedRows);
+  const alignedRows = cleanRows(input.alignedRows);
+  const existingRows = cleanRows(input.existingRows);
   const sheetDefinitions = [
-    ["新语言包字段", ["字段名", "英文原文"], cleanRows(input.generatedRows), (item) => [text(item.key), text(item.value)], [48, 90]],
-    ["产品包复用字段", ["字段名", "单产品语言包英文原文"], cleanRows(input.alignedRows), (item) => [text(item.key), text(item.value)], [48, 90]],
-    ["已有字段原文", ["字段名", "总语言包英文原文", "匹配状态"], cleanRows(input.existingRows), (item) => [text(item.key), text(item.value), item.matched ? "已匹配" : "总语言包未找到"], [48, 90, 20]]
+    ["新语言包字段", ["字段名", "英文原文"], generatedRows, (item) => [text(item.key), i18nRules.normalize(item.value)], [48, 90]],
+    ["产品包复用字段", ["字段名", "单产品语言包英文原文"], alignedRows, (item) => [text(item.key), text(item.value)], [48, 90]],
+    ["已有字段原文", ["字段名", "总语言包英文原文", "匹配状态"], existingRows, (item) => [text(item.key), text(item.value), item.matched ? "已匹配" : "总语言包未找到"], [48, 90, 20]]
   ].filter(([, , rows]) => rows.length);
   if (!sheetDefinitions.length) throw new Error("没有可导出的语言字段。");
 
-  const workbook = XLSX.utils.book_new();
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "text-translation-workbook-"));
+  try {
+  const prefix = text(input.prefix || "language-package").replace(/^goods\./i, "").replace(/[\\/:*?"<>|]/g, "-") || "language-package";
+  const productWorkbookFile = input.productWorkbookFile || "";
+  const templateFile = productWorkbookFile && /\.xlsx$/i.test(productWorkbookFile)
+    ? productWorkbookFile
+    : path.join(folder, "datasheet-template.xlsx");
+  if (!productWorkbookFile) {
+    const template = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(template,
+      XLSX.utils.aoa_to_sheet([["", "1_English (English-英文)"], ["", ""]]), "Datasheet");
+    XLSX.writeFile(template, templateFile);
+  } else if (templateFile !== productWorkbookFile) {
+    XLSX.writeFile(XLSX.readFile(productWorkbookFile), templateFile);
+  }
+  const productData = initializeProductData(productWorkbookFile, templateFile);
+  const shortKey = (value) => text(value).replace(/^goods\./i, "");
+  const seen = new Set();
+  const newProductRows = generatedRows.map((item) => ({
+    key: shortKey(item.key), source: i18nRules.normalize(item.value)
+  })).filter((item) => {
+    const key = item.key.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const htmlKeys = alignedRows.map((item) => ({
+    key: shortKey(item.key), source: text(item.value)
+  })).filter((item) => {
+    const key = item.key.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const { workbook } = buildWorkbook({
+    productName: text(input.productName || prefix),
+    referenceProductName: workbookProductName(productWorkbookFile, prefix),
+    productData,
+    globalEntries: new Map(),
+    htmlKeys,
+    newProductRows,
+    templateFile
+  });
   sheetDefinitions.forEach(([name, headers, rows, mapRow, widths]) => {
     const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows.map(mapRow)]);
     sheet["!cols"] = widths.map((wch) => ({ wch }));
@@ -566,15 +617,15 @@ function generateTextTranslationWorkbook(input = {}) {
     XLSX.utils.book_append_sheet(workbook, sheet, name);
   });
 
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "text-translation-workbook-"));
-  const prefix = text(input.prefix || "language-package").replace(/^goods\./i, "").replace(/[\\/:*?"<>|]/g, "-") || "language-package";
   const fileName = `${prefix}.语言字段结果.xlsx`;
   const outputFile = path.join(folder, fileName);
-  try {
     XLSX.writeFile(workbook, outputFile, { bookType: "xlsx" });
     const styleResult = childProcess.spawnSync(
-      process.env.PYTHON || "python",
-      [path.join(__dirname, "local-i18n-datasheet-style.py"), DEFAULT_TEMPLATE_PATH, outputFile, HEADER_STYLE_REFERENCE_PATH],
+      resolvePython(),
+      [path.join(__dirname, "local-i18n-datasheet-style.py"),
+        templateFile,
+        outputFile,
+        fs.existsSync(HEADER_STYLE_REFERENCE_PATH) ? HEADER_STYLE_REFERENCE_PATH : templateFile],
       { encoding: "utf8" }
     );
     if (styleResult.error || styleResult.status !== 0) {

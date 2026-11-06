@@ -135,6 +135,10 @@ test("product editor forwards exact-only matching to the page search", async () 
   const page = {
     currentUrl: LEGACY_GOODS_INDEX_URL,
     url() { return this.currentUrl; },
+    request: { async get() {
+      return { ok: () => true, status: () => 200,
+        json: async () => ({ status: true, data: { goods_id: 456, name: "H6c" } }) };
+    } },
     async evaluate(_fn, arg) {
       if (!arg?.name) return "";
       searchOptions = arg;
@@ -145,4 +149,38 @@ test("product editor forwards exact-only matching to the page search", async () 
   };
   await feature.openByName(page, "H6c", [], { exactOnly: true });
   assert.deepEqual(searchOptions, { name: "H6c", exactOnly: true });
+});
+
+test("product editor searches the product-name field rather than a page-size combobox", async () => {
+  const feature = createProductManagement({ logLine() {}, normalizeBool: Boolean });
+  let searched = false;
+  let searchSelector = "";
+  const page = {
+    currentUrl: LEGACY_GOODS_INDEX_URL,
+    url() { return this.currentUrl; },
+    async evaluate(_fn, arg) {
+      if (!arg?.name) return "";
+      if (!searched) return { ok: false };
+      this.currentUrl = "https://new-shop.ezvizlife.com/goods/edit/123";
+      return { ok: true, rowText: "H8c" };
+    },
+    locator(selector) {
+      searchSelector = selector;
+      return { first: () => ({ count: async () => 1, fill: async () => {} }) };
+    },
+    getByRole(role, options) {
+      assert.equal(role, "button");
+      assert.match("Product Search", options.name);
+      return { first: () => ({ count: async () => 1, click: async () => { searched = true; } }) };
+    },
+    request: { async get() {
+      return { ok: () => true, status: () => 200,
+        json: async () => ({ status: true, data: { goods_id: 123, name: "H8c" } }) };
+    } },
+    async waitForTimeout() {}
+  };
+  const result = await feature.openByName(page, "H8c", []);
+  assert.match(searchSelector, /placeholder\*="Product Name"/);
+  assert.match(searchSelector, /not\(\[readonly\]\)/);
+  assert.equal(result.editUrl, "https://new-shop.ezvizlife.com/goods/edit/123");
 });

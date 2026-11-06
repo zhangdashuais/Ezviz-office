@@ -83,6 +83,7 @@ test('i18n conversion keeps normal copy translatable', () => {
   assert.equal(isNonTranslatableText('2.8mm fixed lens', 'H9c Dual'), false);
   assert.equal(extractTranslatableText('See everything clearly.', 'H9c Dual'), 'See everything clearly.');
   assert.equal(extractTranslatableText('Ready!', 'H9c Dual'), 'Ready!');
+  assert.equal(extractTranslatableText('around the\n                                clock.', 'H9c Dual'), 'around the clock.');
 });
 
 test('i18n conversion keeps numbers and units inside complete copy', () => {

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { readProductBackendRecord } = require("./product-backend-record");
 
 const MAX_DELIST_PRODUCTS = 50;
 const MAX_DELIST_OPERATIONS = 200;
@@ -88,32 +89,19 @@ function createProductDelistingFeature(deps) {
 
   async function readState(page, productName, logs) {
     const editInfo = await openProductEditorByName(page, productName, logs);
-    await page.waitForFunction(() => {
-      const element = document.querySelector("#replenish");
-      const scope = window.angular && element ? window.angular.element(element).scope() : null;
-      return Boolean(scope?.goodsId && scope?.vm?.basic && typeof scope?.md?.toModel === "function");
-    }, null, { timeout: 30000 });
-    const state = await page.evaluate(() => {
-      const scope = window.angular.element(document.querySelector("#replenish")).scope();
-      return {
-        goodsId: String(scope.goodsId),
-        isSearchable: Boolean(scope.vm.basic.isSearchable),
-        whenType: Number(scope.vm.basic.whenType ?? 0)
-      };
-    });
+    const record = await readProductBackendRecord(page, { productName });
+    const state = {
+      goodsId: String(record.goods_id),
+      isSearchable: Number(record.is_search) !== 0,
+      whenType: Number(record.set_uptime || 0)
+    };
     return { ...state, editUrl: editInfo.editUrl, fingerprint: stateFingerprint(state) };
   }
 
   async function saveDelisted(page) {
-    const payload = await page.evaluate(() => {
-      const scope = window.angular.element(document.querySelector("#replenish")).scope();
-      scope.vm.basic.isSearchable = false;
-      scope.vm.basic.whenType = 0;
-      (scope.$root || scope).$applyAsync?.();
-      const data = scope.md.toModel(scope.vm);
-      data.goods_id = scope.goodsId;
-      return data;
-    });
+    const payload = await readProductBackendRecord(page);
+    payload.is_search = 0;
+    payload.set_uptime = 0;
     const response = await page.request.post("https://shop.ezvizlife.com/goods/do-edit-goods", {
       data: { data: payload },
       headers: { "x-requested-with": "XMLHttpRequest" },

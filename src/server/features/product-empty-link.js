@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { normalizeProductNameForMatch } = require("./product-name-utils");
+const { goodsIdFromEditorUrl, readProductBackendRecord } = require("./product-backend-record");
 
 const DEFAULT_EMPTY_DETAIL = "<p>1<p>";
 const MAX_EMPTY_LINK_PRODUCTS = 20;
@@ -124,6 +125,7 @@ function createProductEmptyLinkFeature(deps) {
     }, logs);
     const identity = await page.evaluate(() => (
       document.querySelector("#username > a")?.textContent
+      || document.querySelector('[class*="_username_"]')?.textContent
       || document.querySelector(".clearfix.login-bar")?.innerText
       || document.querySelector(".login-bar")?.innerText
       || ""
@@ -142,6 +144,13 @@ function createProductEmptyLinkFeature(deps) {
       logs,
       { exactOnly: true }
     );
+    if (goodsIdFromEditorUrl(page.url())) {
+      const payload = await readProductBackendRecord(page, { productName: referenceProductName });
+      if (!payload.images?.length || !payload.spec?.length) {
+        throw new Error("参考产品尚未完整加载 Product Album 或规格，请稍后重试。");
+      }
+      return { goodsId: String(payload.goods_id), payload, editUrl: edit.editUrl };
+    }
     const expectedName = normalizeProductNameForMatch(referenceProductName);
     await page.waitForFunction((name) => {
       const normalize = (value) => String(value || "")

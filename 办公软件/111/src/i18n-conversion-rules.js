@@ -49,7 +49,7 @@
   }
 
   function extractTranslatableText(value, productName) {
-    const text = String(value || '').trim();
+    const text = normalize(value);
     return !text || isNonTranslatableText(text, productName) ? '' : text;
   }
 

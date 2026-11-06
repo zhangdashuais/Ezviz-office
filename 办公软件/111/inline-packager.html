@@ -418,6 +418,7 @@
             <button id="productLangExcelParseBtn">解析并用于字段对齐</button>
           </div>
           <p class="desc">单产品语言包使用 Datasheet 结构：第 1 列字段键、第 2 列英文原文、后续列为各语种；不接受下方总语言包的第 3/4/5 列布局。</p>
+          <p class="desc">下载字段结果 Excel 时，首个工作表为本地 i18n 规则生成的 Datasheet：新字段在黄色分隔行上方，复用字段在下方；上传单产品语言包后会保留其语种列和已有译文。</p>
           <div class="row" style="margin-top: 10px;">
             <label>总语言包表格</label>
             <input type="file" id="langExcelInput" accept=".xlsx,.xls,.csv">

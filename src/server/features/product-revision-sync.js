@@ -17,6 +17,7 @@ const {
   writeUpdatedLanguagePackage
 } = require("./language-package-workbook");
 const { parseProductNames } = require("./product-replacement");
+const { goodsIdFromEditorUrl, readProductBackendRecord, pcViewFromBackendRecord } = require("./product-backend-record");
 
 const SITE_LANGUAGE_NEEDLES = {
   hq: ["english"],
@@ -883,6 +884,101 @@ function applyAutoSpecificationFieldName(body, siteCode) {
   };
 }
 
+function buildNewShopRevisionPayload(record, {
+  overview, specifications, productDescription, productTitle, currentProductTitle,
+  specificationFieldName = "", nextSpecificationFieldName = "",
+  requireSpecificationField = true, fillAdsProductTitle = true
+}, whereToBuy = []) {
+  if (!/^\d+$/.test(String(record?.goodsId || ""))) throw new Error("新版商品数据缺少 goodsId。");
+  if (normalize(record.goodsName) !== normalize(currentProductTitle)) {
+    throw new Error(`新版商品名称不一致：期望 ${currentProductTitle}，实际 ${record.goodsName || "空"}。`);
+  }
+  const data = JSON.parse(JSON.stringify(record));
+  const normalizeField = (value) => String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const knownFieldNames = specificationDetailFieldNames();
+  let field = (data.pcDetail?.ext || []).find((item) => item?.nameKey === specificationFieldName);
+  if (!field) field = (data.pcDetail?.ext || []).find((item) => knownFieldNames.includes(normalizeField(item?.nameKey)));
+  if (!field && requireSpecificationField) throw new Error("Detail 中没有找到 Specification/Specifications 字段。");
+  data.pcDetail ||= { summary: "", ext: [] };
+  data.pcDetail.summary = overview;
+  if (field) {
+    if (nextSpecificationFieldName) field.nameKey = nextSpecificationFieldName;
+    field.nameValue = specifications;
+  }
+  data.brief = productDescription;
+  data.goodsName = productTitle;
+  if (currentProductTitle !== productTitle && data.goodsCode === currentProductTitle) {
+    data.goodsCode = productTitle;
+  }
+  if (fillAdsProductTitle) {
+    data.goodsExtraInfo ||= {};
+    if (currentProductTitle !== productTitle || !String(data.goodsExtraInfo.goodsTitle || "").trim()) {
+      data.goodsExtraInfo.goodsTitle = productTitle;
+    }
+  }
+  return {
+    goodsId: Number(data.goodsId), goodsCatId: data.goodsCatId,
+    goodsTypeId: data.goodsTypeId, goodsName: data.goodsName,
+    goodsCode: data.goodsCode, keyword: data.keyword || "",
+    goodsBrandId: data.brandId, brief: data.brief,
+    goodsIntroduce: data.goodsIntroduce || "", templateId: 0,
+    images: (data.images || []).map((item) => ({
+      imageId: item.imageId, imageUrl: normalizeInternationalImageUrl(item.imageUrl),
+      isDefault: Boolean(item.isDefault)
+    })),
+    realShotCode: data.realShotCode || "",
+    promotionVideoCode: data.promotionVideoCode || "",
+    unit: data.unit || "", setUptime: data.setUptime,
+    upTime: Number(data.setUptime) === 2 ? data.upTime || "" : "",
+    frozenStoreType: data.frozenStoreType,
+    pointRate: data.pointRate == null ? "" : String(data.pointRate),
+    isSearch: Number(data.isSearch) === 1 || data.isSearch === true,
+    sort: data.sort,
+    products: (data.products || []).map((item) => ({
+      productId: item.productId,
+      isOnSale: item.isOnsale === true || item.isOnsale === 1,
+      imageId: item.imageId || data.images?.[0]?.imageId || 0,
+      imageUrl: normalizeInternationalImageUrl(item.imageUrl || data.images?.[0]?.imageUrl || ""),
+      productBn: item.productBn,
+      productSpec: (item.productSpec || []).map((spec) => ({
+        goodsSpecValueId: spec.goodsSpecValueId,
+        specName: spec.specName, specValue: spec.specValue
+      })),
+      salePrice: Number(item.salePrice || 0).toFixed(2),
+      marketPrice: Number(item.marketPrice || 0).toFixed(2),
+      store: item.store,
+      weight: String(item.weight ?? ""), volume: String(item.volumn ?? item.volume ?? ""),
+      frozenStore: item.frozenStore, desc: item.desc || "",
+      isDefault: Boolean(item.isDefault)
+    })),
+    pcDetail: {
+      summary: data.pcDetail.summary,
+      ext: (data.pcDetail.ext || []).map((item) => ({
+        nameKey: item.nameKey || "", nameValue: item.nameValue || ""
+      }))
+    },
+    mobileDetail: {
+      summary: data.mobileDetail?.summary || "",
+      ext: (data.mobileDetail?.ext || []).map((item) => ({
+        nameKey: item.nameKey || "", nameValue: item.nameValue || ""
+      }))
+    },
+    pcRelations: data.pcRelations || [], mobileRelations: data.mobileRelations || [],
+    recommend: data.recommend || [], recommendedGoodsIds: data.recommendedGoodsIds || [],
+    seoInfo: data.seoInfo || { webTitle: "", keyword: "", webDesc: "", setUrl: "" },
+    whereToBuy: (whereToBuy || []).map((item) => ({
+      title: item.title, hrefUrl: item.hrefUrl || "", sort: Number(item.sort || 0)
+    })),
+    goodsExtraInfo: {
+      goodsTitle: data.goodsExtraInfo?.goodsTitle || "",
+      defaultImage: normalizeInternationalImageUrl(data.goodsExtraInfo?.defaultImage || ""),
+      images: (data.goodsExtraInfo?.images || []).map((item) =>
+        normalizeInternationalImageUrl(typeof item === "string" ? item : item?.url || ""))
+        .filter(Boolean)
+    }
+  };
+}
+
 function createProductRevisionSyncFeature(deps) {
   const {
     logLine,
@@ -915,6 +1011,7 @@ function createProductRevisionSyncFeature(deps) {
     }, logs);
     const authenticatedIdentity = await page.evaluate(() =>
       document.querySelector("#username > a")?.textContent
+      || document.querySelector('[class*="_username_"]')?.textContent
       || document.querySelector(".clearfix.login-bar")?.innerText
       || document.querySelector(".login-bar")?.innerText
       || ""
@@ -930,6 +1027,33 @@ function createProductRevisionSyncFeature(deps) {
   }
 
   async function readCurrentProductSnapshot(page, productName, logs, editInfo, options = {}) {
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/edit\//i.test(page.url())) {
+      const record = await readProductBackendRecord(page, { productName });
+      const snapshot = {
+        goodsId: String(record.goods_id),
+        pcView: pcViewFromBackendRecord(record),
+        basic: {
+          name: record.name,
+          summary: String(record.brief || ""),
+          isSearchable: Number(record.is_search) !== 0,
+          whenType: Number(record.set_uptime || 0)
+        }
+      };
+      const detail = readDetailFromPcView(snapshot.pcView);
+      if (!detail.specificationsFound && options.requireSpecifications !== false) {
+        const available = snapshot.pcView.customs.map((field) => normalize(field.name)).filter(Boolean);
+        throw new Error(`${productName} 的 Detail 中没有找到 Specifications 字段。`
+          + (available.length ? `当前自定义字段：${available.join("、")}。` : "当前没有自定义字段。"));
+      }
+      return {
+        ...snapshot,
+        editUrl: editInfo.editUrl,
+        detail,
+        productDescription: snapshot.basic.summary,
+        isSearchable: snapshot.basic.isSearchable,
+        whenType: snapshot.basic.whenType
+      };
+    }
     await page.waitForFunction(() => {
       const element = document.querySelector("#replenish");
       const scope = window.angular && element ? window.angular.element(element).scope() : null;
@@ -1025,6 +1149,28 @@ function createProductRevisionSyncFeature(deps) {
     requireSpecificationField = true,
     fillAdsProductTitle = true
   ) {
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/edit\//i.test(page.url())) {
+      const goodsId = goodsIdFromEditorUrl(page.url());
+      const api = "https://sgpshop-api.ezvizlife.com/goods";
+      const [detailResponse, channelsResponse] = await Promise.all([
+        page.request.post(`${api}/get-detail`, { data: { goodsId: Number(goodsId) }, timeout: 60000 }),
+        page.request.post(`${api}/get-where-to-buy`, { data: { goodsId: Number(goodsId) }, timeout: 60000 })
+      ]);
+      const detail = await detailResponse.json().catch(() => null);
+      const channels = await channelsResponse.json().catch(() => null);
+      if (!detailResponse.ok() || detail?.code !== 200
+        || String(detail.data?.goodsId) !== goodsId) {
+        throw new Error(`新版商品编辑数据读取失败（HTTP ${detailResponse.status()}）。`);
+      }
+      if (!channelsResponse.ok() || channels?.code !== 200 || !Array.isArray(channels.data)) {
+        throw new Error(`新版商品购买渠道读取失败（HTTP ${channelsResponse.status()}）。`);
+      }
+      return buildNewShopRevisionPayload(detail.data, {
+        overview, specifications, productDescription, productTitle, currentProductTitle,
+        specificationFieldName, nextSpecificationFieldName, requireSpecificationField,
+        fillAdsProductTitle
+      }, channels.data);
+    }
     return page.evaluate(({
       overview,
       specifications,
@@ -1133,7 +1279,19 @@ function createProductRevisionSyncFeature(deps) {
   }
 
   async function postProductUpdate(page, payload) {
-    const requestUrl = new URL("/goods/do-edit-goods", page.url()).href;
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/edit\//i.test(page.url())) {
+      if (String(payload?.goodsId) !== goodsIdFromEditorUrl(page.url())) {
+        throw new Error("新版商品保存载荷与当前编辑页 goodsId 不一致。");
+      }
+      const requestUrl = "https://sgpshop-api.ezvizlife.com/goods/modify";
+      const response = await page.request.post(requestUrl, { data: payload, timeout: 60000 });
+      const result = await response.json().catch(() => null);
+      if (!response.ok() || result?.code !== 200) {
+        throw new Error(result?.msg || result?.message || `新版商品保存失败（HTTP ${response.status()}）。`);
+      }
+      return { requestUrl, responseStatus: response.status(), backendStatus: result.code };
+    }
+    const requestUrl = "https://shop.ezvizlife.com/goods/do-edit-goods";
     const response = await page.request.post(requestUrl, {
       data: { data: payload },
       headers: { "x-requested-with": "XMLHttpRequest" },
@@ -2835,6 +2993,7 @@ module.exports = {
   parseProductSearchResults,
   retryProductReadback,
   fillAdsAdditionalProductTitle,
+  buildNewShopRevisionPayload,
   normalizeJapanPublishingProductName,
   publishingProductNameForSite,
   extractSpecificationImage,

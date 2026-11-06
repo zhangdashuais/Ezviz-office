@@ -1,4 +1,6 @@
 const GOODS_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
+const GOODS_LIST_API = "https://sgpshop-api.ezvizlife.com/goods/get-goods-list";
+const { goodsIdFromEditorUrl, readProductBackendRecord } = require("./product-backend-record");
 
 function normalizeTerm(value) {
   return String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
@@ -46,6 +48,30 @@ function createSpecificationTranslationFeature({ logLine }) {
 
   async function listAllProducts(page) {
     await page.goto(GOODS_INDEX_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/index\/?(?:\?|$)/i.test(page.url())) {
+      const products = [];
+      const pageSize = 100;
+      for (let pageNumber = 1; pageNumber <= 500; pageNumber += 1) {
+        const response = await page.request.post(GOODS_LIST_API, {
+          data: { page: pageNumber, pageSize }, timeout: 60000
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok() || result?.code !== 200 || !Array.isArray(result.data)) {
+          throw new Error(`产品列表接口读取失败（HTTP ${response.status()}）。`);
+        }
+        for (const item of result.data) {
+          if (!/^\d+$/.test(String(item.goodsId || ""))) continue;
+          products.push({
+            name: String(item.name || ""),
+            editUrl: new URL(`/goods/edit/${item.goodsId}`, page.url()).href
+          });
+        }
+        const total = Number(result.meta?.total);
+        if (!result.data.length || (Number.isFinite(total) && products.length >= total)) break;
+        if (result.data.length < pageSize) break;
+      }
+      return [...new Map(products.map((item) => [item.editUrl, item])).values()];
+    }
     await page.waitForTimeout(1500);
     const products = [];
     const seenPages = new Set();
@@ -93,6 +119,12 @@ function createSpecificationTranslationFeature({ logLine }) {
   }
 
   async function readEditor(page) {
+    if (goodsIdFromEditorUrl(page.url()) && /\/goods\/edit\/\d+/.test(page.url())) {
+      const record = await readProductBackendRecord(page);
+      const normalized = (value) => String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+      const field = (record.extra || []).find((item) => ["specification", "specifications"].includes(normalized(item?.name_key)));
+      return { goodsId: String(record.goods_id), html: String(field?.name_value || ""), hasField: Boolean(field) };
+    }
     await page.waitForFunction(() => {
       const element = document.querySelector("#replenish");
       const scope = window.angular && element ? window.angular.element(element).scope() : null;
@@ -108,6 +140,19 @@ function createSpecificationTranslationFeature({ logLine }) {
   }
 
   async function saveEditor(page, nextHtml) {
+    if (goodsIdFromEditorUrl(page.url()) && /\/goods\/edit\/\d+/.test(page.url())) {
+      const payload = await readProductBackendRecord(page);
+      const normalized = (value) => String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+      const field = (payload.extra || []).find((item) => ["specification", "specifications"].includes(normalized(item?.name_key)));
+      if (!field) throw new Error("产品没有 Specification 字段。");
+      field.name_value = nextHtml;
+      const response = await page.request.post("https://shop.ezvizlife.com/goods/do-edit-goods", {
+        data: { data: payload }, headers: { "x-requested-with": "XMLHttpRequest" }, timeout: 60000
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok() || Number(body.status) !== 1) throw new Error(body.msg || body.message || `保存失败（HTTP ${response.status()}）`);
+      return;
+    }
     const payload = await page.evaluate((html) => {
       const normalized = (value) => String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
       const scope = window.angular.element(document.querySelector("#replenish")).scope();

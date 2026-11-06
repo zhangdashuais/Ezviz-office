@@ -6,6 +6,10 @@
 
 ## 导航与能力
 
+i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进和连续空格会规范为单个空格，再写入页面结果和字段结果 Excel。
+
+文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。预设样式模板不存在时，结果 Excel 使用默认表头样式。
+
 | 分组 | 页面入口 | 主要能力 | 默认风险 |
 | --- | --- | --- | --- |
 | 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；自动合并编辑器产生的同族数字后缀类（含组合选择器，保留 `w-*` 系统类）；最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: medium; }`，并将每个 `li` 的 `style` 统一为 `list-style: decimal;`，保留原有 class；可选输出 `head`、`body` 标签，最终代码最开头固定添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
@@ -62,6 +66,8 @@ npm test
 ```
 
 端口默认是 `3217`。启动前先检查端口是否已有本项目的 Node 进程；不要误停其他服务。
+
+新版商品后台兼容：旧 `/goods/index` 会重定向到 `new-shop` 或区域新版列表；商品编辑为 `/goods/edit/<goods_id>`。产品预览按精确名称查找卡片，再用后台 JSON 核对 ID 与名称，不依赖旧 Angular `#replenish`。新版 Specification 批量列表使用 `get-goods-list` 分页；新版 WTB 渠道由 `get-where-to-buy` 返回。执行任何提交后仍要回读目标商品核验，预览不得写后台。
 # 欧洲分类页与 Support 巡查
 
 命令入口：`node scripts/audit-europe-category-support.js`。默认读取配置中的 12 个欧洲站点，覆盖两个分类页、分类导航以及产品卡片的全部变体标签组合；逐产品检查详情页和 Support 入口。可通过 `CATEGORY_AUDIT_SITES` 缩小站点范围。只读，不保存绑定。报告及页面截图位于 `outputs/europe-category-support-audit-2026-10-15/`。

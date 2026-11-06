@@ -35,16 +35,26 @@ function registerLanguagePackageRoutes(app, deps) {
     }
   });
 
-  app.post("/api/language-package/text-translation-workbook", (req, res) => {
+  app.post("/api/language-package/text-translation-workbook", upload.single("productWorkbook"), (req, res) => {
     let result;
+    const cleanupUpload = () => {
+      if (!req.file?.path) return;
+      fs.rmSync(req.file.path, { force: true });
+      try { fs.rmdirSync(pathModule.dirname(req.file.path)); } catch {}
+    };
     try {
-      result = languagePackageFeature.generateTextTranslationWorkbook(req.body || {});
+      result = languagePackageFeature.generateTextTranslationWorkbook({
+        ...(req.body || {}),
+        productWorkbookFile: req.file?.path || ""
+      });
       res.download(result.outputFile, result.fileName, (error) => {
         fs.rmSync(result.outputDir, { recursive: true, force: true });
+        cleanupUpload();
         if (error && !res.headersSent) res.status(500).json({ ok: false, error: error.message || String(error) });
       });
     } catch (error) {
       if (result?.outputDir) fs.rmSync(result.outputDir, { recursive: true, force: true });
+      cleanupUpload();
       res.status(400).json({ ok: false, error: error.message || String(error) });
     }
   });

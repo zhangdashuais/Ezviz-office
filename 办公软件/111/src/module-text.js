@@ -71,7 +71,7 @@
       const targetText = window.i18nConversionRules?.extractTranslatableText(text, productName) || '';
       if (!targetText) continue;
 
-      textNodes.push({ node, originalText: targetText });
+      textNodes.push({ node, originalText: targetText, rawText: text });
     }
 
     const conversion = renderTable(textNodes, prefix, existingKeys);
@@ -119,15 +119,16 @@
         .trim().replace(/^goods\./i, '').replace(/[\\/:*?"<>|]/g, '-');
       langExcelDownloadBtn.disabled = true;
       try {
+        const form = new FormData();
+        form.append('prefix', prefixName);
+        form.append('productName', String(langProductNameInput?.value || '').trim());
+        form.append('generatedRows', JSON.stringify(generatedLanguageRows));
+        form.append('alignedRows', JSON.stringify(alignedLanguageRows));
+        form.append('existingRows', JSON.stringify(existingLanguageRows));
+        if (productLangExcelInput?.files?.[0]) form.append('productWorkbook', productLangExcelInput.files[0]);
         const response = await fetch(serviceBase + '/api/language-package/text-translation-workbook', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prefix: prefixName,
-            generatedRows: generatedLanguageRows,
-            alignedRows: alignedLanguageRows,
-            existingRows: existingLanguageRows
-          })
+          body: form
         });
         if (!response.ok) {
           const failure = await response.json().catch(() => ({}));
@@ -263,7 +264,7 @@
         tbody.appendChild(tr);
       }
 
-      item.node.nodeValue = item.node.nodeValue.replace(item.originalText, `{{t('${key}')}}`);
+      item.node.nodeValue = item.node.nodeValue.replace(item.rawText, `{{t('${key}')}}`);
     });
 
     convertedCount = generatedLanguageRows.length;

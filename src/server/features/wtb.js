@@ -1,6 +1,13 @@
 const XLSX = require("xlsx");
+const { isShopProductIndexUrl } = require("./product-management");
+const { goodsIdFromEditorUrl } = require("./product-backend-record");
 
 const LEGACY_SHOP_PRODUCT_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
+const NEW_SHOP_API = "https://sgpshop-api.ezvizlife.com";
+
+function isNewShopEditorUrl(rawUrl) {
+  return /^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/goods\/edit\/\d+\/?(?:\?|$)/i.test(rawUrl || "");
+}
 
 function isLegacyShopBackendUrl(rawUrl) {
   try {
@@ -321,8 +328,8 @@ async function openLegacyProductIndex(page) {
     await page.goto(LEGACY_SHOP_PRODUCT_INDEX_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
   }
   await page.waitForTimeout(1800);
-  if (!isLegacyShopBackendUrl(page.url())) {
-    throw new Error("WTB 必须使用老商城后台 shop.ezvizlife.com，当前页面为：" + page.url());
+  if (!isShopProductIndexUrl(page.url())) {
+    throw new Error("WTB 产品列表打开失败，当前页面为：" + page.url());
   }
 }
 
@@ -551,6 +558,27 @@ async function saveCurrentProductAndCapture(page, logs) {
 }
 
 async function readWtbEditorState(page) {
+  if (isNewShopEditorUrl(page.url())) {
+    const goodsId = goodsIdFromEditorUrl(page.url());
+    const response = await page.request.post(`${NEW_SHOP_API}/goods/get-where-to-buy`, {
+      data: { goodsId: Number(goodsId) }, timeout: 60000
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok() || result?.code !== 200 || !Array.isArray(result.data)) {
+      throw new Error(`WTB 后台读取失败（HTTP ${response.status()}）。`);
+    }
+    const whereToBuy = {};
+    for (const item of result.data) {
+      const title = String(item?.title || "").trim();
+      if (!title || Object.hasOwn(whereToBuy, title)) continue;
+      whereToBuy[title] = {
+        href_url: String(item?.hrefUrl || ""),
+        sort: item?.sort ?? "",
+        src: String(item?.src || "")
+      };
+    }
+    return { goodsId, whereToBuy };
+  }
   await page.waitForFunction(() => {
     const element = document.querySelector("#replenish");
     const scope = window.angular && element ? window.angular.element(element).scope() : null;
@@ -573,6 +601,13 @@ async function readWtbEditorState(page) {
 async function buildWtbDirectPayload(page, links) {
   const editorState = await readWtbEditorState(page);
   const mapped = applyWtbLinksToMap(editorState.whereToBuy, links);
+  if (isNewShopEditorUrl(page.url())) {
+    return {
+      ...mapped,
+      goodsId: editorState.goodsId,
+      payload: { __newShopWtbLinks: mapped.applied, goodsId: editorState.goodsId }
+    };
+  }
   const payload = await page.evaluate((whereToBuy) => {
     const scope = window.angular.element(document.querySelector("#replenish")).scope();
     scope.vm.others.wheretobuy = whereToBuy;
@@ -584,6 +619,36 @@ async function buildWtbDirectPayload(page, links) {
 }
 
 async function postWtbDirectUpdate(page, payload) {
+  if (isNewShopEditorUrl(page.url())) {
+    if (!Array.isArray(payload?.__newShopWtbLinks)
+      || String(payload.goodsId) !== goodsIdFromEditorUrl(page.url())) {
+      throw new Error("WTB 新版后台保存载荷与当前产品不一致。");
+    }
+    await page.getByRole("tab", { name: /^Additional Information$/i }).click();
+    const inputs = page.locator('input[id^="additional_whereToBuy_"][id$="_url"]');
+    const ids = await inputs.evaluateAll((elements) => elements.map((element) => element.id));
+    for (const link of payload.__newShopWtbLinks) {
+      const index = ids.indexOf(`additional_whereToBuy_${link.platform}_url`);
+      if (index < 0) throw new Error(`WTB 新版后台没有找到渠道输入框：${link.platform}`);
+      await inputs.nth(index).fill(link.url);
+    }
+    const responsePromise = page.waitForResponse((response) =>
+      response.url() === `${NEW_SHOP_API}/goods/modify` && response.request().method() === "POST", {
+      timeout: 60000
+    });
+    await page.getByRole("button", { name: /^Submit$/i }).click();
+    const response = await responsePromise;
+    const result = await response.json().catch(() => null);
+    if (!response.ok() || result?.code !== 200) {
+      throw new Error(result?.msg || result?.message || `WTB 保存失败（HTTP ${response.status()}）。`);
+    }
+    return {
+      requestUrl: `${NEW_SHOP_API}/goods/modify`,
+      responseStatus: response.status(),
+      backendStatus: result.code,
+      redirect: ""
+    };
+  }
   const requestUrl = "https://shop.ezvizlife.com/goods/do-edit-goods";
   const response = await page.request.post(requestUrl, {
     data: { data: payload },
@@ -1422,6 +1487,9 @@ async function restoreWtbLink(body, logs) {
       inspectWtbRetailerModal,
       clickWtbRetailer,
       readWtbAuthenticatedIdentity,
+      readWtbEditorState,
+      buildWtbDirectPayload,
+      postWtbDirectUpdate,
       findAndOpenProductEdit,
       isLegacyShopBackendUrl,
       legacyShopProductIndexUrl: LEGACY_SHOP_PRODUCT_INDEX_URL

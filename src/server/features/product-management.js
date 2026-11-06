@@ -2,6 +2,7 @@ const {
   normalizeProductNameForMatch,
   productNameSearchVariants
 } = require("./product-name-utils");
+const { goodsIdFromEditorUrl, readProductBackendRecord } = require("./product-backend-record");
 
 const INT_GOODS_COPY_URL = "https://shop.ezvizlife.com/goods/save-cite";
 const INT_GOODS_CATEGORY_PRIORITY = ["WiFi Cameras", "For Home"];
@@ -75,7 +76,9 @@ function createProductManagement({ logLine, normalizeBool }) {
 
   async function productCacheScope(page) {
     return page.evaluate(() => (
-      document.querySelector(".clearfix.login-bar")?.innerText
+      document.querySelector("#username > a")?.textContent
+      || document.querySelector('[class*="_username_"]')?.textContent
+      || document.querySelector(".clearfix.login-bar")?.innerText
       || document.querySelector(".login-bar")?.innerText
       || ""
     )).catch(() => "").then((value) => value.replace(/\s+/g, " ").trim().toLowerCase());
@@ -100,9 +103,14 @@ function createProductManagement({ logLine, normalizeBool }) {
       // validate backend state instead of re-reading the mutated in-page Angular model.
       await page.goto(cached.editUrl, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(1200);
-      if (!/signin|login/i.test(page.url())) {
+      let cachedRecordValid = false;
+      if (goodsIdFromEditorUrl(page.url()) && !/signin|login/i.test(page.url())) {
+        cachedRecordValid = await readProductBackendRecord(page, { productName: targetName })
+          .then(() => true).catch(() => false);
+      }
+      if (cachedRecordValid) {
         logLine(logs, "已复用产品编辑地址缓存：" + targetName);
-        return { ...cached, cacheHit: true };
+        return { ...cached, editUrl: page.url(), cacheHit: true };
       }
       productEditCache.delete(cacheKey);
     }
@@ -125,10 +133,7 @@ function createProductManagement({ logLine, normalizeBool }) {
         const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope, .ant-list-items .ant-card")].filter(visible);
         const exact = rows.find((row) => [...row.querySelectorAll("td, .goods-name, .product-name, [ng-bind*='name'], a, span, div")]
           .some((cell) => normalizeProductName(cell.innerText || cell.textContent || "") === normalized));
-        const fuzzy = exactOnly
-          ? null
-          : rows.find((row) => normalizeProductName(row.innerText || "").includes(normalized));
-        const row = exact || fuzzy;
+        const row = exact;
         if (!row) return { ok: false };
         const controls = [...row.querySelectorAll("a, button")].filter(visible);
         const edit = controls.find((el) => /^(edit|编辑)$/i.test((el.innerText || el.textContent || "").trim()))
@@ -153,12 +158,12 @@ function createProductManagement({ logLine, normalizeBool }) {
     let found = await findAndClickEdit();
     if (!found.ok) {
       const searchInput = page.locator(
-        'input[type="search"]:visible, input[type="text"]:visible, input:not([type]):visible'
+        'input[placeholder*="Product Name"]:visible:not([readonly]), input[type="text"]:visible:not([readonly]), input[type="search"]:visible:not([readonly])'
       ).first();
       if (await searchInput.count()) {
         for (const searchName of productNameSearchVariants(targetName)) {
           await searchInput.fill(searchName);
-          const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
+          const searchButton = page.getByRole("button", { name: /^(Product Search|Search|查询|搜索)$/i }).first();
           if (await searchButton.count()) await searchButton.click();
           else await searchInput.press("Enter");
           await page.waitForTimeout(3500);
@@ -171,6 +176,9 @@ function createProductManagement({ logLine, normalizeBool }) {
       throw new Error("没有在产品列表中找到产品：" + targetName + (found.reason ? "；" + found.reason : ""));
     }
     await page.waitForTimeout(2500);
+    if (goodsIdFromEditorUrl(page.url())) {
+      await readProductBackendRecord(page, { productName: targetName });
+    }
     logLine(logs, "已打开产品编辑页：" + targetName + " / " + page.url());
     const result = {
       productName: targetName,
@@ -219,12 +227,12 @@ function createProductManagement({ logLine, normalizeBool }) {
     let result = await findExactProduct();
     if (!result.exists) {
       const searchInput = page.locator(
-        'input[type="search"]:visible, input[type="text"]:visible, input:not([type]):visible'
+        'input[placeholder*="Product Name"]:visible:not([readonly]), input[type="text"]:visible:not([readonly]), input[type="search"]:visible:not([readonly])'
       ).first();
       if (await searchInput.count()) {
         for (const searchName of productNameSearchVariants(targetName)) {
           await searchInput.fill(searchName);
-          const searchButton = page.getByText(/^(search|查询|搜索)$/i).first();
+          const searchButton = page.getByRole("button", { name: /^(Product Search|Search|查询|搜索)$/i }).first();
           if (await searchButton.count()) await searchButton.click();
           else await searchInput.press("Enter");
           await page.waitForTimeout(3500);

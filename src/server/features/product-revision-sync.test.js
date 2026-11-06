@@ -35,10 +35,40 @@ const {
   specificationTitleForSite,
   specificationFieldTitleForSite,
   fillAdsAdditionalProductTitle,
+  buildNewShopRevisionPayload,
   normalizeJapanPublishingProductName,
   publishingProductNameForSite,
   LEGACY_INT_GOODS_URL
 } = require("./product-revision-sync");
+
+test("new editor revision payload changes only requested product fields", () => {
+  const source = {
+    goodsId: 351650, goodsName: "DP2 Pro", goodsCode: "DP2 Pro", brief: "Old description",
+    pcDetail: { summary: "Old overview", ext: [
+      { nameKey: "Specifications", nameValue: "Old spec" },
+      { nameKey: "Other", nameValue: "Keep" }
+    ] }, goodsExtraInfo: { goodsTitle: "Existing ads title", images: ["ad.png"] },
+    images: [{ imageId: 12, imageUrl: "album.png", isDefault: true }],
+    products: [{ productId: 7, isOnsale: true, productBn: "SKU", productSpec: [], salePrice: "5.00", marketPrice: "0.00", store: 2 }],
+    isSearch: 1, setUptime: 1
+  };
+  const next = buildNewShopRevisionPayload(source, {
+    overview: "New overview", specifications: "New spec",
+    productDescription: "New description", productTitle: "DP2 Pro",
+    currentProductTitle: "DP2 Pro"
+  }, [{ title: "amazon", hrefUrl: "https://shop.example", sort: "5" }]);
+  assert.equal(next.pcDetail.summary, "New overview");
+  assert.equal(next.pcDetail.ext[0].nameValue, "New spec");
+  assert.equal(next.brief, "New description");
+  assert.equal(next.pcDetail.ext[1].nameValue, "Keep");
+  assert.deepEqual(next.images, source.images);
+  assert.equal(next.isSearch, true);
+  assert.equal(next.setUptime, 1);
+  assert.equal(next.goodsExtraInfo.goodsTitle, "Existing ads title");
+  assert.deepEqual(next.whereToBuy, [{ title: "amazon", hrefUrl: "https://shop.example", sort: 5 }]);
+  assert.equal(next.products[0].productId, 7);
+  assert.deepEqual(source.pcDetail.ext[0], { nameKey: "Specifications", nameValue: "Old spec" });
+});
 
 test("international product copy always uses the legacy global page", () => {
   assert.equal(LEGACY_INT_GOODS_URL, "https://shop.ezvizlife.com/goods/int-goods-list");

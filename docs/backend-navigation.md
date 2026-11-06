@@ -78,7 +78,7 @@ DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/
 
 国际站创建占位产品使用本地工具“产品空链接创建”。预览接口为 `POST /api/product-empty-link/preview`，提交接口为 `POST /api/product-empty-link/submit`。它读取一个现有国际站产品作为配置参考，经 Manual Add 对应的 `/goods/do-add` 新增产品，保留分类、类型、品牌、相册、规格、价格和库存，重置产品名称、序列号、SEO 与推荐关系，把 PC / Mobile Details 写为指定占位 HTML，并固定写入 `is_search=0`（取消勾选 Searchable）。提交前检查重名和预览指纹；创建后按 `goods_id` 调用 `/goods/edit-goods` 回读详情与 Searchable 状态，不因前台缓存未刷新而重复创建。
 
-从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。只读页面快照同时返回列表产品的 `goods_id`、型号、类型、上架状态、创建时间、URL，以及响应中实际存在的 Searchable 字段；未返回该字段时不得由列表数据推断 Detail 开关。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。WTB 不使用新版 Custom Page 落点；登录后固定从 `https://shop.ezvizlife.com/goods/index` 读取账号、查找产品并进入 Edit。
+从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。只读页面快照同时返回列表产品的 `goods_id`、型号、类型、上架状态、创建时间、URL，以及响应中实际存在的 Searchable 字段；未返回该字段时不得由列表数据推断 Detail 开关。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。WTB 登录后从 `https://shop.ezvizlife.com/goods/index` 读取账号并查找产品；旧入口重定向至新版商品列表时继续按新版页面和接口操作。
 
 本地完整上架流程提供 `POST /api/product-publishing/preview` 和 `POST /api/product-publishing/submit`。产品上架只登录目标国家站账号，不登录国际站账号；目标站没有同名产品时，在目标站会话中打开 `/goods/int-goods-list`，明确把复制来源站选择为“国际站”，再等待目标分类的产品列表真实刷新后精确匹配。预览读取 `goods_id`、摘要和列表图片并生成复制源指纹，不打开尚未复制的空 Detail；提交时先核对目标站语言包与预览指纹，默认仅计划填入空译文并保留已有译文；传入 `forceTranslationOverwrite=1` 时改为用 Datasheet 强制覆盖目标译文列，但始终保留英文源列，预检通过后才复制国际产品，再从目标站新产品回读完整 Detail、Specification 图片和 Product Description 并执行本地化更新。目标站已有同名产品时跳过国际复制，直接读取现有产品并只更新 Specification、Product Description 和语言包，Overview 保持不变。预览接口不写入后台。
 保存产品资料前，空的 Ads Additional Information → Product Title 会自动补为当前产品名称；已有值不覆盖。
@@ -116,6 +116,10 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 ## 本地 i18n 语言转换
 
+HTML 文本节点中的换行、缩进和连续空格会压缩为单个空格后写入新字段英文原文；替换 HTML 时仍按原始文本定位，保留节点两侧的排版空白。
+
+文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。预设样式模板不存在时，结果 Excel 使用默认表头样式。
+
 离线分享版位于 `outputs/i18n-converter-sheet1-20261028.zip`：解压后直接打开 `index.html`。总语言包仅读取 Sheet1，将 Category 与 Single word 拼成完整字段名，不读取 Sheet2；单产品语言包仍按 Datasheet 结构读取。支持转换后 HTML 与字段结果 Excel 下载，不包含需本地服务和绝对路径的 Datasheet 生成。
 
 本地页面的 i18n 工具将 HTML 英文文案生成新字段；单独出现的纯数字跳过，完整文案中的数字保留在原句内一起转换。单独出现的单位值、产品名称、数字上下角标、AES/TLS、度数和纯标点节点也跳过。新字段与英文原文在页面单独展示。只有单产品语言包的原文或 Key 可以判定为复用；总包仅用于字段名冲突规避，不参与复用判定。HTML 已有 Key 若不在单产品包，也归入新字段，英文原文留空提示人工补充；结果 Excel 分列“新语言包字段”和“产品包复用字段”。
@@ -142,6 +146,8 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 已上架产品只需更新资料文案和语言包时，`/api/product-revision-sync/preview` 与 `/api/product-revision-sync/submit` 可传 `updateScope=specification-language`。该范围不读取或复制国际站源产品，明确保留目标站当前 Overview 和规格图；Product Description 若在 Datasheet 中存在或能由当前后台文案反查到唯一字段行，则按目标语种更新，缺失时才保留现值；Specification 自定义字段名按官网 tab 固定映射，HTML 顶部标题按规格内容标题映射，正文按目标语言列生成，并按稳定 Key 更新总语言包。新增语言键只追加到与本次既有键匹配最多的语言工作表，避免跨工作表重复。
 产品预览、修订、上架与回读查找产品时从 `https://shop.ezvizlife.com/goods/index` 发起。后台可能重定向到 `new-shop` 或区域新版的 `/goods/index`；最终地址、HTTP 状态及商品列表控件都验证通过才继续。旧版表格行和新版商品卡片均支持查找；真正的 404 或空后台壳仍停止。
+
+新版商品编辑页是 `/goods/edit/<goods_id>`，不再提供旧 Angular 的 `#replenish` 模型。商品预览通过经登录会话读取旧商品 JSON 接口 `/goods/edit-goods?goods_id=...`，并核对商品 ID 与名称；Overview 对应 `summary_intro`，Detail 自定义字段对应 `extra[].name_key/name_value`，Product Description 对应 `brief`。产品列表的精确搜索优先使用 `Product Name` 输入框，不使用分页数量输入框；缓存的编辑地址须重新核验，否则回到列表查找。空链接创建、产品下架、Detail 替换和产品修订预览均沿用这套读取与核验流程。Specification 批量翻译在新版列表通过 `get-goods-list` 分页读取商品，按 ID 回读详情。WTB 在新版编辑页通过 `get-where-to-buy` 读取购买渠道，提交时填写对应渠道的页面输入框并检查 `goods/modify` 结果。预览只读，提交路径仍需以具体商品的保存后回读为准。
 
 # 欧洲分类页与 Support 只读巡查
 
