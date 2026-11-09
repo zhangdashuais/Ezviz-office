@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const XLSX = require("xlsx");
+const { singleLineCellText } = require("./spreadsheet-text");
 const {
   parseLanguageDatasheet,
   yellowPublishingDependency,
@@ -129,6 +130,30 @@ test("parses language Datasheet and resolves a target language", () => {
   );
 });
 
+test("single-line conversion leaves cells without line breaks untouched", () => {
+  assert.equal(singleLineCellText("  keep  spacing  "), "  keep  spacing  ");
+  assert.equal(singleLineCellText("first\n \r\n_x000D_ second"), "first second");
+});
+
+test("replaces cell line breaks and Excel carriage-return escapes before writing translations", () => {
+  const parsed = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["product_title", "Smart camera", "Cámara\r\ninteligente\n_x000D_ para casa\r"]
+  ]));
+  assert.equal(parsed.rows[0].translations.Spanish, "Cámara inteligente para casa");
+  const packageInfo = readLanguagePackage(packageBuffer(), "es-ES");
+  const plan = planLanguagePackageUpdates(packageInfo, parsed, "Spanish");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "language-single-line-"));
+  try {
+    const output = path.join(directory, "es-ES.xls");
+    writeUpdatedLanguagePackage(packageInfo, plan, output);
+    const result = readLanguagePackage(output, "es-ES");
+    assert.equal(result.workbook.Sheets.Sheet1.E2.v, "Cámara inteligente para casa");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("Datasheet parser selects the Datasheet sheet from a combined Europe-drive workbook", () => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
@@ -194,7 +219,7 @@ test("plans exact field and source matches, including identical duplicates", () 
   assert.equal(plan.skippedBlankCount, 1);
 });
 
-test("does not plan an update when only translation line endings differ", () => {
+test("plans to remove existing translation line endings", () => {
   const datasheet = parseLanguageDatasheet(workbookBuffer([
     ["Field", "Source", "French"],
     ["HP8_2", "Doorbell description", "Première ligne\r\n\r\nDeuxième ligne"]
@@ -204,8 +229,24 @@ test("does not plan an update when only translation line endings differ", () => 
     ["goods", "G1", "HP8_2", "Doorbell description", "Première ligne\n\nDeuxième ligne"]
   ], "biff8"), "fr-FR");
   const plan = planLanguagePackageUpdates(languagePackage, datasheet, "French");
-  assert.equal(plan.changedCellCount, 0);
-  assert.equal(plan.unchangedCellCount, 1);
+  assert.equal(plan.changedCellCount, 1);
+  assert.equal(plan.updates[0].translation, "Première ligne Deuxième ligne");
+});
+
+test("fill-blank planning preserves existing wording while removing its line breaks", () => {
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "French"],
+    ["HP8_2", "Doorbell description", "Different new wording"]
+  ]));
+  const languagePackage = readLanguagePackage(workbookBuffer([
+    ["Category", "Serial", "Single word", "en-US", "fr-FR(need translation)"],
+    ["goods", "G1", "HP8_2", "Doorbell description", "Texte existant\n deuxième ligne"]
+  ], "biff8"), "fr-FR");
+  const plan = planLanguagePackageUpdates(languagePackage, datasheet, "French", {
+    fillBlankOnly: true, preserveSource: true
+  });
+  assert.equal(plan.changedCellCount, 1);
+  assert.equal(plan.updates[0].translation, "Texte existant deuxième ligne");
 });
 
 test("plans new Datasheet fields for append and treats the site package source as authoritative", () => {

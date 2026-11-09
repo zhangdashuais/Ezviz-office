@@ -3,6 +3,7 @@ const childProcess = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
+const { singleLineCellText } = require("./spreadsheet-text");
 const { publishingSheetName } = require("../../../办公软件/111/src/product-publishing-input-rules");
 
 function normalize(value) {
@@ -64,7 +65,7 @@ function parseLanguageDatasheet(input) {
     const translations = {};
     headers.forEach(({ header, column }) => {
       const value = cellValue(sheet, row, column);
-      translations[header] = value == null ? "" : String(value);
+      translations[header] = singleLineCellText(value);
     });
     const hasTranslation = Object.values(translations).some((value) => normalize(value));
     if (!key && !source && !hasTranslation) continue;
@@ -263,7 +264,7 @@ function languagePackageImportDatasheet(packageInfo) {
     for (let row = section.firstDataRow; row <= section.lastDataRow; row += 1) {
       const key = normalize(cellValue(sheet, row, section.keyColumn));
       const source = normalize(cellValue(sheet, row, section.sourceColumn));
-      const translation = String(cellValue(sheet, row, section.targetColumn) ?? "");
+      const translation = singleLineCellText(cellValue(sheet, row, section.targetColumn));
       if (!key && !source && !normalize(translation)) continue;
       rows.push({ key, source, rowNumber: row + 1,
         translations: { [translationHeader]: translation } });
@@ -312,7 +313,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
   const preservedExisting = [];
   const selectedByKey = new Map();
   parsedDatasheet.rows.forEach((entry) => {
-    const translation = String(entry.translations[translationHeader] ?? "");
+    const translation = singleLineCellText(entry.translations[translationHeader]);
     if (!normalize(translation)) {
       skippedBlank.push({ key: entry.key, datasheetRow: entry.rowNumber });
       return;
@@ -344,7 +345,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
   });
 
   selectedByKey.forEach((entry) => {
-    const translation = String(entry.translations[translationHeader] ?? "");
+    const translation = singleLineCellText(entry.translations[translationHeader]);
     const candidates = candidatesByKey.get(entry.key) || [];
     if (!candidates.length) {
       if (!entry.source) {
@@ -397,7 +398,11 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
         const item = { ...candidate, key: entry.key, translation,
           datasheetSource: entry.source, datasheetRow: entry.rowNumber,
           sourceMismatch: true };
-        if (normalize(candidate.current)) preservedExisting.push({ ...item, same: false });
+        if (normalize(candidate.current)) {
+          const cleanCurrent = singleLineCellText(candidate.current);
+          if (cleanCurrent !== candidate.current) updates.push({ ...item, translation: cleanCurrent });
+          else preservedExisting.push({ ...item, same: false });
+        }
         else updates.push(item);
         return;
       }
@@ -407,7 +412,9 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
       const item = { ...candidate, key: entry.key, translation,
         datasheetSource: entry.source, datasheetRow: entry.rowNumber };
       if (options.fillBlankOnly && normalize(candidate.current)) {
-        preservedExisting.push({ ...item, same: normalizeTranslationForComparison(candidate.current)
+        const cleanCurrent = singleLineCellText(candidate.current);
+        if (cleanCurrent !== candidate.current) updates.push({ ...item, translation: cleanCurrent });
+        else preservedExisting.push({ ...item, same: normalizeTranslationForComparison(candidate.current)
           === normalizeTranslationForComparison(translation) });
         return;
       }

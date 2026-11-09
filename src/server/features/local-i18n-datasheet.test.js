@@ -259,6 +259,34 @@ test("generates the text-translation workbook with the reference header and no l
   assert.equal(workbook.Sheets["已有字段原文"], undefined);
 });
 
+test("generated Datasheet writes each source and translation on one line", (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "local-i18n-single-line-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const templateFile = path.join(folder, "template.xlsx");
+  const template = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(template, XLSX.utils.aoa_to_sheet([
+    ["", "English", "Polish"], ["", "", ""]
+  ]), "Datasheet");
+  XLSX.writeFile(template, templateFile);
+  const productData = {
+    headers: ["English", "Polish"],
+    rows: new Map([["dp2c_pro_3", {
+      key: "DP2C_Pro_3",
+      values: { English: "Doorbell\ncopy", Polish: "Pierwsza\r\ndruga_x000D_ linia" }
+    }]])
+  };
+  const { workbook } = buildWorkbook({
+    productName: "DP2C Pro",
+    productData,
+    globalEntries: new Map(),
+    htmlKeys: [],
+    newProductRows: [{ key: "DP2C_Pro_3", source: "Doorbell\ncopy" }],
+    templateFile
+  });
+  assert.equal(workbook.Sheets.Datasheet.B2.v, "Doorbell copy");
+  assert.equal(workbook.Sheets.Datasheet.C2.v, "Pierwsza druga linia");
+});
+
 test("text-translation Datasheet keeps the reference language columns and translations", (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "text-translation-reference-"));
   t.after(() => fs.rmSync(folder, { recursive: true, force: true }));

@@ -6,6 +6,7 @@ const XLSX = require("xlsx");
 const cheerio = require("cheerio");
 const i18nRules = require("../../../办公软件/111/src/i18n-conversion-rules");
 const { resolvePython } = require("./python-runtime");
+const { singleLineCellText } = require("./spreadsheet-text");
 
 const HTML_ROOT = "D:\\代码存放\\产品代码\\ezviz";
 const PRODUCT_ROOT = "D:\\产品";
@@ -422,7 +423,9 @@ function buildWorkbook({ productName, referenceProductName, productData, globalE
       const sourceCell = cell(templateSheet, 1, Math.min(column, 29));
       const style = copy(sourceCell?.s) || {};
       if (yellow) style.fgColor = { rgb: YELLOW };
-      sheet[XLSX.utils.encode_cell({ r: rowIndex, c: column })] = { t: "s", v: item, s: style };
+      sheet[XLSX.utils.encode_cell({ r: rowIndex, c: column })] = {
+        t: "s", v: column === 0 ? item : singleLineCellText(item), s: style
+      };
     });
   };
   let row = 1;
@@ -561,9 +564,9 @@ function generateTextTranslationWorkbook(input = {}) {
   const alignedRows = cleanRows(input.alignedRows);
   const existingRows = cleanRows(input.existingRows);
   const sheetDefinitions = [
-    ["新语言包字段", ["字段名", "英文原文"], generatedRows, (item) => [text(item.key), i18nRules.normalize(item.value)], [48, 90]],
-    ["产品包复用字段", ["字段名", "单产品语言包英文原文"], alignedRows, (item) => [text(item.key), text(item.value)], [48, 90]],
-    ["已有字段原文", ["字段名", "总语言包英文原文", "匹配状态"], existingRows, (item) => [text(item.key), text(item.value), item.matched ? "已匹配" : "总语言包未找到"], [48, 90, 20]]
+    ["新语言包字段", ["字段名", "英文原文"], generatedRows, (item) => [text(item.key), singleLineCellText(i18nRules.normalize(item.value))], [48, 90]],
+    ["产品包复用字段", ["字段名", "单产品语言包英文原文"], alignedRows, (item) => [text(item.key), singleLineCellText(item.value)], [48, 90]],
+    ["已有字段原文", ["字段名", "总语言包英文原文", "匹配状态"], existingRows, (item) => [text(item.key), singleLineCellText(item.value), item.matched ? "已匹配" : "总语言包未找到"], [48, 90, 20]]
   ].filter(([, , rows]) => rows.length);
   if (!sheetDefinitions.length) throw new Error("没有可导出的语言字段。");
 
