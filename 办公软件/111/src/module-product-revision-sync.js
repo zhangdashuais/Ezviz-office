@@ -1092,15 +1092,7 @@
       delist: "下架模式：只关闭 Searchable，并将 Type of listing 设为 No Set Uptime。"
     })[currentMode()] || "请选择操作类型。");
   }
-  operationSelect.addEventListener("change", () => {
-    if (isLanguageOnly()) {
-      operationSelect.value = "publish-batch";
-      document.querySelector('.nav-item[data-target="tab-language-package"]')?.click();
-      document.getElementById("languageDatasheetInput")?.focus();
-      return;
-    }
-    updateModeUi();
-  });
+  operationSelect.addEventListener("change", updateModeUi);
   sameProductTab.addEventListener("click", () => showRevisionPanel("same"));
   commonPartTab.addEventListener("click", () => showRevisionPanel("common"));
   productNameInput.addEventListener("input", invalidatePreview);

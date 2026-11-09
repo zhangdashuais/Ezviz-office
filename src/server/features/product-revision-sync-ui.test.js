@@ -12,12 +12,13 @@ const script = fs.readFileSync(
   "utf8"
 );
 
-test("language-only selection opens the standalone Datasheet workflow", () => {
+test("language-only selection stays in product revision and uses its own Datasheet input", () => {
   assert.match(html, /value="specification-only">只改 Specification/);
   assert.match(html, /value="language-only">只改语言包/);
-  assert.match(html, /id="languageDatasheetInput"/);
-  assert.match(script, /if \(isLanguageOnly\(\)\) \{[\s\S]*tab-language-package/);
-  assert.match(script, /document\.getElementById\("languageDatasheetInput"\)\?\.focus\(\)/);
+  assert.match(html, /id="revisionSyncLanguageDatasheet"/);
+  assert.match(script, /operationSelect\.addEventListener\("change", updateModeUi\)/);
+  assert.doesNotMatch(script, /nav-item\[data-target="tab-language-package"\]/);
+  assert.match(script, /if \(isLanguageOnly\(\)\) form\.append\("updateScope", "language-only"\)/);
 });
 
 test("batch publishing only renders sites whose Specification language is ready", () => {

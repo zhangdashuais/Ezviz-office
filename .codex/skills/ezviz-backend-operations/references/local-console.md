@@ -26,7 +26,7 @@ i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进
 | 产品上架与维护 | 产品批量上架 | 自动识别产品 Excel；目标站点列表只显示全部所选产品的 Specification 语言列状态均为 `OK` 的站点。首次预览显示已有译文对比后，结果区才出现“强制覆盖已有译文”；切换会自动重新预览，默认关闭。开启后仍只改目标译文列，不改英文源列或 `Sheet1`。没有状态行的普通独立 Specification 文件保持原有兼容行为 | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | 语言包上传 | 上传 `.xls/.xlsx` 到 Language Management | 写后台 |
 | 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；允许英文原文内容变化并警告，上传后遇到短暂旧包时只重下验证、不重复上传 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
-| 产品上架与维护 | 已上架产品单独更新 Specification | `updateScope=specification-only` 时只保存并回读 Specification；可直接上传欧洲云盘的 Datasheet + Spec/Specification 双工作表 Excel，自动选择规格工作表。操作下拉中的“只改语言包”会跳转至独立的单产品 Datasheet 更新语言包功能，不再读取产品 Detail/Spec | `preview` 只读；`submit` 写后台并回读 |
+| 产品上架与维护 | 已上架产品单独更新 Specification / 语言包 | `updateScope=specification-only` 时只保存并回读 Specification；可直接上传欧洲云盘的 Datasheet + Spec/Specification 双工作表 Excel，自动选择规格工作表。操作下拉中的“只改语言包”留在产品资料操作页，使用该页的 Datasheet 输入和目标站点映射，仅更新语言包，不读取产品 Detail/Spec | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | Details 一键同步 | 固定以国际站同名产品为源，只需填写产品名并选择目标站点；仅同步 PC Details Overview，目标站不存在产品时跳过；未识别的规格字段名不会阻止仅同步 Overview，提交后确认全部自定义字段不变；不修改语言包、Product Description 或其他配置 | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | 产品上线站点搜索（独立 Tab） | 输入产品名称后只读搜索全部启用的 EZVIZ 国家官网；匹配忽略大小写和所有空格，返回命中站点、产品链接及失败站点 | 只读官网搜索 |
 | 产品上架与维护 | HG2_400_4 语言包定向修订 | 逐站预览 E 列，删除 `15s / 18s / 20s` 后原生保存、上传并回读；空值不上传 | `preview` 只读；`submit` 写后台并可回滚 |
