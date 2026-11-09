@@ -56,6 +56,15 @@ test("Specifications 不存在时不回退到其他 Detail 字段", () => {
   assert.equal(result.specificationsFound, false);
 });
 
+test("Spec 简称支持读取且不匹配其他自定义字段", () => {
+  const result = readDetailFieldsFromModel({ pcView: { customs: [
+    { name: "Special features", value: "Keep" },
+    { name: " SPEC ", value: "Specification content" }
+  ] } });
+  assert.equal(result.specificationsFound, true);
+  assert.equal(result.specifications, "Specification content");
+});
+
 test("Detail 规格字段兼容单数并优先复数命名", () => {
   const singular = readDetailFieldsFromModel({
     pcView: { summary: "", customs: [{ name: "Specification", value: "single" }] }
