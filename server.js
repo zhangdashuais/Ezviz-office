@@ -360,9 +360,9 @@ function buildBannerPlan(body, files) {
         fields: { ...commonFields, position: String(position) },
         backend: {
           listUrl: "https://shop.ezvizlife.com/pages/index",
-          editorPage: "Homepage / web.index.index4",
-          widget: ".home-banner.js-widget-wrapper",
-          uploadTarget: "PC image first file input, Mobile image second file input"
+          editorPage: "Homepage / 当前唯一启用模板",
+          widget: "新版 swipeBanner (index) 组件；旧版 .home-banner.js-widget-wrapper",
+          uploadTarget: "PC / Mobile 图片上传至文件服务后写入对应 Banner 字段"
         }
       };
     })

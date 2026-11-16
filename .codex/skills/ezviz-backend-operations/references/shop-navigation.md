@@ -56,7 +56,7 @@
 
 - TDK 可能从 `/tdk/index` 跳转到 `https://new-eu-shop.ezvizlife.com/tdk/index`。
 - Popup 自动化优先使用 `https://new-shop.ezvizlife.com/popup/index`，旧侧栏仍显示 `/config/popup`。
-- 商城登录后可能按账号区域落到 `new-<区域>-shop.ezvizlife.com`；拉美账号实测为 `https://new-sa-shop.ezvizlife.com/templates/list`。`new-shop` 的相关页面属于 Custom Page 等新版模块；Banner 的 Homepage 管理仍直接使用 `https://shop.ezvizlife.com/pages/index`，不要从新版 Homepage 菜单进入。
+- 商城登录后可能按账号区域落到 `new-<区域>-shop.ezvizlife.com`；拉美账号实测为 `https://new-sa-shop.ezvizlife.com/templates/list`。Banner 由 `https://shop.ezvizlife.com/pages/index` 进入 Homepage 管理；若跳转到新版 `/pages/index`，选唯一启用的模板，在 `/pages/editor?themeNo=...` 中操作 `swipeBanner (index)`。2026-11-16 国际站启用 `web.index.index6`，列表按钮为 `Editor`（编辑）和 `Visual`（只预览）；不要把 `Visual` 当编辑入口。
 - 新版商城可将纯站点名称作为显示别名；若身份区域返回包含数字或邮箱标记的具体账号且与目标凭据不一致，必须停止任务，不得把该账号记作目标站点别名。
 - 产品列表从 `https://shop.ezvizlife.com/goods/index` 发起；后台可能重定向到 `new-shop.ezvizlife.com/goods/index` 或区域新版域名。仅在最终 URL 属于正式商城商品列表、HTTP 正常且页面商品列表控件已加载时继续；实际返回 404 或未加载时停止。
 

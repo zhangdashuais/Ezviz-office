@@ -67,10 +67,11 @@ const wtbUrl = resolveShopNavigationUrl("where-to-buy");
 const popupUrl = resolveShopNavigationUrl("popup", { preferAutomationUrl: true });
 ```
 
-TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife.com/tdk/index`。Popup 自动化目前使用 `new-shop.ezvizlife.com/popup/index`，与旧侧栏路由 `/config/popup` 并存。Banner 不使用新版 Custom Page 入口；Homepage 管理固定直接访问 `https://shop.ezvizlife.com/pages/index`。
+TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife.com/tdk/index`。Popup 自动化目前使用 `new-shop.ezvizlife.com/popup/index`，与旧侧栏路由 `/config/popup` 并存。Banner 从 `https://shop.ezvizlife.com/pages/index` 进入 Homepage 管理；若跳到新版 `new[-区域]-shop`，选唯一启用的首页模板（2026-11-16 国际站为 `web.index.index6`），通过 `/pages/editor?themeNo=...` 的 `swipeBanner (index)` 组件编辑，不进入 Custom Page。
 
 普通 Banner 对所有站点（含波兰）插入轮播第 1 位；PC/Mobile 图片使用项目共用的带签名文件服务上传方式，避免旧版 `op_image` 参数被拒绝。
-Banner UTM 修复按前台当前可见顺序匹配后台轮播链接，跳过定时隐藏的轮播；`banner-fix-utm` 可带 `dryRun=1` 只读预览。官网巡查请求带一次性查询参数，避免误读发布前的缓存页面。
+Banner UTM 修复按前台当前可见顺序匹配后台轮播链接，兼容新版后台存储的 `/category/...` 相对链接并保留其相对格式，跳过定时隐藏的轮播；`banner-fix-utm` 可带 `dryRun=1` 只读预览。官网巡查请求带一次性查询参数，避免误读发布前的缓存页面。
+新版 Banner 只调用 `website-theme/get-detail`、`modify`、`publish` 处理 `swipeBanner` 组件；保存前确认组件未被并发修改，保存后回读字段。旧版仍沿用 widget 接口。检查期间不要点击后台 Save/Publish。
 
 DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/下线时间，并可在界面选择“Banner + Popup”“仅 Banner”或“仅 Popup”；选择 Banner 时还可指定 White / Black 字体颜色。它不读取普通 Banner/Popup 表单：标题固定为空白占位，Model 使用五国固定文案，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 并分别添加 Banner/Popup UTM；Banner 通过后台当前 WebUploader 上传，默认隐藏 More、新窗口打开、直接发布，Popup 通过 Playwright 填写真实后台表单、文件控件上传图片、点击 Submit 并在列表页点击 Enable。接口可用 `includeBanner=false` 或 `includePopup=false` 只执行另一类资源，并用 `bannerColor=White|Black` 选择颜色。根目录下按 `de/fr/es/it/nl`（亦支持国家英文名、本地名和中文名）分类；文件名或子目录名用 `banner-pc`、`banner-mobile`、`popup` 标识用途。`POST /api/campaign/dtc-assets` 只读预检目录；单文件超过 10 MB、必需素材缺失或同一用途匹配多个文件时，该国家会被跳过并返回原因，不影响其他国家继续执行。
 
