@@ -6,6 +6,7 @@ const SPECIFICATION_FIELD_NAMES = [
   "specifications",
   "specification",
   "specs",
+  "spec",
   "specificaties",
   "spezifikationen",
   "spécifications",

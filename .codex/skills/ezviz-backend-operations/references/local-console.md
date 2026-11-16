@@ -68,6 +68,8 @@ npm test
 端口默认是 `3217`。启动前先检查端口是否已有本项目的 Node 进程；不要误停其他服务。
 
 新版商品后台兼容：旧 `/goods/index` 会重定向到 `new-shop` 或区域新版列表；商品编辑为 `/goods/edit/<goods_id>`。产品预览按精确名称查找卡片，再用后台 JSON 核对 ID 与名称，不依赖旧 Angular `#replenish`。新版 Specification 批量列表使用 `get-goods-list` 分页；新版 WTB 渠道由 `get-where-to-buy` 返回。执行任何提交后仍要回读目标商品核验，预览不得写后台。
+产品上架与修订的规格字段兼容 `Spec` / `Specs` 简称。原 Specification 为空或不含图片时仍可生成并替换规格表格，不添加图片；有图时保留原图及 alt。预览、提交及回读使用相同的字段识别规则。
+
 # 欧洲分类页与 Support 巡查
 
 命令入口：`node scripts/audit-europe-category-support.js`。默认读取配置中的 12 个欧洲站点，覆盖两个分类页、分类导航以及产品卡片的全部变体标签组合；逐产品检查详情页和 Support 入口。可通过 `CATEGORY_AUDIT_SITES` 缩小站点范围。只读，不保存绑定。报告及页面截图位于 `outputs/europe-category-support-audit-2026-10-15/`。

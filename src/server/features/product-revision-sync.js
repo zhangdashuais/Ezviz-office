@@ -105,6 +105,7 @@ const SPECIFICATION_DETAIL_FIELD_NAMES = [
   "specifications",
   "specification",
   "specs",
+  "spec",
   "especificaciones",
   "especificación",
   "especificaiones",
@@ -235,7 +236,7 @@ function readTagAttribute(tag, name) {
 function extractSpecificationImage(html) {
   const tags = String(html || "").match(/<img\b[^>]*>/gi) || [];
   if (!tags.length) {
-    throw new Error("国际站 Specification 中没有找到图片，无法自动继承图片地址和 alt。");
+    return { src: "", alt: "", emptyPlaceholder: true };
   }
   const imageAddress = (tag) => {
     const srcset = readTagAttribute(tag, "srcset").trim();
@@ -1322,7 +1323,7 @@ function createProductRevisionSyncFeature(deps) {
     const snapshot = await readProductSnapshot(session.page, request.productName, logs);
     const image = extractSpecificationImage(snapshot.detail.specifications);
     if (!image.src) {
-      logLine(logs, "国际站 Specification 只有空图片占位，目标规格将保持无图片状态。");
+      logLine(logs, "国际站 Specification 没有可用图片，目标规格将保持无图片状态。");
     }
     const fingerprint = hashValue(JSON.stringify({
       productName: request.productName,

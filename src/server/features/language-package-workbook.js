@@ -3,6 +3,7 @@ const childProcess = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
+const { singleLineCellText } = require("./spreadsheet-text");
 const { publishingSheetName } = require("../../../办公软件/111/src/product-publishing-input-rules");
 
 function normalize(value) {
@@ -414,7 +415,11 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
         const item = { ...candidate, key: entry.key, translation,
           datasheetSource: entry.source, datasheetRow: entry.rowNumber,
           sourceMismatch: true };
-        if (normalize(candidate.current)) preservedExisting.push({ ...item, same: false });
+        if (normalize(candidate.current)) {
+          const cleanCurrent = singleLineCellText(candidate.current);
+          if (cleanCurrent !== candidate.current) updates.push({ ...item, translation: cleanCurrent });
+          else preservedExisting.push({ ...item, same: false });
+        }
         else updates.push(item);
         return;
       }
@@ -424,7 +429,9 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
       const item = { ...candidate, key: entry.key, translation,
         datasheetSource: entry.source, datasheetRow: entry.rowNumber };
       if (options.fillBlankOnly && normalize(candidate.current)) {
-        preservedExisting.push({ ...item, same: normalizeTranslationForComparison(candidate.current)
+        const cleanCurrent = singleLineCellText(candidate.current);
+        if (cleanCurrent !== candidate.current) updates.push({ ...item, translation: cleanCurrent });
+        else preservedExisting.push({ ...item, same: normalizeTranslationForComparison(candidate.current)
           === normalizeTranslationForComparison(translation) });
         return;
       }

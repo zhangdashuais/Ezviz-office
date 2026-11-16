@@ -97,6 +97,7 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 独立的“只改语言包”按 Datasheet 的非空译文默认覆盖目标站已有译文；预览会列出实际待覆盖字段，相同译文显示为不变。该规则不影响产品上架默认只填空译文的保护策略。对于后台下载的 `.xls`，提交使用 Excel 原生写入，逐格核对 Sheet1 的实际内容，避免通用 BIFF8 写入截断长文案。
 
 “本地 i18n Datasheet 生成”从产品 HTML 提取未 i18n 化的英文文案，将当前产品的新字段放在黄色提示行上方；HTML 已引用或按英文原文复用的旧字段放在黄色提示行下方。生成成功后先备份原 HTML，再把硬编码文案写回对应的 `goods.*` 字段；重复执行会复用现有输出并保持字段归类不变。
+生成 Datasheet、导出语言字段结果和向站点语言包写入译文时，单元格内的回车、换行及 `_x000d_` 转为空格；没有换行的单元格保留原样。仅填空模式遇到已有译文的换行时，只清理该译文的换行，不使用 Datasheet 候选文案覆盖其余文字。
 “i18n 语言转换”的最终代码始终以 `<!-- product detail webflow -->` 开头，且只保留一个该标记。处理 HTML 片段时会原样保留全部 `<link>` 标签，包括样式表、预加载字体以及属性顺序或引号写法不同的 CSS 引用，避免浏览器解析时将其移入临时 `head` 后从片段输出中丢失。
 产品名及其从左到右的名称前缀（如 `TY1`、`TY1 G1`、`TY1 G1 3K`）视为型号，不生成语言包字段；包含型号的完整描述句不受此规则影响。
 纯数字单独出现时不转换为语言字段；数字出现在完整文案中时保留在整句语言字段内，例如 `Up to 15m` 必须整体转换。单位值、角度和加密协议单独出现时也不转换。
@@ -143,11 +144,11 @@ HTML 文本节点中的换行、缩进和连续空格会压缩为单个空格后
 
 产品上架和产品修订使用的语言包 Datasheet 允许穿插说明行：当一行只有第一列说明文字、原文及全部译文列均为空时会安全跳过；只要任一译文列有内容而原文为空，仍会阻止预览。
 
-产品上架和产品修订读取 Detail 规格字段时兼容明确的单数 `Specification`、复数 `Specifications` 和已记录的本地化规格标题；若单复数同时存在，优先使用复数。不会回退到其他自定义字段。
+产品上架和产品修订读取 Detail 规格字段时兼容明确的单数 `Specification`、复数 `Specifications`、简称 `Spec` / `Specs` 和已记录的本地化规格标题；若单复数同时存在，优先使用复数。不会回退到其他自定义字段。原规格内容为空或没有图片时，仍按工作簿目标语言列替换规格表格，不生成图片标签；有图片时继续保留原图片地址和 alt。
 
 规格 HTML 的主图地址支持标准 `src` 以及常见懒加载属性 `data-src`、`data-original`、`data-lazy-src` 和 `srcset`。
 若源规格明确包含无地址的空图片占位标签，则视为源产品无规格图，目标规格会省略图片块；不会猜测或生成图片地址。
-后台产品资料操作页面用同一个操作类型下拉承载文件夹批量上架、源站同步修订、只改 Specification、多产品相同内容修订和产品下架；页面按模式显示必要字段。选择“只改语言包”会跳转至独立的单产品 Datasheet 语言包功能，不再读取产品 Detail/Spec。只改 Specification 可上传欧洲云盘双工作表 Excel 并自动选择 Spec / Specification；独立语言包功能自动读取 Datasheet，普通单工作表文件也兼容。多产品相同部分修订可同时选择多个国家站点，对最多 50 个产品的 Detail 或 Specification 执行同一条精确删除/替换，也可只把 Specification 的 Custom Page Name 输入框修成站点固定文案，并按国家 × 产品逐项预览、保存和回读。直接修订接口可只更新 Basic Information 的 Product Description，或只更新 Specification 自定义字段名；Overview 与 Specification 内容会原样保留。
+后台产品资料操作页面用同一个操作类型下拉承载文件夹批量上架、源站同步修订、只改 Specification、只改语言包、多产品相同内容修订和产品下架；页面按模式显示必要字段。“只改语言包”留在当前页面，使用本页 Datasheet 输入和目标站点映射，仅更新语言包，不读取产品 Detail/Spec。只改 Specification 可上传欧洲云盘双工作表 Excel 并自动选择 Spec / Specification；只改语言包自动读取 Datasheet，普通单工作表文件也兼容。多产品相同部分修订可同时选择多个国家站点，对最多 50 个产品的 Detail 或 Specification 执行同一条精确删除/替换，也可只把 Specification 的 Custom Page Name 输入框修成站点固定文案，并按国家 × 产品逐项预览、保存和回读。直接修订接口可只更新 Basic Information 的 Product Description，或只更新 Specification 自定义字段名；Overview 与 Specification 内容会原样保留。
 
 已上架产品只需更新资料文案和语言包时，`/api/product-revision-sync/preview` 与 `/api/product-revision-sync/submit` 可传 `updateScope=specification-language`。该范围不读取或复制国际站源产品，明确保留目标站当前 Overview 和规格图；Product Description 若在 Datasheet 中存在或能由当前后台文案反查到唯一字段行，则按目标语种更新，缺失时才保留现值；Specification 自定义字段名按官网 tab 固定映射，HTML 顶部标题按规格内容标题映射，正文按目标语言列生成，并按稳定 Key 更新总语言包。新增语言键只追加到与本次既有键匹配最多的语言工作表，避免跨工作表重复。
 产品预览、修订、上架与回读查找产品时从 `https://shop.ezvizlife.com/goods/index` 发起。后台可能重定向到 `new-shop` 或区域新版的 `/goods/index`；最终地址、HTTP 状态及商品列表控件都验证通过才继续。旧版表格行和新版商品卡片均支持查找；真正的 404 或空后台壳仍停止。

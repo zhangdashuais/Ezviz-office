@@ -70,6 +70,48 @@ test("new editor revision payload changes only requested product fields", () => 
   assert.deepEqual(source.pcDetail.ext[0], { nameKey: "Specifications", nameValue: "Old spec" });
 });
 
+test("publishing replaces a Spec field without requiring an existing image", () => {
+  const oldSpec = '<table><tr><td>Old specification</td></tr></table>';
+  const source = {
+    goodsId: 123, goodsName: "CP8", brief: "Keep description",
+    pcDetail: { summary: "Keep overview", ext: [
+      { nameKey: "FAQ", nameValue: "Keep FAQ" },
+      { nameKey: "Spec", nameValue: oldSpec }
+    ] }
+  };
+  const before = readDetailFromPcView({ customs: source.pcDetail.ext.map((item) => ({
+    name: item.nameKey, value: item.nameValue
+  })) });
+  assert.equal(before.specificationsFound, true);
+  const image = extractSpecificationImage(before.specifications);
+  assert.deepEqual(image, { src: "", alt: "", emptyPlaceholder: true });
+  const html = buildPcSpecificationHtml({ title: "Specifications", rows: [[
+    { name: "A1", value: "Resolution" }, { name: "B1", value: "4K" }
+  ]] }, image);
+  assert.match(html, /4K/);
+  assert.doesNotMatch(html, /<img\b/);
+  const next = buildNewShopRevisionPayload(source, {
+    overview: source.pcDetail.summary, specifications: html,
+    productDescription: source.brief, productTitle: "CP8", currentProductTitle: "CP8",
+    specificationFieldName: before.specificationsFieldName,
+    nextSpecificationFieldName: "Specifications"
+  });
+  const after = readDetailFromPcView({ customs: next.pcDetail.ext.map((item) => ({
+    name: item.nameKey, value: item.nameValue
+  })) });
+  assert.equal(after.specifications, html);
+  assert.equal(after.specificationsFieldName, "Specifications");
+  assert.deepEqual(next.pcDetail.ext[0], source.pcDetail.ext[0]);
+  assert.equal(next.pcDetail.summary, source.pcDetail.summary);
+  assert.equal(next.brief, source.brief);
+  assert.equal(source.pcDetail.ext[1].nameValue, oldSpec);
+});
+
+test("an empty existing Specification can be populated without an image", () => {
+  assert.deepEqual(extractSpecificationImage(""), { src: "", alt: "", emptyPlaceholder: true });
+  assert.equal(readDetailFromPcView({ customs: [{ name: " Spec ", value: "" }] }).specificationsFound, true);
+});
+
 test("international product copy always uses the legacy global page", () => {
   assert.equal(LEGACY_INT_GOODS_URL, "https://shop.ezvizlife.com/goods/int-goods-list");
 });
