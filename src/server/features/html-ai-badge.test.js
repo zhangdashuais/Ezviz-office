@@ -44,3 +44,10 @@ test("a page with only a final section receives no badge code", () => {
   assert.equal(result.sectionCount, 0);
   assert.equal(result.html, source);
 });
+
+test("section badges can use the top right corner", () => {
+  const html = addSectionAiBadges("<section>Image</section><section>Notes</section>", { position: "top-right" }).html;
+  assert.match(html, /x=rect\.right-8,y=rect\.top\+8/);
+  assert.match(html, /translate\(-100%,0\)/);
+  assert.equal(addSectionAiBadges(html, { position: "top-right" }).html, html);
+});

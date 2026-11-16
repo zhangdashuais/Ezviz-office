@@ -1,5 +1,5 @@
 (function() {
-  function createAiBadgeHtml(source, label = "AI GENERATED") {
+  function createAiBadgeHtml(source, label = "AI GENERATED", position = "bottom-right") {
     const html = String(source || "");
     if (!html.trim()) throw new Error("请粘贴或上传网页 HTML。");
     if (html.includes("data-ezviz-ai-badge-code")) return html;
@@ -12,6 +12,7 @@
     const scopedHtml = html.slice(0, rootEnd) + ` data-ezviz-ai-scope="${scope}"` + html.slice(rootEnd);
     const safeLabel = JSON.stringify(String(label || "AI GENERATED").trim() || "AI GENERATED")
       .replace(/</g, "\\u003c");
+    const topRight = position === "top-right";
     const badgeCode = `\n<style data-ezviz-ai-badge-code>
 .ezviz-ai-badge-layer{position:fixed;inset:0;z-index:9999;pointer-events:none}
 .ezviz-ai-badge-chip{position:absolute;padding:5px 8px;border:1px solid rgba(255,255,255,.22);border-radius:5px;background:rgba(0,0,0,.58);color:#fff;font:700 12px/1 Arial,sans-serif;white-space:nowrap;box-sizing:border-box}
@@ -30,10 +31,10 @@
   function update(){queued=false;items.forEach(function(item){
     var el=item.el,style=getComputedStyle(el),rect=el.getBoundingClientRect();
     var visible=el.isConnected&&style.visibility!=='hidden'&&style.display!=='none'&&rect.width>0&&rect.height>0;
-    var x=rect.right-10,y=rect.bottom-10;
+    var x=rect.right-8,y=rect.${topRight ? "top+8" : "bottom-8"};
     visible=visible&&x>0&&x<innerWidth&&y>0&&y<innerHeight;
     item.badge.hidden=!visible;
-    if(visible){item.badge.style.left=x+'px';item.badge.style.top=y+'px';item.badge.style.transform='translate(-100%,-100%)';}
+    if(visible){item.badge.style.left=x+'px';item.badge.style.top=y+'px';item.badge.style.transform='translate(-100%,${topRight ? "0" : "-100%"})';}
   });}
   function schedule(){if(!queued){queued=true;requestAnimationFrame(update);}
   }
@@ -53,6 +54,7 @@
   if (typeof document === "undefined") return;
   const input = document.getElementById("aiBadgeImageInput");
   const textInput = document.getElementById("aiBadgeTextInput");
+  const positionInput = document.getElementById("aiBadgePosition");
   const runBtn = document.getElementById("aiBadgeRunBtn");
   const clearBtn = document.getElementById("aiBadgeClearBtn");
   const status = document.getElementById("aiBadgeStatus");
@@ -61,6 +63,7 @@
   const list = document.getElementById("aiBadgeList");
   const htmlFileInput = document.getElementById("aiBadgeHtmlFile");
   const htmlSource = document.getElementById("aiBadgeHtmlSource");
+  const htmlPositionInput = document.getElementById("aiBadgeHtmlPosition");
   const htmlRunButton = document.getElementById("aiBadgeHtmlRunBtn");
   const htmlOutput = document.getElementById("aiBadgeHtmlOutput");
   const htmlDownload = document.getElementById("aiBadgeHtmlDownload");
@@ -108,7 +111,7 @@
     const fontSize = Math.max(8, Math.min(20, Math.round(canvas.width * 0.022)));
     const padX = Math.round(fontSize * 0.75);
     const padY = Math.round(fontSize * 0.45);
-    const margin = Math.max(8, Math.min(28, Math.round(canvas.width * 0.025)));
+    const margin = 8;
     ctx.font = `700 ${fontSize}px Arial, sans-serif`;
     ctx.textBaseline = "middle";
 
@@ -116,7 +119,7 @@
     const width = Math.ceil(ctx.measureText(badgeText).width + padX * 2);
     const height = fontSize + padY * 2;
     const x = canvas.width - width - margin;
-    const y = canvas.height - height - margin;
+    const y = positionInput?.value === "top-right" ? margin : canvas.height - height - margin;
 
     roundRect(x, y, width, height, Math.round(height / 4));
     ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
@@ -297,9 +300,9 @@
   });
   htmlRunButton?.addEventListener("click", () => {
     try {
-      htmlOutput.value = createAiBadgeHtml(htmlSource.value, textInput.value);
+      htmlOutput.value = createAiBadgeHtml(htmlSource.value, textInput.value, htmlPositionInput?.value);
       htmlDownload.disabled = false;
-      setStatus("网页 AI 标识代码已生成。每个 section 右下角会显示标识，单独图片不打标。", "ok");
+      setStatus(`网页 AI 标识代码已生成。每个 section ${htmlPositionInput?.value === "top-right" ? "右上" : "右下"}角会显示标识，单独图片不打标。`, "ok");
     } catch (error) {
       htmlDownload.disabled = true;
       setStatus(error.message || "网页代码处理失败。", "warn");

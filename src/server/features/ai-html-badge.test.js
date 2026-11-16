@@ -9,10 +9,16 @@ test("HTML AI badges keep source markup and target every section, not images", (
   assert.match(output, /<section class="hero"><img src="photo.jpg"><\/section><section>No background<\/section>/);
   assert.match(output, /querySelectorAll\('section'\)/);
   assert.doesNotMatch(output, /querySelectorAll\('img,section'\)|style\.backgroundImage/);
-  assert.match(output, /y=rect\.bottom-10/);
+  assert.match(output, /x=rect\.right-8,y=rect\.bottom-8/);
   const generatedScript = output.match(/<script data-ezviz-ai-badge-code>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(generatedScript);
   assert.doesNotMatch(generatedScript, /}}/);
   assert.doesNotThrow(() => new Function(generatedScript));
   assert.equal(createAiBadgeHtml(output), output);
+});
+
+test("HTML AI badges can use the top right corner", () => {
+  const output = createAiBadgeHtml('<div><section>Image</section></div>', "AI GENERATED", "top-right");
+  assert.match(output, /x=rect\.right-8,y=rect\.top\+8/);
+  assert.match(output, /translate\(-100%,0\)/);
 });
