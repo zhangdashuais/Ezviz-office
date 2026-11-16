@@ -22,3 +22,11 @@ test("HTML AI badges can use the top right corner", () => {
   assert.match(output, /x=rect\.right-8,y=rect\.top\+8/);
   assert.match(output, /translate\(-100%,0\)/);
 });
+
+test("HTML AI badges use the selected font size and keep the automatic default", () => {
+  const source = '<div><section>Image</section></div>';
+  assert.match(createAiBadgeHtml(source), /font:700 12px\/1 Arial/);
+  assert.match(createAiBadgeHtml(source, "AI GENERATED", "bottom-right", "24"), /font:700 24px\/1 Arial/);
+  assert.match(createAiBadgeHtml(source, "AI GENERATED", "bottom-right", "64"), /font:700 64px\/1 Arial/);
+  assert.match(createAiBadgeHtml(source, "AI GENERATED", "bottom-right", "99"), /font:700 12px\/1 Arial/);
+});
