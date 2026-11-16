@@ -435,9 +435,10 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
           === normalizeTranslationForComparison(translation) });
         return;
       }
-      if (normalizeTranslationForComparison(candidate.current)
-        === normalizeTranslationForComparison(translation)) unchanged.push(item);
-      else updates.push(item);
+      if (singleLineCellText(candidate.current) !== candidate.current
+        || normalizeTranslationForComparison(candidate.current)
+          !== normalizeTranslationForComparison(translation)) updates.push(item);
+      else unchanged.push(item);
     });
   });
 

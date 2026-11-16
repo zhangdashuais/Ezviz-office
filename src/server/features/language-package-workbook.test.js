@@ -570,7 +570,9 @@ test("reading translations converts Excel carriage returns and line breaks to sp
   );
   const imported = languagePackageImportDatasheet(importedPackage);
   assert.equal(imported.rows[0].translations["Imported translation"], "Cámara inteligente");
-  assert.equal(planLanguagePackageUpdates(importedPackage, parsed, "Spanish").changedCellCount, 0);
+  const cleanupPlan = planLanguagePackageUpdates(importedPackage, parsed, "Spanish");
+  assert.equal(cleanupPlan.changedCellCount, 1);
+  assert.equal(cleanupPlan.updates[0].translation, "Cámara inteligente");
 });
 
 test("full-package import follows publishing rules and appends only to Sheet2", () => {
