@@ -2,7 +2,7 @@ const { uploadWebflowAssetBuffer } = require("./webflow-asset-upload");
 const cheerio = require("cheerio");
 
 function planVisibleBannerUtmFixes(slides, visibleUrls, siteCode, config, buildCampaignUrl) {
-  const normalized = (url) => { try { return new URL(url).toString(); } catch { return String(url || ""); } };
+  const normalized = (url) => { try { return new URL(url, "https://www.ezviz.com").toString(); } catch { return String(url || ""); } };
   const positions = new Map();
   visibleUrls.forEach((url, index) => {
     const key = normalized(url);
@@ -13,7 +13,9 @@ function planVisibleBannerUtmFixes(slides, visibleUrls, siteCode, config, buildC
   for (const [index, url] of slides.entries()) {
     const position = positions.get(normalized(url));
     if (!position) continue; // 定时隐藏的 Banner 不占当前前台位置。
-    const fixedUrl = buildCampaignUrl(url, { siteCode, placement: "banner", position }, config);
+    const fixedAbsoluteUrl = buildCampaignUrl(normalized(url), { siteCode, placement: "banner", position }, config);
+    const fixedUrl = String(url || "").startsWith("/") && !String(url || "").startsWith("//")
+      ? fixedAbsoluteUrl.replace(/^https:\/\/www\.ezviz\.com/i, "") : fixedAbsoluteUrl;
     if (fixedUrl !== url) changes.push({ index, position, from: url, to: fixedUrl });
   }
   for (const url of visibleUrls) {
@@ -34,6 +36,15 @@ function createBannerManagement(deps) {
     logLine(logs, "直接进入旧版 Homepage 管理：" + SHOP_HOMEPAGE_URL);
     await page.goto(SHOP_HOMEPAGE_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(5000);
+
+    if (/^https:\/\/new(?:-[a-z]{2,3})?-shop\.ezvizlife\.com\/pages\/index/i.test(page.url())) {
+      const homepage = await getNewHomepageTheme(page);
+      const editorUrl = new URL("/pages/editor?themeNo=" + encodeURIComponent(homepage.themeNo), page.url()).toString();
+      logLine(logs, "进入新版 Homepage 编辑器：" + editorUrl + " / " + homepage.template);
+      await page.goto(editorUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await page.getByRole("tab", { name: /swipeBanner\s*\(index\)/i }).waitFor({ timeout: 30000 });
+      return page;
+    }
 
     logLine(logs, "查找启用状态的 Homepage Visual Editor 链接。");
     const editorHref = await page.evaluate(() => {
@@ -513,6 +524,112 @@ function createBannerManagement(deps) {
     return result.url;
   }
 
+  function newHomepageApi(page) {
+    return page.evaluate(() => {
+      const entry = performance.getEntriesByType("resource")
+        .find((item) => /\/website-theme\/(?:get-list|get-detail)(?:\?|$)/.test(item.name));
+      return entry ? new URL(entry.name).origin : "";
+    }).then((origin) => origin || "https://sgpshop-api.ezvizlife.com");
+  }
+
+  async function newHomepagePost(page, endpoint, data) {
+    const api = await newHomepageApi(page);
+    const response = await page.request.post(api + "/website-theme/" + endpoint, { data });
+    const result = await response.json().catch(() => null);
+    if (!response.ok() || result?.code !== 200) {
+      throw new Error("新版 Homepage " + endpoint + " 失败：" + (result?.msg || "HTTP " + response.status()));
+    }
+    return result.data;
+  }
+
+  async function getNewHomepageTheme(page) {
+    const themes = await newHomepagePost(page, "get-list", { page: 1, pageSize: 100 });
+    if (!Array.isArray(themes)) throw new Error("新版 Homepage 列表格式不正确。");
+    const enabled = themes.filter((item) => item.status === 1);
+    if (enabled.length !== 1 || !/^web\.index\.index\d+$/i.test(enabled[0].template || "")) {
+      throw new Error("无法唯一确定启用中的 Homepage 模板：" + JSON.stringify(enabled.map(({ themeNo, template }) => ({ themeNo, template }))));
+    }
+    return enabled[0];
+  }
+
+  function findNewBannerComponent(theme) {
+    const matches = (theme?.regions || []).flatMap((region) =>
+      (region.components || [])
+        .filter((component) => component.componentType === "swipeBanner")
+        .map((component) => ({ regionId: region.regionId, componentId: component.componentId, componentData: component.componentData }))
+    );
+    if (matches.length !== 1 || !Array.isArray(matches[0].componentData)) {
+      throw new Error("新版 Homepage 没有唯一的 swipeBanner 组件，已停止操作。");
+    }
+    return matches[0];
+  }
+
+  async function readNewBanner(page, themeNo) {
+    const theme = await newHomepagePost(page, "get-detail", { themeNo });
+    if (theme?.themeNo !== themeNo) throw new Error("新版 Homepage 回读的模板编号不一致。");
+    return findNewBannerComponent(theme);
+  }
+
+  async function saveNewBanner(page, themeNo, original, updated) {
+    const latest = await readNewBanner(page, themeNo);
+    if (latest.componentId !== original.componentId || latest.regionId !== original.regionId ||
+      JSON.stringify(latest.componentData) !== JSON.stringify(original.componentData)) {
+      throw new Error("Banner 在预览后被其他人修改，已停止保存，请重新执行。");
+    }
+    await newHomepagePost(page, "modify", {
+      themeNo, componentId: original.componentId, regionId: original.regionId, componentData: updated
+    });
+    const saved = await readNewBanner(page, themeNo);
+    if (saved.componentData.length !== updated.length ||
+      updated.some((slide, index) => Object.entries(slide).some(([key, value]) =>
+        String(saved.componentData[index]?.[key] ?? "") !== String(value ?? "")))) {
+      throw new Error("Banner 保存后回读不一致，未继续发布，请人工检查后台。");
+    }
+    return saved;
+  }
+
+  function newBannerImageUrl(url) {
+    return String(url || "").replace(/^https?:\/\//i, "");
+  }
+
+  function buildNewBannerSlide(fields, url, pcUri, mobileUri) {
+    return {
+      title: fields.headline || "", subTitle: fields.slogan || "", model: fields.model || "",
+      url, color: normalizeBannerColor(fields.color), pcImg: newBannerImageUrl(pcUri),
+      info: fields.introduction || "", mobileImg: newBannerImageUrl(mobileUri),
+      noMoreButton: fields.noMoreButton ? 1 : 0, isVideo: 0, target: fields.openNewTab ? 1 : 0,
+      timerOnline: normalizeBannerDateTime(fields.onlineAtUtc),
+      timerOffline: normalizeBannerDateTime(fields.offlineAtUtc)
+    };
+  }
+
+  async function publishNewHomepage(page, themeNo) {
+    await newHomepagePost(page, "publish", { themeNo });
+  }
+
+  async function submitBannerToNewHomepage(page, item, fields, pcImage, mobileImage, site, body, logs) {
+    const themeNo = new URL(page.url()).searchParams.get("themeNo");
+    if (!themeNo) throw new Error("新版 Homepage 编辑器缺少 themeNo。");
+    const original = await readNewBanner(page, themeNo);
+    const pcUri = await uploadMallImageDirect(pcImage, logs, "PC");
+    const mobileUri = mobileImage && mobileImage !== pcImage
+      ? await uploadMallImageDirect(mobileImage, logs, "Mobile") : pcUri;
+    const url = item.localizedUrlSuggestion || item.url;
+    const slide = buildNewBannerSlide(fields, url, pcUri, mobileUri);
+    const targetPosition = bannerTargetPosition(site);
+    const updated = original.componentData.map((entry) => ({ ...entry }));
+    updated.splice(Math.min(targetPosition - 1, updated.length), 0, slide);
+    await saveNewBanner(page, themeNo, original, updated);
+    logLine(logs, "新版 Homepage Banner 已保存并回读，第 " + targetPosition + " 位，共 " + updated.length + " 张。");
+    if (fields.publishAfterUpload) {
+      await publishNewHomepage(page, themeNo);
+      logLine(logs, "新版 Homepage 已发布。");
+    }
+    const postSubmitAudit = await auditAndRepairBannerAfterSubmit(site, body, logs);
+    return { mode: "new-homepage", site, url, editorUrl: page.url(), insertedPosition: targetPosition,
+      totalSlides: updated.length, postSubmitAudit };
+  }
+
   async function getHomepageBannerWidgetInfo(page) {
     return page.evaluate(() => {
       const banner = document.querySelector(".home-banner.js-widget-wrapper");
@@ -550,6 +667,9 @@ function createBannerManagement(deps) {
     page.setDefaultTimeout(25000);
     page = await ensureShopLoggedIn(page, { ...body, credentialDomain: credentialDomainForSite(site), credentialGroup: "Website" }, logs);
     page = await openHomepageBannerEditor(page, logs);
+    if (/\/pages\/editor\?themeNo=/i.test(page.url())) {
+      return submitBannerToNewHomepage(page, item, fields, pcImage, mobileImage, site, body, logs);
+    }
     await page.waitForTimeout(3000);
 
     const widgetInfo = await getHomepageBannerWidgetInfo(page);
@@ -680,6 +800,10 @@ function createBannerManagement(deps) {
 
     page = await ensureShopLoggedIn(page, { ...body, credentialDomain: credentialDomainForSite(site), credentialGroup: "Website" }, logs);
     page = await openHomepageBannerEditor(page, logs);
+    if (/\/pages\/editor\?themeNo=/i.test(page.url())) {
+      logLine(logs, "站点已切换新版 Homepage，使用组件接口保存 Banner。");
+      return submitBannerToNewHomepage(page, item, fields, pcImage, mobileImage, site, body, logs);
+    }
     const editorUrl = page.url();
     await page.waitForTimeout(5000);
 
@@ -753,6 +877,30 @@ function createBannerManagement(deps) {
     }, logs);
     page = await openHomepageBannerEditor(page, logs);
     const editorUrl = page.url();
+    if (/\/pages\/editor\?themeNo=/i.test(editorUrl)) {
+      const themeNo = new URL(editorUrl).searchParams.get("themeNo");
+      const original = await readNewBanner(page, themeNo);
+      const homepage = new URL(site.url);
+      homepage.searchParams.set("_banner_utm_check", String(Date.now()));
+      const response = await fetch(homepage, { cache: "no-store" });
+      if (!response.ok) throw new Error("读取前台 Banner 失败：HTTP " + response.status);
+      const $ = cheerio.load(await response.text());
+      const visibleUrls = $(".home-banner.js-widget-wrapper .swiper-container-home > .swiper-wrapper > .swiper-slide")
+        .map((_, slide) => $(slide).find("a[href]").first().attr("href") || "").get().filter(Boolean)
+        .map((href) => new URL(href, site.url).toString());
+      if (!visibleUrls.length) throw new Error("前台没有读取到 Banner，停止 UTM 修复。");
+      const slides = original.componentData.map((slide) => slide.url || "");
+      const changes = planVisibleBannerUtmFixes(slides, visibleUrls, site.siteCode, config, buildCampaignUrl);
+      logLine(logs, "新版 Homepage 前台显示 " + visibleUrls.length + " 张、后台配置 " + slides.length + " 张；待修正 " + changes.length + " 条。");
+      if (normalizeBool(body.dryRun)) return { site, editorUrl, changes, fixedCount: 0, preview: true };
+      if (changes.length) {
+        const updated = original.componentData.map((slide) => ({ ...slide }));
+        for (const change of changes) updated[change.index].url = change.to;
+        await saveNewBanner(page, themeNo, original, updated);
+        if (normalizeBool(body.publishAfterFix ?? true)) await publishNewHomepage(page, themeNo);
+      }
+      return { site, editorUrl, fixedCount: changes.length, changes };
+    }
     await page.waitForTimeout(5000);
 
     logLine(logs, "Open home banner edit dialog for UTM repair.");
