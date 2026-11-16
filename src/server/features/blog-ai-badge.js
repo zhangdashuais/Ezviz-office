@@ -62,11 +62,12 @@ function escapeText(value) {
 function addBlogImageAiBadges(input, options = {}) {
   if (typeof input !== "string" || !input.trim()) throw new Error("请提供 Blog HTML 代码。");
   const text = String(options.text || DEFAULT_TEXT).trim();
+  const topRight = options.position === "top-right";
   if (!text || text.length > 80) throw new Error("标识文案需为 1 至 80 个字符。");
   const source = removeGeneratedBadges(input);
   const targets = imageTargets(source);
   if (!targets.length) throw new Error("Blog HTML 中没有找到 <img> 元素。");
-  const badge = `<span aria-hidden="true" style="position:absolute;right:8px;bottom:8px;z-index:1;pointer-events:none;padding:5px 8px;border:1px solid rgba(255,255,255,.22);border-radius:5px;background:rgba(0,0,0,.58);color:#fff;font:700 12px/1 Arial,sans-serif;white-space:nowrap;box-sizing:border-box;line-height:1;transform:scale(.75);transform-origin:right bottom;">${escapeText(text)}</span>`;
+  const badge = `<span aria-hidden="true" style="position:absolute;right:8px;${topRight ? "top:8px" : "bottom:8px"};z-index:1;pointer-events:none;padding:5px 8px;border:1px solid rgba(255,255,255,.22);border-radius:5px;background:rgba(0,0,0,.58);color:#fff;font:700 12px/1 Arial,sans-serif;white-space:nowrap;box-sizing:border-box;line-height:1;transform:scale(.75);transform-origin:right ${topRight ? "top" : "bottom"};">${escapeText(text)}</span>`;
   const html = applyReplacements(source, targets.map((target) => ({
     ...target,
     value: `<span ${WRAPPER_MARKER} style="display:inline-block;position:relative;max-width:100%;vertical-align:middle;line-height:0;">${source.slice(target.start, target.end)}${badge}</span>`

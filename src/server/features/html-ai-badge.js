@@ -24,8 +24,9 @@ function sectionTagOffsets(html) {
   return offsets;
 }
 
-function badgeCode(text) {
+function badgeCode(text, position) {
   const label = JSON.stringify(text).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+  const topRight = position === "top-right";
   return `<style ${MARKER}>.ezviz-ai-badge-layer{position:fixed;inset:0;z-index:9;pointer-events:none}.tab_inner{z-index:10}.ezviz-ai-badge-chip{position:absolute;padding:5px 8px;border:1px solid rgba(255,255,255,.22);border-radius:5px;background:rgba(0,0,0,.58);color:#fff;font:700 12px/1 Arial,sans-serif;white-space:nowrap;box-sizing:border-box}</style><script ${MARKER}>(function(){
   function start(){
     var sections=Array.from(document.querySelectorAll('[${SECTION_MARKER}]'));
@@ -37,11 +38,11 @@ function badgeCode(text) {
     function update(){queued=false;items.forEach(function(item){
       var el=item.el,style=getComputedStyle(el),rect=el.getBoundingClientRect();
       var visible=el.isConnected&&style.visibility!=='hidden'&&style.display!=='none'&&rect.width>0&&rect.height>0;
-      var x=rect.right-10,y=rect.bottom-10;
+      var x=rect.right-8,y=rect.${topRight ? "top+8" : "bottom-8"};
       visible=visible&&x>0&&x<innerWidth&&y>0&&y<innerHeight;
       item.badge.hidden=!visible;
       if(visible){
-        item.badge.style.left=x+'px';item.badge.style.top=y+'px';item.badge.style.transform='translate(-100%,-100%)';
+        item.badge.style.left=x+'px';item.badge.style.top=y+'px';item.badge.style.transform='translate(-100%,${topRight ? "0" : "-100%"})';
         var badgeRect=item.badge.getBoundingClientRect();
         item.badge.hidden=Array.from(document.querySelectorAll('.tab_inner')).some(function(nav){
           var navRect=nav.getBoundingClientRect();
@@ -61,6 +62,7 @@ function badgeCode(text) {
 function addSectionAiBadges(input, options = {}) {
   if (typeof input !== "string" || !input.trim()) throw new Error("请提供 HTML 代码。");
   const text = String(options.text || DEFAULT_TEXT).trim();
+  const position = options.position === "top-right" ? "top-right" : "bottom-right";
   if (!text || text.length > 80) throw new Error("标识文案需为 1 至 80 个字符。");
   const source = removeExistingBadgeCode(input);
   const offsets = sectionTagOffsets(source);
@@ -71,7 +73,7 @@ function addSectionAiBadges(input, options = {}) {
     html = html.slice(0, offset) + ` ${SECTION_MARKER}` + html.slice(offset);
   }
   if (targetOffsets.length) {
-    const code = badgeCode(text);
+    const code = badgeCode(text, position);
     const bodyEnd = /<\/body\s*>/i.exec(html);
     if (bodyEnd) html = html.slice(0, bodyEnd.index) + code + html.slice(bodyEnd.index);
     else html += code;

@@ -122,8 +122,8 @@ Blog HTML 图片标识：`POST /api/blog-ai-badge?text=AI%20GENERATED`，请求�
 | POST | `/api/language-package/local-i18n-path-picker` | 打开本机 HTML、Excel、输出目录或最终 `.xlsx` 保存路径选择器 |
 | POST | `/api/language-package/local-i18n-datasheet` | 使用请求路径、已保存默认路径或自动匹配路径生成 Datasheet 并替换 HTML；HTML 已有 `goods.*` 字段的英文原文优先从总语言包不可修改的 `en-US` 原文列读取，单产品语言包仅补充总包缺失项；纯数字节点单独出现时跳过，完整文案中的数字随整句转换 |
 | POST | `/api/language-package/datasheet-inspect` | 识别单产品 Datasheet 的语种列和字段，不访问商城后台 |
-| POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖预览；没有 Edit/Download 行的英文站点可使用明确带匹配 `lang_code` 的 Download Language Template；页面默认跳过站点缺失 Key，不上传 |
-| POST | `/api/language-package/datasheet-submit` | 单任务运行；只提交预览为 `ready` 的站点，`failed` / `no-change` 站点跳过且不阻塞批次。Global 的 `English (Source)` 同时更新原文列和译文列并双列回读。含待更新 Global 的全站任务先提交 Global，再等待英文源同步并仅对已验证源字段自动刷新其余站点基线；其他变化仍按预览指纹拦截。随后原生修改、上传并重新下载回读，失败时回滚原包 |
+| POST | `/api/language-package/datasheet-preview` | 逐站下载当前语言包，按 Datasheet 的 Key 和语种列生成覆盖预览；`overwriteEnglishSource=1` 才把英文源差异纳入待写计划，默认保留原文；预览指纹包含该选择。没有 Edit/Download 行的英文站点可使用明确带匹配 `lang_code` 的 Download Language Template；页面默认跳过站点缺失 Key，不上传 |
+| POST | `/api/language-package/datasheet-submit` | 单任务运行；只提交预览为 `ready` 的站点，`failed` / `no-change` 站点跳过且不阻塞批次。`overwriteEnglishSource=1` 时只覆盖可写工作表的差异英文源并与译文双列回读；不允许改 `Sheet1`，缺英文源停止。预览后改变覆盖选项会因指纹不匹配而拒绝提交。上传失败时回滚原包 |
 | POST | `/api/language-package/hg2-400-4-preview` | 逐站下载语言包并预览 `HG2_400_4` E 列秒数删除，不上传 |
 | POST | `/api/language-package/hg2-400-4-submit` | 按预览指纹逐站修改、上传并重新下载回读；失败时回滚原包 |
 | POST | `/api/ecadmin/run` | 按所选动作处理/上传资料 |

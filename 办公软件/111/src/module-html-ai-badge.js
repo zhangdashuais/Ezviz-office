@@ -1,6 +1,7 @@
 (function () {
   const fileInput = document.getElementById("htmlAiBadgeFile");
   const textInput = document.getElementById("htmlAiBadgeText");
+  const positionInput = document.getElementById("htmlAiBadgePosition");
   const source = document.getElementById("htmlAiBadgeSource");
   const output = document.getElementById("htmlAiBadgeOutput");
   const runButton = document.getElementById("htmlAiBadgeRun");
@@ -39,6 +40,7 @@
 
   source.addEventListener("input", invalidate);
   textInput.addEventListener("input", invalidate);
+  positionInput?.addEventListener("change", invalidate);
 
   runButton.addEventListener("click", async () => {
     if (!source.value.trim()) {
@@ -49,7 +51,7 @@
     runButton.disabled = true;
     setStatus("正在给 Section 添加标识，末尾 Section 将跳过...");
     try {
-      const response = await fetch(`/api/html-ai-badge?text=${encodeURIComponent(textInput.value.trim())}`, {
+      const response = await fetch(`/api/html-ai-badge?text=${encodeURIComponent(textInput.value.trim())}&position=${encodeURIComponent(positionInput?.value || "bottom-right")}`, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: source.value

@@ -8,7 +8,8 @@ const {
   detectProductLanguageTableLayout,
   buildSourceKeyIndex,
   buildProductPrefix,
-  preserveStylesheetLinks
+  preserveStylesheetLinks,
+  replaceTextNodeValue
 } = require('../../../办公软件/111/src/i18n-conversion-rules');
 
 test('i18n conversion skips protected standalone values', () => {
@@ -106,6 +107,13 @@ test('i18n conversion skips standalone numbers and keeps numbers inside full cop
   assert.equal(isNonTranslatableText('30', 'H9c Dual'), true);
   assert.equal(extractTranslatableText('30', 'H9c Dual'), '');
   assert.equal(extractTranslatableText('Up to 30 days of battery life', 'H9c Dual'), 'Up to 30 days of battery life');
+});
+
+test('text-node replacement preserves only the outer layout whitespace', () => {
+  assert.equal(
+    replaceTextNodeValue('\n    Enjoys Clearer Videos with Less\n    Storage\n  ', "{{t('goods.HB90F_TRIPLE_KIT_1')}}"),
+    "\n    {{t('goods.HB90F_TRIPLE_KIT_1')}}\n  "
+  );
 });
 
 test('i18n fragment conversion preserves every original link tag', () => {

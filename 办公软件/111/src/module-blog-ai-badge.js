@@ -1,6 +1,7 @@
 (function () {
   const fileInput = document.getElementById("blogAiBadgeFile");
   const textInput = document.getElementById("blogAiBadgeText");
+  const positionInput = document.getElementById("blogAiBadgePosition");
   const source = document.getElementById("blogAiBadgeSource");
   const output = document.getElementById("blogAiBadgeOutput");
   const runButton = document.getElementById("blogAiBadgeRun");
@@ -36,6 +37,7 @@
   });
   source.addEventListener("input", invalidate);
   textInput.addEventListener("input", invalidate);
+  positionInput?.addEventListener("change", invalidate);
 
   runButton.addEventListener("click", async () => {
     if (!source.value.trim()) {
@@ -46,7 +48,7 @@
     runButton.disabled = true;
     setStatus("正在为 Blog 图片添加标识...");
     try {
-      const response = await fetch(`/api/blog-ai-badge?text=${encodeURIComponent(textInput.value.trim())}`, {
+      const response = await fetch(`/api/blog-ai-badge?text=${encodeURIComponent(textInput.value.trim())}&position=${encodeURIComponent(positionInput?.value || "bottom-right")}`, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: source.value

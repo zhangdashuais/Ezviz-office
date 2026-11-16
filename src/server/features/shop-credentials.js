@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
+const os = require("os");
 
 function createShopCredentials(options = {}) {
   const desktopRoot = options.desktopRoot;
@@ -9,7 +10,15 @@ function createShopCredentials(options = {}) {
   const workbookNames = options.workbookNames || ["网站账号密码", "账号密码"];
 
   function findWorkbook() {
-    const roots = [desktopRoot, process.env.EZVIZ_CREDENTIAL_DIR, backendRoot, ...additionalRoots]
+    const userProfileRoot = options.userProfileRoot || process.env.USERPROFILE || os.homedir();
+    const hiklinkRoot = path.join(userProfileRoot, "Documents", "HikLink_Files");
+    const receivedRoots = fs.existsSync(hiklinkRoot)
+      ? fs.readdirSync(hiklinkRoot, { withFileTypes: true })
+        .filter((item) => item.isDirectory())
+        .map((item) => path.join(hiklinkRoot, item.name, "received"))
+        .filter((dir) => fs.existsSync(dir))
+      : [];
+    const roots = [desktopRoot, process.env.EZVIZ_CREDENTIAL_DIR, backendRoot, ...additionalRoots, ...receivedRoots]
       .filter((dir, index, list) => dir && list.indexOf(dir) === index && fs.existsSync(dir));
     const candidates = [];
     const ignored = new Set(["node_modules", ".git", "outputs", ".playwright", ".playwright-cli", "runtime_uploads"]);
@@ -22,16 +31,22 @@ function createShopCredentials(options = {}) {
         } else if (item.isFile() && item.name.endsWith(".xlsx") && !item.name.startsWith("~$")) {
           const stat = fs.statSync(full);
           const named = workbookNames.some((name) => item.name.includes(name) || full.includes(name));
-          if (named || stat.size === 23744) candidates.push({ full, size: stat.size, named });
+          if (named || stat.size === 23744) candidates.push({ full, size: stat.size, named, modified: stat.mtimeMs });
         }
       }
     }
-    roots.forEach((root) => walk(root));
-    return candidates.find((item) => item.named && item.full.startsWith(desktopRoot))?.full
-      || candidates.find((item) => item.size === 23744 && item.full.startsWith(desktopRoot))?.full
-      || candidates.find((item) => item.named)?.full
-      || candidates.find((item) => item.size === 23744)?.full
-      || (() => { throw new Error("没有找到网站账号密码 Excel 表，请放在项目 credentials 目录或桌面，或设置 EZVIZ_CREDENTIAL_DIR 指向账号表所在文件夹。"); })();
+    roots.forEach((root) => {
+      const start = candidates.length;
+      walk(root);
+      for (let index = start; index < candidates.length; index += 1) candidates[index].root = root;
+    });
+    const named = candidates.filter((item) => item.named);
+    const sized = candidates.filter((item) => item.size === 23744);
+    const preferred = (items) => roots.flatMap((root) => items.filter((item) => item.root === root)
+      .sort((a, b) => b.modified - a.modified))[0]?.full;
+    return preferred(named)
+      || preferred(sized)
+      || (() => { throw new Error("没有找到网站账号密码 Excel 表，请放在项目 credentials 目录、桌面或 Documents/HikLink_Files/*/received，或设置 EZVIZ_CREDENTIAL_DIR 指向账号表所在文件夹。"); })();
   }
 
   function entries(buffer) {

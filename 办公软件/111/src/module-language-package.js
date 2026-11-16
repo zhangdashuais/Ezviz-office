@@ -15,6 +15,7 @@
     datasheet: document.getElementById("languageDatasheetInput"),
     datasheetInspect: document.getElementById("languageDatasheetInspectBtn"),
     datasheetMappings: document.getElementById("languageDatasheetMappings"),
+    overwriteEnglishSource: document.getElementById("languageDatasheetOverwriteEnglishSource"),
     datasheetPreview: document.getElementById("languageDatasheetPreviewBtn"),
     datasheetSubmit: document.getElementById("languageDatasheetSubmitBtn"),
     datasheetStatus: document.getElementById("languageDatasheetStatus"),
@@ -321,6 +322,7 @@
     formData.append("targets", JSON.stringify(targets));
     formData.append("shopUsername", el.username.value.trim());
     formData.append("shopPassword", el.password.value);
+    formData.append("overwriteEnglishSource", el.overwriteEnglishSource.checked ? "1" : "0");
     if (submit) {
       formData.append("expectedDatasheetFingerprint", datasheetPreview.datasheet.fingerprint);
       formData.append("approvedSiteCodes", JSON.stringify(
@@ -350,11 +352,27 @@
       if (item.rollback) lines.push("  回滚：" + item.rollback);
       if (plan.translationHeader) lines.push("  译文列：" + plan.translationHeader);
       if (item.plan) {
-        lines.push("  填补空译文 " + plan.changedCellCount + "，新增 " + plan.appendedFieldCount
-          + "，已有译文保留 " + (plan.preservedExistingCount || 0)
-          + "，不变 " + plan.unchangedCellCount + "，空译文跳过 " + plan.skippedBlankCount);
+        lines.push("  待更新译文 " + plan.changedCellCount + "，新增 " + plan.appendedFieldCount
+          + "，不变 " + plan.unchangedCellCount + "，Datasheet 空译文跳过 " + plan.skippedBlankCount);
+        lines.push("  英文原文：" + (result.overwriteEnglishSource
+          ? (item.status === "updated" ? "已覆盖 " : "确认后将覆盖 ")
+            + plan.sourceChangedCellCount + " 处差异" : "保留站点现值，不覆盖"));
         if (plan.sourceMismatches?.length) {
-          lines.push("  提醒：" + plan.sourceMismatches.length + " 个字段英文原文与站点语言包不同，Key 匹配结果已保留。");
+          lines.push("  提醒：" + plan.sourceMismatches.length + " 个字段英文原文与站点语言包不同；"
+            + (result.overwriteEnglishSource
+              ? (item.status === "updated" ? "已按 Datasheet 覆盖。" : "确认上传后将按 Datasheet 覆盖。")
+              : "站点英文原文将保留。"));
+          plan.sourceMismatches.forEach((mismatch) => {
+            lines.push("    Key：" + mismatch.key);
+            lines.push("      Datasheet 英文原文"
+              + (mismatch.datasheetSourceLocation
+                ? "（" + mismatch.datasheetSourceLocation + "）"
+                : "（第 " + mismatch.datasheetRow + " 行）")
+              + "：" + mismatch.expectedSource);
+            (mismatch.packageEntries || mismatch.packageSources?.map((source) => ({ source })) || [])
+              .forEach((entry) => lines.push("      站点语言包原文"
+                + (entry.location ? "（" + entry.location + "）" : "") + "：" + entry.source));
+          });
         }
         (plan.inputWarnings || []).forEach((warning) => lines.push("  提示：" + warning.message));
       }
@@ -452,6 +470,11 @@
   el.datasheetMappings.addEventListener("change", () => {
     datasheetPreview = null;
     el.datasheetSubmit.disabled = true;
+  });
+  el.overwriteEnglishSource.addEventListener("change", () => {
+    datasheetPreview = null;
+    el.datasheetSubmit.disabled = true;
+    setDatasheetStatus("英文原文覆盖选项已改变，请重新预览后再确认上传。", "warn");
   });
   el.datasheetPreview.addEventListener("click", () => runDatasheet("preview"));
   el.datasheetSubmit.addEventListener("click", () => runDatasheet("submit"));

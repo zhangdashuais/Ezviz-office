@@ -1389,7 +1389,7 @@ function createProductRevisionSyncFeature(deps) {
       missing: plan.missing.slice(0, 50),
       newFields: plan.newFields.slice(0, 50),
       appendedFieldCount: plan.newFields.length,
-      sourceMismatches: plan.sourceMismatches.slice(0, 50),
+      sourceMismatches: plan.sourceMismatches,
       warnings: (plan.inputWarnings || []).slice(0, 50)
     };
   }
@@ -1550,7 +1550,7 @@ function createProductRevisionSyncFeature(deps) {
 
   async function previewDirectRevision(body, logs, existingSession) {
     const prepared = await prepareDirectRevision(body, logs, existingSession);
-    return {
+    const result = {
       mode: "product-direct-revision-preview",
       site: prepared.site,
       productName: prepared.request.productName,
@@ -1569,6 +1569,11 @@ function createProductRevisionSyncFeature(deps) {
       detailOperations: prepared.detail.results,
       specificationOperations: prepared.specification.results
     };
+    if (body?.includeHtml === true || body?.includeHtml === "true") {
+      result.currentSpecificationHtml = prepared.before.detail.specifications;
+      result.desiredSpecificationHtml = prepared.specification.value;
+    }
+    return result;
   }
 
   async function submitDirectRevision(body, logs, existingSession) {
@@ -1602,6 +1607,50 @@ function createProductRevisionSyncFeature(deps) {
         description: "passed"
       }
     };
+  }
+
+  async function searchBackendProducts(body, logs) {
+    const siteCode = normalize(body?.siteCode).toLowerCase();
+    const query = normalize(body?.query);
+    const site = getCampaignSites(readCampaignConfig()).find((item) => item.siteCode === siteCode);
+    if (!site || site.enabled === false) throw new Error("所选国家站点不存在或未启用。");
+    const session = await prepareSiteSession(site, body, logs);
+    const page = session.page;
+    await page.goto("https://shop.ezvizlife.com/goods/index", {
+      waitUntil: "domcontentloaded", timeout: 60000
+    });
+    await page.waitForTimeout(1800);
+    if (query) {
+      const input = page.locator(
+        'input[placeholder*="Product Name"]:visible:not([readonly]), input[type="search"]:visible:not([readonly]), input[type="text"]:visible:not([readonly])'
+      ).first();
+      if (!(await input.count())) throw new Error("产品列表没有找到搜索框。");
+      await input.fill(query);
+      const button = page.getByRole("button", { name: /^(Product Search|Search|查询|搜索)$/i }).first();
+      if (await button.count()) await button.click();
+      else await input.press("Enter");
+      await page.waitForTimeout(3500);
+    }
+    const products = await page.evaluate(() => {
+      const visible = (el) => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+      return [...document.querySelectorAll("tr, .goods-item.ng-scope, .ant-list-items .ant-card")]
+        .filter(visible)
+        .map((row) => {
+          const nameElement = row.querySelector("td.lb > a, .goods-name, .product-name, [ng-bind*='name']");
+          const links = [...row.querySelectorAll("a[href]")].map((link) => ({
+            text: (link.innerText || link.textContent || "").trim(),
+            href: link.href || link.getAttribute("href") || ""
+          }));
+          return {
+            name: (nameElement?.innerText || nameElement?.textContent || "").trim(),
+            rowText: (row.innerText || "").replace(/\s+/g, " ").trim().slice(0, 500),
+            links
+          };
+        })
+        .filter((item) => item.name || item.rowText)
+        .slice(0, 100);
+    });
+    return { mode: "product-catalog-search", site, query, products };
   }
 
   function commonRevisionTargets(body) {
@@ -2968,6 +3017,7 @@ function createProductRevisionSyncFeature(deps) {
     submitPublishingLanguagePackageBatch,
     previewDirectRevision,
     submitDirectRevision,
+    searchBackendProducts,
     previewCommonRevision,
     submitCommonRevision,
     previewContentSync,

@@ -677,6 +677,18 @@
     outputElement.value = lines.join("\n");
   }
 
+  function appendSourceMismatches(lines, mismatches, indent) {
+    if (!mismatches?.length) return;
+    lines.push(`${indent}英文原文不一致：${mismatches.length} 个字段`);
+    mismatches.forEach((entry) => {
+      lines.push(`${indent}  Key：${entry.key}`);
+      lines.push(`${indent}    Datasheet 英文原文（${entry.datasheetSourceLocation || `第 ${entry.datasheetRow} 行`}）：${entry.expectedSource}`);
+      (entry.packageEntries || entry.packageSources?.map((source) => ({ source })) || [])
+        .forEach((packageEntry) => lines.push(`${indent}    站点语言包英文原文`
+          + `${packageEntry.location ? `（${packageEntry.location}）` : ""}：${packageEntry.source}`));
+    });
+  }
+
   function renderPreview(data) {
     const result = data.result;
     const publishing = result.mode === "product-publishing-preview";
@@ -725,12 +737,7 @@
               .map((entry) => entry.key).join("、")
           );
         }
-        if (item.languagePackage?.sourceMismatches?.length) {
-          lines.push(
-            "  · 语言包原文不一致：" + item.languagePackage.sourceMismatches
-              .map((entry) => entry.key).join("、")
-          );
-        }
+        appendSourceMismatches(lines, item.languagePackage?.sourceMismatches, "  · ");
         return;
       }
       if (publishing && item.copySource) {
@@ -779,12 +786,7 @@
               .map((entry) => entry.key).join("、")
           );
         }
-        if (item.languagePackage.sourceMismatches?.length) {
-          lines.push(
-            "    原文不一致：" + item.languagePackage.sourceMismatches
-              .map((entry) => entry.key).join("、")
-          );
-        }
+        appendSourceMismatches(lines, item.languagePackage.sourceMismatches, "    ");
         (item.languagePackage.warnings || []).slice(0, 5).forEach((warning) => {
           lines.push(`    警告：${warning.message}`);
         });
@@ -850,6 +852,7 @@
         `  · 已有译文保留 ${item.languagePackage.preservedExistingCount || 0} 个：`
         + (item.languagePackage.preservedExisting || []).slice(0, 20).map((entry) => entry.key).join("、")
       );
+      if (packageOnly) appendSourceMismatches(lines, item.languagePackage?.sourceMismatches, "  · ");
     });
     showLines(lines, data);
   }

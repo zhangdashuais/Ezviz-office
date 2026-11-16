@@ -58,6 +58,42 @@ test("normalizes HTML indentation in new source copy while replacing the origina
   );
 });
 
+test("uses text-node source offsets for multiline copy beside nested markup", () => {
+  const html = [
+    "<p><strong>",
+    "  Enjoys Clearer Videos with Less",
+    "  Storage<sup>6</sup>",
+    "</strong></p>",
+    "<li>",
+    "  Red-blue light and siren are off by default. Please enable it in settings to use this",
+    "  feature.",
+    "</li>"
+  ].join("\n");
+  const result = extractNewProductRows(
+    html, "HB90f Triple Kit", "hb90f_triple_kit",
+    { headers: ["English"], rows: new Map() }, new Map()
+  );
+
+  assert.deepEqual(result.newRows, [
+    { key: "HB90F_TRIPLE_KIT_1", source: "Enjoys Clearer Videos with Less Storage" },
+    {
+      key: "HB90F_TRIPLE_KIT_2",
+      source: "Red-blue light and siren are off by default. Please enable it in settings to use this feature."
+    }
+  ]);
+  assert.equal(
+    replaceHtmlText(html, result.replacements),
+    [
+      "<p><strong>",
+      "  {{t(&#39;goods.HB90F_TRIPLE_KIT_1&#39;)}}<sup>6</sup>",
+      "</strong></p>",
+      "<li>",
+      "  {{t(&#39;goods.HB90F_TRIPLE_KIT_2&#39;)}}",
+      "</li>"
+    ].join("\n")
+  );
+});
+
 test("does not reuse copy found only in the total package or previous output", () => {
   const productData = {
     headers: ["English"],

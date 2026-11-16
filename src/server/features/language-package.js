@@ -11,6 +11,7 @@ const {
   languagePackageImportDatasheet,
   planLanguagePackageUpdates,
   planPublishingLanguagePackageUpdates,
+  planDatasheetRevisionLanguagePackageUpdates,
   languagePackageKeySnapshot,
   languagePackageSheetSnapshot,
   workbookContentFingerprintForGlobalRebase,
@@ -1038,6 +1039,8 @@ function parseStandaloneDatasheet(filePath) {
 
 async function reviseFromDatasheet(body, file, logs, submit = false) {
   if (!file?.path) throw new Error("请上传单产品 Datasheet。");
+  const overwriteEnglishSource = body?.overwriteEnglishSource === "1"
+    || body?.overwriteEnglishSource === true;
   const parsedDatasheet = parseStandaloneDatasheet(file.path);
   if (submit && body?.expectedDatasheetFingerprint !== parsedDatasheet.fingerprint) {
     throw new Error("Datasheet 与预览时不一致，请重新预览。");
@@ -1084,13 +1087,16 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       originalFingerprint = packageInfo.contentFingerprint;
       const originalSheet1 = languagePackageSheetSnapshot(packageInfo, "Sheet1");
       const targetDatasheet = parsedDatasheet;
-      const plan = planPublishingLanguagePackageUpdates(
+      const plan = planDatasheetRevisionLanguagePackageUpdates(
         packageInfo,
         targetDatasheet,
-        target.languagePackageHeader
+        target.languagePackageHeader,
+        { overwriteEnglishSource }
       );
-      const changed = plan.changedCellCount + plan.newFields.length;
-      const comparisonFingerprint = packageInfo.contentFingerprint;
+      const changed = plan.changedCellCount + plan.newFields.length
+        + (overwriteEnglishSource ? plan.sourceChangedCellCount : 0);
+      const comparisonFingerprint = packageInfo.contentFingerprint
+        + (overwriteEnglishSource ? ":overwrite-english" : "");
       if (!submit || !changed) {
         results.push({
           status: changed ? "ready" : "no-change",
@@ -1108,9 +1114,15 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       const originalPath = path.join(runDir, `${target.site.siteCode}-before${extension}`);
       const modifiedPath = path.join(runDir, `${target.site.siteCode}-after${extension}`);
       fs.copyFileSync(downloaded.filePath, originalPath);
-      const generated = writeUpdatedLanguagePackage(
-        packageInfo, plan, modifiedPath, { preserveSheets: ["Sheet1"] }
-      );
+      const generated = extension === ".xls"
+        ? writeUpdatedLanguagePackageNative(
+          downloaded.filePath, packageInfo, targetDatasheet, plan, modifiedPath,
+          { preserveSheets: ["Sheet1"], syncSource: overwriteEnglishSource }
+        )
+        : writeUpdatedLanguagePackage(
+          packageInfo, plan, modifiedPath,
+          { preserveSheets: ["Sheet1"], syncSource: overwriteEnglishSource }
+        );
       await uploadLanguagePackageForPage(session.page, {
         ...generated,
         fileName: downloaded.fileName,
@@ -1129,15 +1141,17 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
           return {
             info,
             sheet1: languagePackageSheetSnapshot(info, "Sheet1"),
-            plan: planPublishingLanguagePackageUpdates(
+            plan: planDatasheetRevisionLanguagePackageUpdates(
               info,
               targetDatasheet,
-              target.languagePackageHeader
+              target.languagePackageHeader,
+              { overwriteEnglishSource }
             )
           };
         },
         isComplete: ({ plan: currentPlan, sheet1 }) => !currentPlan.changedCellCount
-          && !currentPlan.missing.length && sheet1 === originalSheet1,
+          && !currentPlan.missing.length && sheet1 === originalSheet1
+          && (!overwriteEnglishSource || !currentPlan.sourceChangedCellCount),
         cleanup: (file) => fs.rmSync(file.filePath, { force: true }),
         pause: () => session.page.waitForTimeout(3000),
         onRetry: (attempt) => logLine(
@@ -1149,6 +1163,7 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
       const verifiedInfo = readback.inspection.info;
       const verifiedPlan = readback.inspection.plan;
       if (verifiedPlan.changedCellCount || verifiedPlan.missing.length
+        || (overwriteEnglishSource && verifiedPlan.sourceChangedCellCount)
         || readback.inspection.sheet1 !== originalSheet1) {
         throw new Error("上传后回读与预期不符（字段或 Sheet1 发生变化）。");
       }
@@ -1158,7 +1173,7 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
         fingerprint: packageInfo.contentFingerprint,
         verifiedFingerprint: verifiedInfo.contentFingerprint,
         plan: summarizeDatasheetPlan(plan),
-        sourceSynced: false
+        sourceSynced: overwriteEnglishSource && plan.sourceChangedCellCount > 0
       });
     } catch (error) {
       let rollback = null;
@@ -1202,6 +1217,7 @@ async function reviseFromDatasheet(body, file, logs, submit = false) {
 
   return {
     mode: submit ? "submit" : "preview",
+    overwriteEnglishSource,
     datasheet: inspectLanguageDatasheet(file),
     runDir: submit ? runDir : "",
     sites: results

@@ -44,6 +44,7 @@ function registerProductRevisionSyncRoutes(app, deps) {
     ["/api/product-revision-sync/submit", excelUpload, feature.submit, "product revision submit", excelArgs, true],
     ["/api/product-revision/preview", upload.none(), feature.previewDirectRevision, "direct revision preview", delistingArgs, true],
     ["/api/product-revision/submit", upload.none(), feature.submitDirectRevision, "direct revision submit", delistingArgs, true],
+    ["/api/product-catalog/search", upload.none(), feature.searchBackendProducts, "product catalog search", delistingArgs, true],
     ["/api/product-revision/common-preview", upload.none(), feature.previewCommonRevision, "common revision preview", delistingArgs, true],
     ["/api/product-revision/common-submit", upload.none(), feature.submitCommonRevision, "common revision submit", delistingArgs, true],
     ["/api/product-content-sync/preview", upload.none(), feature.previewContentSync, "product content sync preview", delistingArgs, true],

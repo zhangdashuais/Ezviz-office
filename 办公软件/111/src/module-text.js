@@ -264,7 +264,10 @@
         tbody.appendChild(tr);
       }
 
-      item.node.nodeValue = item.node.nodeValue.replace(item.rawText, `{{t('${key}')}}`);
+      item.node.nodeValue = window.i18nConversionRules.replaceTextNodeValue(
+        item.node.nodeValue,
+        `{{t('${key}')}}`
+      );
     });
 
     convertedCount = generatedLanguageRows.length;

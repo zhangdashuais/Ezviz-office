@@ -36,18 +36,14 @@ function copy(value) {
   return value ? JSON.parse(JSON.stringify(value)) : value;
 }
 
-function locateRawHtmlText(rawNode, source) {
-  const escaped = source
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-  for (const candidate of [...new Set([source, escaped])]) {
-    const start = rawNode.indexOf(candidate);
-    if (start >= 0) return { start, length: candidate.length };
-  }
-  return null;
+function textNodeSourceRange(html, location) {
+  if (!location) return null;
+  const rawNode = html.slice(location.startOffset, location.endOffset);
+  const leadingWhitespace = rawNode.match(/^\s*/u)?.[0].length || 0;
+  const trailingWhitespace = rawNode.match(/\s*$/u)?.[0].length || 0;
+  const start = location.startOffset + leadingWhitespace;
+  const end = location.endOffset - trailingWhitespace;
+  return start < end ? { start, end } : null;
 }
 
 function isProductNameOnlyText(value, productName) {
@@ -338,14 +334,10 @@ function extractNewProductRows(html, productName, productKey, productData, globa
     const normalized = i18nRules.normalize(source);
     const location = node.sourceCodeLocation;
     if (!location) return;
-    const rawNode = html.slice(location.startOffset, location.endOffset);
-    const rawLocation = locateRawHtmlText(rawNode, raw);
-    if (!rawLocation) return;
+    const sourceRange = textNodeSourceRange(html, location);
+    if (!sourceRange) return;
     if (!occurrences.has(normalized)) occurrences.set(normalized, []);
-    occurrences.get(normalized).push({
-      start: location.startOffset + rawLocation.start,
-      end: location.startOffset + rawLocation.start + rawLocation.length
-    });
+    occurrences.get(normalized).push(sourceRange);
     const existing = sourceIndex.get(normalized);
     if (existing) reused.set(existing.key.toLowerCase(), existing);
     else if (!newSources.has(normalized)) newSources.set(normalized, source);

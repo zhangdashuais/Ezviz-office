@@ -173,7 +173,21 @@ function createProductManagement({ logLine, normalizeBool }) {
       }
     }
     if (!found.ok) {
-      throw new Error("没有在产品列表中找到产品：" + targetName + (found.reason ? "；" + found.reason : ""));
+      const suggestions = await page.evaluate(() => {
+        const visible = (el) => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+        const rows = [...document.querySelectorAll("tr, .goods-item.ng-scope, .ant-list-items .ant-card")]
+          .filter(visible);
+        const names = rows.map((row) => {
+          const preferred = row.querySelector("td.lb > a, .goods-name, .product-name, [ng-bind*='name']");
+          if (preferred) return (preferred.innerText || preferred.textContent || "").trim();
+          const cells = [...row.querySelectorAll("td")].map((cell) => (cell.innerText || "").trim()).filter(Boolean);
+          return cells.find((value) => !/^\d+$/.test(value) && value.length < 120) || "";
+        }).filter(Boolean);
+        return [...new Set(names)].slice(0, 12);
+      }).catch(() => []);
+      const suggestionText = suggestions.length ? `；当前搜索结果：${suggestions.join(" | ")}` : "";
+      throw new Error("没有在产品列表中找到产品：" + targetName
+        + (found.reason ? "；" + found.reason : "") + suggestionText);
     }
     await page.waitForTimeout(2500);
     if (goodsIdFromEditorUrl(page.url())) {

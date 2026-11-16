@@ -32,3 +32,11 @@ test("blog badge rerun updates text without duplicating wrappers", () => {
 test("blog badges require a real image", () => {
   assert.throws(() => addBlogImageAiBadges('<p>No image</p>'), /没有找到/);
 });
+
+test("blog badges can use the top right corner", () => {
+  const source = '<img src="a.png">';
+  const html = addBlogImageAiBadges(source, { position: "top-right" }).html;
+  assert.match(html, /right:8px;top:8px/);
+  assert.match(html, /transform-origin:right top/);
+  assert.equal(addBlogImageAiBadges(html, { position: "top-right" }).html, html);
+});

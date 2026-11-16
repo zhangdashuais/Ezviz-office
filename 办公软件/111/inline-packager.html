@@ -79,7 +79,7 @@
           <p class="desc">批量处理 HTML、CSS 和 JS 资源，并自动为 Webflow CSS 添加 <code>.page.page-webflow</code> 作用域。完成后同时返回 HTML 与独立 CSS 文件。</p>
 
           <select id="versionSelect" hidden>
-            <option value="src/main-default.js?v=20260917-1" selected>Standard</option>
+            <option value="src/main-default.js?v=20261112-2" selected>Standard</option>
           </select>
           <select id="imageModeSelect" hidden>
             <option value="upload" selected>Upload Assets</option>
@@ -125,12 +125,16 @@
       <div id="tab-ai-badge" class="tab-content">
         <div class="card">
           <h3>图片 AI 标志</h3>
-          <p class="desc">选择图片后，系统会在右下角叠加固定标识。输出超过 512 KB 时会保持原分辨率并转为 JPG 压缩；最低画质仍超限时会提示，不会缩放、上传或覆盖原文件。</p>
+          <p class="desc">选择图片后，系统会在所选位置叠加固定标识，距边缘 8px。输出超过 512 KB 时会保持原分辨率并转为 JPG 压缩；最低画质仍超限时会提示，不会缩放、上传或覆盖原文件。</p>
           <div class="form-grid">
             <label for="aiBadgeImageInput">图片文件</label>
             <input id="aiBadgeImageInput" type="file" accept="image/*" multiple>
             <label for="aiBadgeTextInput">标志文案</label>
-            <input id="aiBadgeTextInput" type="text" value="AI GENERATED">
+            <input id="aiBadgeTextInput" type="text" value="AI MODIFIED">
+            <label for="aiBadgeFontSize">字体大小</label>
+            <select id="aiBadgeFontSize"><option value="auto">自动（保持原默认）</option><option value="8">8 px</option><option value="10">10 px</option><option value="12">12 px</option><option value="14">14 px</option><option value="16">16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option><option value="40">40 px</option><option value="48">48 px</option><option value="64">64 px</option></select>
+            <label for="aiBadgePosition">打标位置</label>
+            <select id="aiBadgePosition"><option value="bottom-right">右下</option><option value="top-right">右上</option></select>
           </div>
           <div id="aiBadgeDropZone" style="margin-top: 16px; padding: 28px; border: 2px dashed var(--border); border-radius: 10px; text-align: center; color: var(--text-muted); background: #f8fafc;">
             拖拽图片到这里，或点击上方选择图片
@@ -151,7 +155,9 @@
         </div>
         <div class="card">
           <h3>网页 HTML 打标</h3>
-          <p class="desc">为页面内每个 section 的右下角添加同款 AI 标识，单独的 img 不打标。保留原网页结构与图片文件，生成的代码可复制或下载。</p>
+          <p class="desc">为页面内每个 section 的所选角落添加同款 AI 标识，距边缘 8px；单独的 img 不打标。保留原网页结构与图片文件，生成的代码可复制或下载。</p>
+          <label for="aiBadgeHtmlPosition">打标位置</label>
+          <select id="aiBadgeHtmlPosition"><option value="bottom-right">右下</option><option value="top-right">右上</option></select>
           <label for="aiBadgeHtmlFile">上传 HTML 文件（也可直接粘贴）</label>
           <input id="aiBadgeHtmlFile" type="file" accept=".html,.htm,.txt,text/html,text/plain">
           <label for="aiBadgeHtmlSource">原始 HTML</label>
@@ -168,12 +174,14 @@
       <div id="tab-html-ai-badge" class="tab-content">
         <div class="card">
           <h3>HTML Section AI 标志</h3>
-          <p class="desc">对 HTML 中除最后一个 <code>&lt;section&gt;</code> 外的每个 Section 右下角添加 AI GENERATED 标识。末尾纯文字说明区会跳过。支持上传 HTML 文件或直接粘贴代码；再次处理已打标代码时不会重复添加。</p>
+          <p class="desc">对 HTML 中除最后一个 <code>&lt;section&gt;</code> 外的每个 Section 在所选角落添加 AI GENERATED 标识，距边缘 8px。末尾纯文字说明区会跳过。支持上传 HTML 文件或直接粘贴代码；再次处理已打标代码时不会重复添加。</p>
           <div class="form-grid">
             <label for="htmlAiBadgeFile">HTML 文件</label>
             <input id="htmlAiBadgeFile" type="file" accept=".html,.htm,.txt,text/html,text/plain">
             <label for="htmlAiBadgeText">标志文案</label>
             <input id="htmlAiBadgeText" type="text" value="AI GENERATED" maxlength="80">
+            <label for="htmlAiBadgePosition">打标位置</label>
+            <select id="htmlAiBadgePosition"><option value="bottom-right">右下</option><option value="top-right">右上</option></select>
           </div>
           <label for="htmlAiBadgeSource" style="display: block; margin-top: 16px;">HTML 源代码</label>
           <textarea id="htmlAiBadgeSource" spellcheck="false" placeholder="上传 HTML 文件后会自动填入；也可以直接粘贴 HTML 代码。" style="min-height: 180px;"></textarea>
@@ -192,12 +200,14 @@
       <div id="tab-blog-ai-badge" class="tab-content">
         <div class="card">
           <h3>Blog 图片 AI 标志</h3>
-          <p class="desc">给 Blog HTML 中每张图片的右下角添加 AI GENERATED 标识。支持上传 .html/.txt 或粘贴代码；不改图片地址，不依赖脚本，也不会重复打标。</p>
+          <p class="desc">给 Blog HTML 中每张图片的所选角落添加 AI GENERATED 标识，距边缘 8px。支持上传 .html/.txt 或粘贴代码；不改图片地址，不依赖脚本，也不会重复打标。</p>
           <div class="form-grid">
             <label for="blogAiBadgeFile">Blog HTML 文件</label>
             <input id="blogAiBadgeFile" type="file" accept=".html,.htm,.txt,text/html,text/plain">
             <label for="blogAiBadgeText">标识文案</label>
             <input id="blogAiBadgeText" type="text" value="AI GENERATED" maxlength="80">
+            <label for="blogAiBadgePosition">打标位置</label>
+            <select id="blogAiBadgePosition"><option value="bottom-right">右下</option><option value="top-right">右上</option></select>
           </div>
           <label for="blogAiBadgeSource" style="display:block;margin-top:16px;">Blog HTML 源代码</label>
           <textarea id="blogAiBadgeSource" spellcheck="false" placeholder="上传文件后会自动填入，也可直接粘贴 Blog HTML。" style="min-height:180px;"></textarea>
@@ -807,7 +817,7 @@
 
         <div class="card">
           <h3>按单产品 Datasheet 更新站点语言包</h3>
-          <p class="desc">上传结构类似 Datasheet 的单产品语言表，先下载站点当前包，再按 Key 补齐空译文；已有译文和 Sheet1 不改，新 Key 有英文原文及译文时追加。先预览，确认后上传并回读验证。</p>
+          <p class="desc">上传结构类似 Datasheet 的单产品语言表，先下载站点当前包，再按 Key 更新译文；默认覆盖已有译文，Datasheet 空译文跳过，Sheet1 不改，新 Key 有英文原文及译文时追加。英文原文默认保留，可在核对差异后选择覆盖；更改选项须重新预览。先预览，确认后上传并回读验证。</p>
           <div class="form-grid">
             <label for="languageDatasheetInput">单产品 Datasheet</label>
             <input id="languageDatasheetInput" type="file" accept=".xls,.xlsx">
@@ -817,11 +827,14 @@
           </div>
           <div id="languageDatasheetMappings" class="revision-targets">选择上方站点并识别 Datasheet 后显示语言列映射。</div>
           <div class="row">
+            <label><input id="languageDatasheetOverwriteEnglishSource" type="checkbox"> 用 Datasheet 英文原文覆盖站点原有英文（默认不覆盖；仅限可写工作表）</label>
+          </div>
+          <div class="row">
             <button id="languageDatasheetPreviewBtn" type="button" disabled>预览站点语言包</button>
             <button id="languageDatasheetSubmitBtn" type="button" disabled>确认并上传</button>
           </div>
           <div id="languageDatasheetStatus" class="status">请先选择站点并上传单产品 Datasheet。</div>
-          <textarea id="languageDatasheetOutput" placeholder="字段匹配、填补空译文、新增、跳过和站点回读结果会显示在这里..."></textarea>
+          <textarea id="languageDatasheetOutput" placeholder="字段匹配、覆盖译文、新增、跳过和站点回读结果会显示在这里..."></textarea>
         </div>
 
         <div id="languageStatus" class="status">请先加载站点。</div>
@@ -1186,13 +1199,13 @@
 
   <script src="src/ui.js"></script>
   <script src="src/css-scope.js?v=20260821-1"></script>
-  <script src="src/inline-output.js?v=20261026-1"></script>
+  <script src="src/inline-output.js?v=20261112-2"></script>
   <script src="src/module-task-progress.js?v=20261015-1"></script>
   <script src="src/module-inline.js"></script>
   <script src="src/module-asset-upload.js?v=20260924-1"></script>
-  <script src="src/module-ai-badge.js?v=20261019-3"></script>
-  <script src="src/module-html-ai-badge.js?v=20261026-1"></script>
-  <script src="src/module-blog-ai-badge.js?v=20261103-1"></script>
+  <script src="src/module-ai-badge.js?v=20261116-3"></script>
+  <script src="src/module-html-ai-badge.js?v=20261116-1"></script>
+  <script src="src/module-blog-ai-badge.js?v=20261116-1"></script>
   <script src="src/module-pdf-upload.js?v=20260924-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>

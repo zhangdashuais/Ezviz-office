@@ -12,6 +12,13 @@ function normalize(value) {
     .trim();
 }
 
+function normalizeTranslationLineBreaks(value) {
+  return String(value == null ? "" : value)
+    .replace(/(?:_x000d_|\r\n?|\n)+/gi, " ")
+    .replace(/ +/g, " ")
+    .trim();
+}
+
 function hashBuffer(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
@@ -64,7 +71,7 @@ function parseLanguageDatasheet(input) {
     const translations = {};
     headers.forEach(({ header, column }) => {
       const value = cellValue(sheet, row, column);
-      translations[header] = value == null ? "" : String(value);
+      translations[header] = normalizeTranslationLineBreaks(value);
     });
     const hasTranslation = Object.values(translations).some((value) => normalize(value));
     if (!key && !source && !hasTranslation) continue;
@@ -228,8 +235,7 @@ function normalizeSourceForComparison(value) {
 }
 
 function normalizeTranslationForComparison(value) {
-  return String(value == null ? "" : value)
-    .replace(/\r\n?/g, "\n")
+  return normalizeTranslationLineBreaks(value)
     .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "");
 }
 
@@ -263,7 +269,9 @@ function languagePackageImportDatasheet(packageInfo) {
     for (let row = section.firstDataRow; row <= section.lastDataRow; row += 1) {
       const key = normalize(cellValue(sheet, row, section.keyColumn));
       const source = normalize(cellValue(sheet, row, section.sourceColumn));
-      const translation = String(cellValue(sheet, row, section.targetColumn) ?? "");
+      const translation = normalizeTranslationLineBreaks(
+        cellValue(sheet, row, section.targetColumn)
+      );
       if (!key && !source && !normalize(translation)) continue;
       rows.push({ key, source, rowNumber: row + 1,
         translations: { [translationHeader]: translation } });
@@ -312,7 +320,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
   const preservedExisting = [];
   const selectedByKey = new Map();
   parsedDatasheet.rows.forEach((entry) => {
-    const translation = String(entry.translations[translationHeader] ?? "");
+    const translation = normalizeTranslationLineBreaks(entry.translations[translationHeader]);
     if (!normalize(translation)) {
       skippedBlank.push({ key: entry.key, datasheetRow: entry.rowNumber });
       return;
@@ -344,7 +352,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
   });
 
   selectedByKey.forEach((entry) => {
-    const translation = String(entry.translations[translationHeader] ?? "");
+    const translation = normalizeTranslationLineBreaks(entry.translations[translationHeader]);
     const candidates = candidatesByKey.get(entry.key) || [];
     if (!candidates.length) {
       if (!entry.source) {
@@ -385,9 +393,18 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
       sourceMismatches.push({
         key: entry.key,
         datasheetRow: entry.rowNumber,
+        datasheetSourceLocation: `${parsedDatasheet.sheetName}!${XLSX.utils.encode_cell({
+          r: entry.rowNumber - 1, c: 1
+        })}`,
         location,
         expectedSource: entry.source,
-        packageSources: [...new Set(candidates.map((candidate) => candidate.source))]
+        packageSources: [...new Set(candidates.map((candidate) => candidate.source))],
+        packageEntries: candidates.map((candidate) => ({
+          location: `${candidate.sheetName}!${XLSX.utils.encode_cell({
+            r: candidate.row, c: candidate.sourceColumn
+          })}`,
+          source: candidate.source
+        }))
       });
     }
     candidates.forEach((candidate) => {
@@ -499,7 +516,8 @@ function assertPlanPreservesSheet(packageInfo, plan, sheetName) {
 
 function planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader, options = {}) {
   const plan = planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader,
-    { fillBlankOnly: options.forceOverwriteExisting !== true, preserveSource: true });
+    { fillBlankOnly: options.forceOverwriteExisting !== true,
+      preserveSource: options.overwriteEnglishSource !== true });
   assertSafePlan(plan);
   if (plan.newFields.length && selectAppendSection(packageInfo, plan).sheetName === "Sheet1") {
     const sheet2 = packageInfo.sections.find((section) => section.sheetName === "Sheet2");
@@ -510,9 +528,22 @@ function planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, tran
   return plan;
 }
 
+function planDatasheetRevisionLanguagePackageUpdates(
+  packageInfo, parsedDatasheet, translationHeader, options = {}
+) {
+  const plan = planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader,
+    { forceOverwriteExisting: true, overwriteEnglishSource: options.overwriteEnglishSource === true });
+  if (options.overwriteEnglishSource && plan.sourceUpdates.some((update) => !update.source)) {
+    throw new Error("Datasheet 英文原文为空，不能覆盖站点语言包英文原文。");
+  }
+  return plan;
+}
+
 function sheetCellSnapshot(sheet) {
   return JSON.stringify({
-    ref: sheet["!ref"] || "",
+    // Excel may trim an empty, formatted edge from !ref when saving BIFF8.
+    // Compare actual cells so that this harmless UsedRange change does not
+    // hide a real source or translation edit on the protected sheet.
     cells: Object.keys(sheet).filter((address) => !address.startsWith("!"))
       .filter((address) => {
         const cell = sheet[address];
@@ -530,6 +561,7 @@ function languagePackageSheetSnapshot(packageInfo, sheetName) {
 
 function writeUpdatedLanguagePackage(packageInfo, plan, outputPath, options = {}) {
   assertSafePlan(plan);
+  const syncSource = options.syncSource === true;
   const preservedSheets = options.preserveSheets || [];
   preservedSheets.forEach((sheetName) => assertPlanPreservesSheet(packageInfo, plan, sheetName));
   const beforeSnapshots = new Map(preservedSheets.map((sheetName) => [
@@ -544,6 +576,11 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath, options = {}
     });
     const existing = sheet[address] || {};
     sheet[address] = { ...existing, t: "s", v: update.translation, w: update.translation };
+  });
+  if (syncSource) plan.sourceUpdates.forEach((update) => {
+    const sheet = packageInfo.workbook.Sheets[update.sheetName];
+    const address = XLSX.utils.encode_cell({ r: update.row, c: update.sourceColumn });
+    sheet[address] = { ...sheet[address], t: "s", v: update.source, w: update.source };
   });
   const appended = [];
   const appendSection = selectAppendSection(packageInfo, plan);
@@ -619,6 +656,11 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath, options = {}
       });
     }
   });
+  if (syncSource) plan.sourceUpdates.forEach((update) => {
+    const actual = cellValue(verified.workbook.Sheets[update.sheetName],
+      update.row, update.sourceColumn);
+    if (String(actual) !== update.source) failures.push({ key: update.key, expected: update.source, actual });
+  });
   if (failures.length) {
     throw new Error(`语言包生成后回读失败：${failures.length} 个单元格不一致。`);
   }
@@ -627,7 +669,7 @@ function writeUpdatedLanguagePackage(packageInfo, plan, outputPath, options = {}
     fileName: path.basename(outputPath),
     size: fs.statSync(outputPath).size,
     sha256: verified.fingerprint,
-    verifiedCellCount: plan.updates.length + appended.length,
+    verifiedCellCount: plan.updates.length + (syncSource ? plan.sourceUpdates.length : 0) + appended.length,
     appendedFieldCount: appended.length,
     appendedFields: appended
   };
@@ -643,6 +685,12 @@ function writeUpdatedLanguagePackageNative(
 ) {
   assertSafePlan(plan);
   const syncSource = options.syncSource === true;
+  const preservedSheets = options.preserveSheets || [];
+  preservedSheets.forEach((sheetName) => assertPlanPreservesSheet(packageInfo, plan, sheetName));
+  const beforeSnapshots = new Map(preservedSheets.map((sheetName) => [
+    sheetName,
+    sheetCellSnapshot(packageInfo.workbook.Sheets[sheetName] || {})
+  ]));
   const instructions = {
     updates: [
       ...plan.updates.map((update) => ({
@@ -688,11 +736,19 @@ function writeUpdatedLanguagePackageNative(
         `Excel 原生保存失败：${result.error?.message || result.stderr || result.stdout}`.trim()
       );
     }
+    if (!fs.existsSync(outputPath)) {
+      throw new Error(`Excel 原生保存未生成语言包：${result.stderr || result.stdout || "未知原因"}`.trim());
+    }
   } finally {
     fs.rmSync(instructionPath, { force: true });
   }
 
   const verified = readLanguagePackage(outputPath);
+  preservedSheets.forEach((sheetName) => {
+    if (sheetCellSnapshot(verified.workbook.Sheets[sheetName] || {}) !== beforeSnapshots.get(sheetName)) {
+      throw new Error(`生成的语言包 ${sheetName} 与原包不一致，已停止上传。`);
+    }
+  });
   const verificationPlan = planLanguagePackageUpdates(
     verified,
     parsedDatasheet,
@@ -701,6 +757,11 @@ function writeUpdatedLanguagePackageNative(
   if (verificationPlan.changedCellCount || verificationPlan.missing.length
     || (syncSource && verificationPlan.sourceChangedCellCount)) {
     throw new Error("语言包经 Excel 保存后回读不一致。");
+  }
+  if (syncSource && plan.sourceUpdates.some((update) => String(cellValue(
+    verified.workbook.Sheets[update.sheetName], update.row, update.sourceColumn
+  )) !== update.source)) {
+    throw new Error("语言包经 Excel 保存后英文原文回读不一致。");
   }
   return {
     filePath: outputPath,
@@ -726,6 +787,7 @@ module.exports = {
   languagePackageImportDatasheet,
   planLanguagePackageUpdates,
   planPublishingLanguagePackageUpdates,
+  planDatasheetRevisionLanguagePackageUpdates,
   languagePackageKeySnapshot,
   languagePackageSheetSnapshot,
   assertSafePlan,

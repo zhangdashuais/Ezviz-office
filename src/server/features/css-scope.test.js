@@ -7,6 +7,7 @@ const {
   pruneUnusedCssClasses,
   scopeCss
 } = require("../../../办公软件/111/src/css-scope.js");
+const { appendRequiredCss } = require("../../../办公软件/111/src/inline-output.js");
 
 test("prefixes normal selectors and selector lists", () => {
   const input = ".card, .button:hover { color: red; }";
@@ -89,6 +90,17 @@ test("prunes unused class selectors inside grouping at-rules", () => {
 
   assert.match(result.css, /@media \(max-width: 767px\)\s*\{\s*\.used/);
   assert.doesNotMatch(result.css, /missing/);
+});
+
+test("inline packaging keeps only selected HTML classes before scoping", () => {
+  const html = '<div class="page page-webflow"><section class="hero"></section></div>';
+  const css = '.hero, .other { color: red; } @media (max-width: 767px) { .hero { width: 100%; } .other { width: 50%; } }';
+  const result = scopeCss(appendRequiredCss(pruneUnusedCssClasses(css, html).css));
+
+  assert.match(result, /\.page\.page-webflow \.hero/);
+  assert.match(result, /@media[^{}]+\{\s*\.page\.page-webflow \.hero/);
+  assert.match(result, /font-weight: 500 !important/);
+  assert.doesNotMatch(result, /\.other/);
 });
 
 test("keeps default webflow dynamic classes even when absent from html", () => {

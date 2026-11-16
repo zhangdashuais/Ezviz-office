@@ -11,6 +11,10 @@ const script = fs.readFileSync(
   path.resolve(__dirname, "../../../办公软件/111/src/module-product-revision-sync.js"),
   "utf8"
 );
+const languagePackageScript = fs.readFileSync(
+  path.resolve(__dirname, "../../../办公软件/111/src/module-language-package.js"),
+  "utf8"
+);
 
 test("language-only selection opens the standalone Datasheet workflow", () => {
   assert.match(html, /value="specification-only">只改 Specification/);
@@ -18,6 +22,14 @@ test("language-only selection opens the standalone Datasheet workflow", () => {
   assert.match(html, /id="languageDatasheetInput"/);
   assert.match(script, /if \(isLanguageOnly\(\)\) \{[\s\S]*tab-language-package/);
   assert.match(script, /document\.getElementById\("languageDatasheetInput"\)\?\.focus\(\)/);
+});
+
+test("language-only results show both English sources and their cell addresses", () => {
+  assert.match(languagePackageScript, /mismatch\.datasheetSourceLocation/);
+  assert.match(languagePackageScript, /mismatch\.expectedSource/);
+  assert.match(languagePackageScript, /entry\.location/);
+  assert.match(languagePackageScript, /entry\.source/);
+  assert.match(script, /appendSourceMismatches\(lines, item\.languagePackage\?\.sourceMismatches/);
 });
 
 test("batch publishing only renders sites whose Specification language is ready", () => {

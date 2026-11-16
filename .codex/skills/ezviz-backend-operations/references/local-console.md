@@ -6,14 +6,14 @@
 
 ## 导航与能力
 
-i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进和连续空格会规范为单个空格，再写入页面结果和字段结果 Excel。
+i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进和连续空格会规范为单个空格，再写入页面结果和字段结果 Excel。HTML 替换直接使用文本节点的源码起止位置或当前 DOM 文本节点，不再以规范化文案严格匹配原源码；首尾排版空白与相邻 `<sup>` 等元素会保留。
 
 文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。预设样式模板不存在时，结果 Excel 使用默认表头样式。
 
 | 分组 | 页面入口 | 主要能力 | 默认风险 |
 | --- | --- | --- | --- |
-| 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；自动合并编辑器产生的同族数字后缀类（含组合选择器，保留 `w-*` 系统类）；最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: medium; }`，并将每个 `li` 的 `style` 统一为 `list-style: decimal;`，保留原有 class；可选输出 `head`、`body` 标签，最终代码最开头固定添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
-| 基础工具 | 图片 AI 标志 | 图片文件模式用 Canvas 在右下角叠加 `AI GENERATED`，输出超过 512 KB 时保持原分辨率并转为 JPG；网页 HTML 模式可粘贴或上传代码，仅在每个可见 `section` 右下角显示标识，不单独标记 `img`，无背景图的 `section` 也会打标；生成的脚本避免相邻双右花括号，兼容商城 Detail 模板处理 | 本地生成；不上传、不覆盖原文件；网页模式保留原始图片地址和页面结构 |
+| 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；自动合并编辑器产生的同族数字后缀类（含组合选择器，保留 `w-*` 系统类），按所选 HTML 清理未使用的 CSS 类选择器（保留 Webflow 动态类与非类规则）；最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: 500 !important; }`，并将每个 `li` 的 `style` 统一为 `list-style: decimal;`，保留原有 class；最终 HTML 输出前把 `&amp;` 还原为 `&`；可选输出 `head`、`body` 标签，最终代码最开头固定添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
+| 基础工具 | 图片 AI 标志 | 图片文件模式用 Canvas 在所选位置叠加默认文案 `AI MODIFIED`，输出超过 512 KB 时保持原分辨率并转为 JPG；字号可选择自动或 8–64 px，自动时图片按宽度取 8–20 px；网页 HTML 模式复用文案和字号选项，自动字号仍为 12 px，仅在每个可见 `section` 的所选位置显示标识，不单独标记 `img`，无背景图的 `section` 也会打标；生成的脚本避免相邻双右花括号，兼容商城 Detail 模板处理 | 本地生成；不上传、不覆盖原文件；网页模式保留原始图片地址和页面结构 |
 | 基础工具 | Blog 图片 AI 标志 | Blog HTML 可上传或粘贴，为每个真实 `<img>` 右下角生成缩放至原尺寸 75% 的 `AI GENERATED` 标识；`<picture>` 整体作为一张图片处理，重复处理不叠加；使用内联 HTML/CSS，不依赖运行时脚本 | 本地生成；不上传、不覆盖原文件；保留图片 URL 和原始 `<img>` 标记 |
 | 基础工具 | 视频上传-海外 | 选择 MP4，经项目已登录的 UMP“视频上传-海外”页面取得动态 token 并上传至文件服务，回传 MFS 视频地址；限 500 MB | 写入正式文件服务；不创建产品记录；不要重复提交 |
 | 基础工具 | PDF / HTML 文字对比 | 先汇总 HTML 全部可见文字，排除 PDF 从 Specification 标题页到文件末尾的全部内容，再逐条检查此前正文；支持 HTML/PDF 拆分的数值与单位反向匹配，仅列出未匹配片段；可将语言字段建议应用到原 HTML 并在页面显示完整源码 | 本地读取；不覆盖原文件 |
@@ -23,9 +23,9 @@ i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进
 | 产品资料处理 | Datasheet 生成 Spec 表 | 从 PDF/文本生成 Spec Excel | 本地生成 |
 | 产品资料处理 | 网站翻译表精简 | 自动识别 Datasheet 与 Specification 的语言列；选择目标语言后分别导出仅含英文和目标语言的工作簿，并保留原模板及字体颜色 | 本地生成 |
 | 产品上架与维护 | Specification 翻译上架 | 预览翻译结果或提交后台 | `preview` 只读；`submit` 写后台 |
-| 产品上架与维护 | 产品批量上架 | 自动识别产品 Excel；目标站点列表只显示全部所选产品的 Specification 语言列状态均为 `OK` 的站点。首次预览显示已有译文对比后，结果区才出现“强制覆盖已有译文”；切换会自动重新预览，默认关闭。开启后仍只改目标译文列，不改英文源列或 `Sheet1`。没有状态行的普通独立 Specification 文件保持原有兼容行为 | `preview` 只读；`submit` 写后台并回读 |
+| 产品上架与维护 | 产品批量上架 | 自动识别产品 Excel；目标站点列表只显示全部所选产品的 Specification 语言列状态均为 `OK` 的站点。首次预览显示已有译文对比后，结果区才出现“强制覆盖已有译文”；切换会自动重新预览，默认关闭。开启后仍只改目标译文列，不改英文源列或 `Sheet1`。读取译文时把 Excel `_x000d_`、回车及换行统一转为空格；回读比较不忽略正文差异。没有状态行的普通独立 Specification 文件保持原有兼容行为 | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | 语言包上传 | 上传 `.xls/.xlsx` 到 Language Management | 写后台 |
-| 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；允许英文原文内容变化并警告，上传后遇到短暂旧包时只重下验证、不重复上传 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
+| 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；英文原文不一致时在预览及上传结果中逐条列出全部 Key、Datasheet 英文单元格及内容、后台英文单元格及内容。默认保留站点英文原文，可勾选覆盖，切换后须重新预览；只写可写工作表，提交后双列回读，失败回滚 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
 | 产品上架与维护 | 已上架产品单独更新 Specification | `updateScope=specification-only` 时只保存并回读 Specification；可直接上传欧洲云盘的 Datasheet + Spec/Specification 双工作表 Excel，自动选择规格工作表。操作下拉中的“只改语言包”会跳转至独立的单产品 Datasheet 更新语言包功能，不再读取产品 Detail/Spec | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | Details 一键同步 | 固定以国际站同名产品为源，只需填写产品名并选择目标站点；仅同步 PC Details Overview，目标站不存在产品时跳过；未识别的规格字段名不会阻止仅同步 Overview，提交后确认全部自定义字段不变；不修改语言包、Product Description 或其他配置 | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | 产品上线站点搜索（独立 Tab） | 输入产品名称后只读搜索全部启用的 EZVIZ 国家官网；匹配忽略大小写和所有空格，返回命中站点、产品链接及失败站点 | 只读官网搜索 |
@@ -44,7 +44,7 @@ i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进
 
 - 本地服务入口：`server.js`
 - 站点与活动配置：`config/banner-check.json`
-- 商城账号读取：`src/server/features/shop-credentials.js`
+- 商城账号读取：`src/server/features/shop-credentials.js`。依次查找桌面、`EZVIZ_CREDENTIAL_DIR`、项目 `credentials/` 和当前用户 `Documents/HikLink_Files/*/received/`；同一目录有多个命名匹配的账号表时选最近修改的一份，不输出密码。
 - 登录与浏览器会话：`src/server/features/browser-auth.js`
 - Banner：`src/server/features/banner-management.js`
 - Popup：`src/server/features/popup-management.js`

@@ -2,7 +2,7 @@
 
 本项目是一个本地办公自动化工具，用于网站资料处理、商城后台配置、Banner / Popup 巡查、Spec 解析等内部工作流。
 
-新电脑安装、配置、验证、更新与排障请参阅 [项目部署说明](项目部署说明.md)。
+新电脑获取源码请参阅 [Git 获取与更新说明](docs/git-source-install.md)；安装、配置、验证、回退与排障请参阅 [项目部署说明](项目部署说明.md)。本地服务默认监听所有网卡，使用前请按部署说明限制端口访问。
 
 ## TDK 配置通道
 
@@ -16,8 +16,14 @@ WTB 页面提供可下载的信息模板，字段为 `Product`、`Product Page U
 
 ## 使用
 
+新电脑先安装 Git 和 Node.js 24.x，再从 `main` 获取源码：
+
 ```powershell
-npm install
+Set-Location 'E:\'
+git clone --branch main https://github.com/zhangdashuais/Ezviz-office.git
+Set-Location 'E:\Ezviz-office'
+npm ci
+npx playwright install chromium
 npm start
 ```
 

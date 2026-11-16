@@ -6,18 +6,26 @@ const {
   appendRequiredCss,
   requiredListItemStyleValue,
   ensureMarker,
+  restoreAmpersands,
   wrap
 } = require("../../../办公软件/111/src/inline-output.js");
 
-test("always appends the required medium emphasis rule", () => {
+test("always appends the required 500 emphasis rule with important", () => {
   assert.equal(
     appendRequiredCss(".title { color: red; }"),
-    ".title { color: red; }\n\nb, strong {\n  font-weight: medium;\n}"
+    ".title { color: red; }\n\nb, strong {\n  font-weight: 500 !important;\n}"
   );
 });
 
 test("uses the required decimal list-item style", () => {
   assert.equal(requiredListItemStyleValue(), "list-style: decimal;");
+});
+
+test("restores ampersands in the final inline HTML without changing other entities", () => {
+  assert.equal(
+    restoreAmpersands('<a href="/page?a=1&amp;b=2">A &amp; B &lt; C</a>'),
+    '<a href="/page?a=1&b=2">A & B &lt; C</a>'
+  );
 });
 
 test("wraps inline output with optional head and body tags", () => {

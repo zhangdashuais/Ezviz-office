@@ -6,11 +6,11 @@
 
 机器可读配置位于 `src/server/config/shop-navigation.json`，辅助查询方法位于 `src/server/features/shop-navigation.js`。
 
-本地平台的“一键内联打包”会同步完成 Webflow CSS 作用域处理，并把编辑器产生的同族数字后缀类在 HTML、CSS 和组合选择器中统一为基础类；`w-*` 系统类及没有同族证据的单个编号类保持不变。最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: medium; }`，每个 `li` 的 `style` 固定为 `list-style: decimal;`，但保留原有 class。可选输出 `head`、`body` 标签；默认不输出，便于粘贴到商城后台。最终代码始终以 `<!-- product detail webflow -->` 标记开头，包括保留 `head`、`body` 时。下载 `store.html` 的同时在页面展示最终 CSS，并提供 `webflow.scoped.css` 下载。“图片 AI 标志”的输出超过 512 KB 时会保持原分辨率转为 JPG 并降低画质；最低画质仍超限时明确报错，不会缩放图片。其“DOC上传”使用文件服务 `service/attach` 动态 token 批量上传 PDF，并为每个成功文件生成一个与 `declaration-of-conformity.html` 一致的独立 `<li>` 标签，不包含外层 `<ul>`；“PDF / HTML 文字对比”可上传总语言包还原 `goods.xxx` 字段；生成字段修改建议后，可将建议应用到原始 HTML 的对应语言字段，并在页面显示完整修改版源码，不覆盖用户原文件。若原始 HTML 是片段，输出仍保持片段，不额外补 `DOCTYPE` / `html` 外层标签。
+本地平台的“一键内联打包”会同步完成 Webflow CSS 作用域处理，并把编辑器产生的同族数字后缀类在 HTML、CSS 和组合选择器中统一为基础类；`w-*` 系统类及没有同族证据的单个编号类保持不变。打包 CSS 时按所选 HTML 保留用到的类选择器并移除未使用的类选择器；Webflow 动态类、非类规则、媒体查询、动画与字体声明保留。最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: 500 !important; }`，每个 `li` 的 `style` 固定为 `list-style: decimal;`，但保留原有 class。最终 HTML 输出前把 `&amp;` 还原为 `&`。可选输出 `head`、`body` 标签；默认不输出，便于粘贴到商城后台。最终代码始终以 `<!-- product detail webflow -->` 标记开头，包括保留 `head`、`body` 时。下载 `store.html` 的同时在页面展示最终 CSS，并提供 `webflow.scoped.css` 下载。“图片 AI 标志”的输出超过 512 KB 时会保持原分辨率转为 JPG 并降低画质；最低画质仍超限时明确报错，不会缩放图片。其“DOC上传”使用文件服务 `service/attach` 动态 token 批量上传 PDF，并为每个成功文件生成一个与 `declaration-of-conformity.html` 一致的独立 `<li>` 标签，不包含外层 `<ul>`；“PDF / HTML 文字对比”可上传总语言包还原 `goods.xxx` 字段；生成字段修改建议后，可将建议应用到原始 HTML 的对应语言字段，并在页面显示完整修改版源码，不覆盖用户原文件。若原始 HTML 是片段，输出仍保持片段，不额外补 `DOCTYPE` / `html` 外层标签。
 
 本地 GA4 / Google 数据连接会把十分钟有效的 OAuth 临时状态保存在忽略 Git 的 `runtime/ga4-oauth-pending.json`，即使授权期间后台进程重载，回调也能继续完成；成功后立即清除对应状态。
 
-“图片 AI 标志”另提供网页 HTML 模式：上传或粘贴代码后生成可复制、下载的 HTML。运行时仅在每个可见 `section` 右下角显示标识，包括没有背景图的区块；单独的 `img` 不打标，也不改原图片文件。
+“图片 AI 标志”的标志文案默认是 `AI MODIFIED`，可选择自动或 8–64 px 固定字号，自动时图片按宽度取 8–20 px，网页 HTML 标识为 12 px。网页 HTML 模式可上传或粘贴代码后生成可复制、下载的 HTML；运行时仅在每个可见 `section` 的所选位置显示标识，包括没有背景图的区块；单独的 `img` 不打标，也不改原图片文件。
 
 基础工具另有独立的“Blog 图片 AI 标志”：上传或粘贴 Blog HTML 后，通过 `/api/blog-ai-badge` 为每张 `<img>`（或包含图片的 `<picture>`）生成右下角标识，整体尺寸为原来的 75%，结果可下载。仅插入内联 HTML/CSS，不依赖脚本，不修改图片地址；再次处理会替换旧标识而非叠加。
 
@@ -77,7 +77,7 @@ DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/
 
 ## 添加产品特殊入口
 
-国际站创建占位产品使用本地工具“产品空链接创建”。预览接口为 `POST /api/product-empty-link/preview`，提交接口为 `POST /api/product-empty-link/submit`。它读取一个现有国际站产品作为配置参考，经 Manual Add 对应的 `/goods/do-add` 新增产品，保留分类、类型、品牌、相册、规格、价格和库存，重置产品名称、序列号、SEO 与推荐关系，把 PC / Mobile Details 写为指定占位 HTML，并固定写入 `is_search=0`（取消勾选 Searchable）。提交前检查重名和预览指纹；创建后按 `goods_id` 调用 `/goods/edit-goods` 回读详情与 Searchable 状态，不因前台缓存未刷新而重复创建。
+国际站创建占位产品使用本地工具“产品空链接创建”。预览接口为 `POST /api/product-empty-link/preview`，提交接口为 `POST /api/product-empty-link/submit`。它读取一个现有国际站产品作为配置参考，经 Manual Add 对应的 `/goods/do-add` 新增产品，保留分类、类型、品牌、相册、规格、价格和库存，重置产品名称、序列号、SEO 与推荐关系，把 PC / Mobile Details 写为指定占位 HTML，并固定写入 `is_search=0`（取消勾选 Searchable）。提交前检查重名和预览指纹；创建后按 `goods_id` 调用 `/goods/edit-goods` 回读详情与 Searchable 状态，不因前台缓存未刷新而重复创建。预览所需账号表可从桌面、项目 `credentials/`、`EZVIZ_CREDENTIAL_DIR` 或当前用户 `Documents/HikLink_Files/*/received/` 读取；同目录多份账号表优先选最近修改的一份。
 
 从国际站复制产品到当前国家站时，直接打开 `/goods/int-goods-list`，无需先进入 `/goods/index`。默认按 `WiFi Cameras → For Home → 其他有效类目` 查找产品。只读页面快照同时返回列表产品的 `goods_id`、型号、类型、上架状态、创建时间、URL，以及响应中实际存在的 Searchable 字段；未返回该字段时不得由列表数据推断 Detail 开关。页面的 `Copy → Complete` 最终提交 `POST /goods/save-cite`，表单字段为 `cite=` 和 `copy=<goods_id>,`。WTB 登录后从 `https://shop.ezvizlife.com/goods/index` 读取账号并查找产品；旧入口重定向至新版商品列表时继续按新版页面和接口操作。
 
@@ -91,6 +91,10 @@ Detail 中的 Specification 表格内容使用目标站映射到的 Specificatio
 语言包定向修订提供 `/api/language-package/hg2-400-4-preview` 与 `/api/language-package/hg2-400-4-submit`。流程逐站下载语言包，精确定位 `HG2_400_4` 并只处理 E 列中的 `15s / 18s / 20s`；E 列为空或不含目标内容时不上传。旧 `.xls` 使用本机 Excel 原生保存以保留后台要求的文件结构，提交后重新下载回读，失败时恢复原包。
 
 语言包页另有独立的“按单产品 Datasheet 更新站点语言包”功能。`datasheet-inspect` 识别第三列起的语种说明；`datasheet-preview` 按字段 Key 对比所选站点当前语言包；`datasheet-submit` 只提交预览状态为 `ready` 的站点，`failed` 与 `no-change` 会显示为跳过，不再禁用整批确认按钮，也不会在提交阶段再次登录这些站点。Global 选择 `English (Source)` 时会同时覆盖 `en-US` 原文列和译文列，并在上传后双列回读；其他站点仍只覆盖译文列。没有 Edit/Download 行、但明确提供带 `lang_code` 的 `Download Language Template` 时，英文站点可用该链接读取当前模板，语种不匹配时仍拒绝。页面默认跳过站点不存在的 Key，避免追加缺少后台元数据的行。空译文跳过，实际下载语言代码必须与 Datasheet 语种一致。全站提交中 Global 为 `ready` 时会强制先更新 Global，再等待英文原文同步到其他站点并自动刷新这些站点的预览基线；基线只忽略本批次已验证的英文源字段变化，其他字段变化仍停止提交。同一时间只允许一个 Datasheet 预览或提交任务。旧 `.xls` 仍由本机 Excel 原生保存，尾部格式化空行不会被当成追加模板行；上传后最多回读 6 次、每次间隔 3 秒，重试只重新下载而不重复上传，最终仍不一致时恢复原包。
+预览及上传结果发现英文原文不一致时，页面逐条显示全部差异的 Key、Datasheet 英文原文单元格及内容、站点语言包英文原文单元格及内容；默认只提示差异并保留站点英文原文。旧的只改语言包同步结果也显示同样的完整清单，不截断为前 50 条。
+单产品 Datasheet 语言包流程另提供默认关闭的“覆盖站点原有英文”复选框。勾选后重新预览，只把可写工作表中匹配 Key 的英文差异纳入待更新数；提交指纹包含覆盖选择，改变选项必须重预览。生成后和上传后均回读英文源列及译文列；`Sheet1` 仍受保护，缺少 Datasheet 英文原文时停止，不会静默清空站点英文。
+
+独立的“只改语言包”按 Datasheet 的非空译文默认覆盖目标站已有译文；预览会列出实际待覆盖字段，相同译文显示为不变。该规则不影响产品上架默认只填空译文的保护策略。对于后台下载的 `.xls`，提交使用 Excel 原生写入，逐格核对 Sheet1 的实际内容，避免通用 BIFF8 写入截断长文案。
 
 “本地 i18n Datasheet 生成”从产品 HTML 提取未 i18n 化的英文文案，将当前产品的新字段放在黄色提示行上方；HTML 已引用或按英文原文复用的旧字段放在黄色提示行下方。生成成功后先备份原 HTML，再把硬编码文案写回对应的 `goods.*` 字段；重复执行会复用现有输出并保持字段归类不变。
 “i18n 语言转换”的最终代码始终以 `<!-- product detail webflow -->` 开头，且只保留一个该标记。处理 HTML 片段时会原样保留全部 `<link>` 标签，包括样式表、预加载字体以及属性顺序或引号写法不同的 CSS 引用，避免浏览器解析时将其移入临时 `head` 后从片段输出中丢失。
@@ -105,7 +109,7 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 批量上架的“强制覆盖已有译文”选项位于预览结果下方，首次预览完成并展示后台现有译文与 Datasheet 候选译文后才显示。切换选项会自动重新执行只读预览；只有当前选项对应的预览通过后才能提交。
 
-多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications，语言表头从实际工作簿读取并由页面选择。目标站已有同名产品时跳过复制，只更新 Specification、Product Description 和语言包，保留 Overview。批量上架先读取 Datasheet 黄色的 `If you have proofread …` 依赖说明，若依赖产品同批次上架则先处理依赖产品；预览和提交均逐站查询依赖产品是否已存在。黄色行后续字段与其他字段一样按 Key 处理：默认只补后台空译文或追加缺失字段，勾选“强制覆盖已有译文”后用 Datasheet 覆盖目标译文列；即使英文原文不匹配也始终保留后台英文源列并提示差异。批量提交逐站合并语言包，一站一次上传；默认保留的已有译文列入人工校对 CSV。预览和提交的 `forceTranslationOverwrite` 值必须一致，否则拒绝执行并要求重新预览。产品上架不允许修改语言包 `Sheet1`：预览阻止写入，生成后逐格比对，不一致不上传。一次上传后最多下载回读 6 次，不重复上传；语言包处理失败的站点不再执行产品复制或保存，其他通过站点可继续。每个产品还须在该站预览通过，才进入产品操作。明确提供 Product Description 时写入目标译文；缺少时首次上架保留国际复制源描述，已存在产品保留目标站当前描述。Detail 规格字段兼容 `Specification/Specifications`、本地化标题与日本站 `仕様`。产品下架仍使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，关闭 `isSearchable` 并设 `whenType=0` 后回读。
+多产品文件夹流程使用 `/api/product-publishing/batch-preview` 和 `/api/product-publishing/batch-submit`；每个产品配对 Datasheet 与 Specifications，语言表头从实际工作簿读取并由页面选择。目标站已有同名产品时跳过复制，只更新 Specification、Product Description 和语言包，保留 Overview。批量上架先读取 Datasheet 黄色的 `If you have proofread …` 依赖说明，若依赖产品同批次上架则先处理依赖产品；预览和提交均逐站查询依赖产品是否已存在。黄色行后续字段与其他字段一样按 Key 处理：默认只补后台空译文或追加缺失字段，勾选“强制覆盖已有译文”后用 Datasheet 覆盖目标译文列；即使英文原文不匹配也始终保留后台英文源列并提示差异。批量提交逐站合并语言包，一站一次上传；默认保留的已有译文列入人工校对 CSV。预览和提交的 `forceTranslationOverwrite` 值必须一致，否则拒绝执行并要求重新预览。产品上架不允许修改语言包 `Sheet1`：预览阻止写入，生成后逐格比对，不一致不上传。读取译文时将 Excel `_x000d_`、回车和换行统一转为单个空格；一次上传后最多下载回读 6 次，不重复上传，正文不同仍判失败。语言包处理失败的站点不再执行产品复制或保存，其他通过站点可继续。每个产品还须在该站预览通过，才进入产品操作。明确提供 Product Description 时写入目标译文；缺少时首次上架保留国际复制源描述，已存在产品保留目标站当前描述。Detail 规格字段兼容 `Specification/Specifications`、本地化标题与日本站 `仕様`。产品下架仍使用 `/api/product-delisting/preview` 和 `/api/product-delisting/submit`，关闭 `isSearchable` 并设 `whenType=0` 后回读。
 
 无需 Excel 的产品内容同步使用 `/api/product-content-sync/preview` 和 `/api/product-content-sync/submit`。源固定为国际站 `hq`，按同名产品只把 PC Details 的 Overview 原样同步到所选目标站；目标站不存在产品时跳过，不复制产品，也不修改 Specifications、语言包、Product Description、Specification 字段名或其他配置。目标站的规格自定义字段名即使未识别，也可只比较和同步 Overview。提交前同时校验源站与目标站 Overview 指纹，保存后回读 Overview，并确认原自定义字段（含 Specifications）仍保持不变。
 
@@ -117,7 +121,7 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 ## 本地 i18n 语言转换
 
-HTML 文本节点中的换行、缩进和连续空格会压缩为单个空格后写入新字段英文原文；替换 HTML 时仍按原始文本定位，保留节点两侧的排版空白。
+HTML 文本节点中的换行、缩进和连续空格会压缩为单个空格后写入新字段英文原文；替换 HTML 时直接使用解析器返回的文本节点源码起止位置，不再用规范化文案反查源码。源码换行、缩进和 HTML 实体不会造成漏转换，节点两侧排版空白及相邻 `<sup>` 等子元素保持不变。
 
 文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。预设样式模板不存在时，结果 Excel 使用默认表头样式。
 

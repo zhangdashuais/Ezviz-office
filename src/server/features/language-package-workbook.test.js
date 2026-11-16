@@ -12,6 +12,7 @@ const {
   languagePackageImportDatasheet,
   planLanguagePackageUpdates,
   planPublishingLanguagePackageUpdates,
+  planDatasheetRevisionLanguagePackageUpdates,
   languagePackageKeySnapshot,
   languagePackageSheetSnapshot,
   assertSafePlan,
@@ -234,6 +235,11 @@ test("copies translations by stable key while only reporting a source mismatch",
   const plan = planLanguagePackageUpdates(languagePackage, datasheet, "Spanish");
   assert.equal(plan.safe, true);
   assert.equal(plan.sourceMismatches.length, 1);
+  assert.deepEqual(plan.sourceMismatches[0].packageEntries, [
+    { location: "Sheet1!D2", source: "Smart camera" }
+  ]);
+  assert.equal(plan.sourceMismatches[0].expectedSource, "Revised source");
+  assert.equal(plan.sourceMismatches[0].datasheetSourceLocation, "Sheet1!B2");
   assert.equal(plan.sourceChangedCellCount, 1);
   assert.equal(plan.sourceUpdates[0].source, "Revised source");
   assert.equal(plan.changedCellCount, 1);
@@ -336,6 +342,14 @@ test("publishing fills blank translations but preserves populated keys and misma
   ]);
   assert.equal(forced.preservedExistingCount, 0);
   assert.equal(forced.sourceChangedCellCount, 0);
+  const datasheetRevision = planDatasheetRevisionLanguagePackageUpdates(
+    forcedPackage, forcedDatasheet, "Spanish"
+  );
+  assert.deepEqual(datasheetRevision.updates.map((item) => item.key),
+    forced.updates.map((item) => item.key));
+  assert.equal(datasheetRevision.preservedExistingCount, 0);
+  assert.equal(datasheetRevision.sourceChangedCellCount, 0);
+  assert.doesNotThrow(() => assertPlanPreservesSheet(forcedPackage, datasheetRevision, "Sheet1"));
   const revision = planLanguagePackageUpdates(current, datasheet, "Spanish");
   assert.ok(revision.updates.some((item) => item.key === "reviewed"));
   assert.ok(revision.sourceUpdates.some((item) => item.key === "different_source"));
@@ -428,6 +442,94 @@ test("publishing ignores BIFF8 blank placeholders but still protects Sheet1 cont
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("protected-sheet snapshot ignores only empty Excel UsedRange edges", () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Source", "Translation"], ["A long source", "Bản dịch"]
+  ]), "Sheet1");
+  const first = { workbook };
+  const baseline = languagePackageSheetSnapshot(first, "Sheet1");
+  workbook.Sheets.Sheet1["!ref"] = "A1:C3";
+  assert.equal(languagePackageSheetSnapshot(first, "Sheet1"), baseline);
+  workbook.Sheets.Sheet1.B2.v = "Changed";
+  assert.notEqual(languagePackageSheetSnapshot(first, "Sheet1"), baseline);
+});
+
+test("Datasheet revision overwrites English only when requested and preserves Sheet1", () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["common", "C1", "protected_key", "Do not touch", "保留"]
+  ]), "Sheet1");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "shared_key", "Old English", "Traducción"]
+  ]), "Sheet2");
+  const input = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["shared_key", "New English", "Traducción"]
+  ]));
+  const original = readLanguagePackage(input, "es-ES");
+  assert.equal(planDatasheetRevisionLanguagePackageUpdates(
+    original, datasheet, "Spanish"
+  ).sourceChangedCellCount, 0);
+  const plan = planDatasheetRevisionLanguagePackageUpdates(
+    original, datasheet, "Spanish", { overwriteEnglishSource: true }
+  );
+  assert.equal(plan.changedCellCount, 0);
+  assert.equal(plan.sourceChangedCellCount, 1);
+  assert.throws(() => planDatasheetRevisionLanguagePackageUpdates(
+    original,
+    parseLanguageDatasheet(workbookBuffer([
+      ["Field", "Source", "Spanish"], ["shared_key", "", "Traducción"]
+    ])),
+    "Spanish", { overwriteEnglishSource: true }
+  ), /英文原文为空/);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "language-source-choice-"));
+  try {
+    const output = path.join(directory, "updated.xlsx");
+    writeUpdatedLanguagePackage(original, plan, output,
+      { syncSource: true, preserveSheets: ["Sheet1"] });
+    const verified = readLanguagePackage(output, "es-ES");
+    assert.equal(verified.workbook.Sheets.Sheet1.E2.v, "保留");
+    assert.equal(verified.workbook.Sheets.Sheet2.D2.v, "New English");
+    assert.equal(verified.workbook.Sheets.Sheet2.E2.v, "Traducción");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("reading translations converts Excel carriage returns and line breaks to spaces", () => {
+  const parsed = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["product_title", "Smart camera", "Cámara_x000d_\r\ninteligente\n"]
+  ]));
+  assert.equal(parsed.rows[0].translations.Spanish, "Cámara inteligente");
+  const plan = planLanguagePackageUpdates(readLanguagePackage(packageBuffer(), "es-ES"), parsed, "Spanish");
+  assert.equal(plan.updates[0].translation, "Cámara inteligente");
+  assert.equal(
+    normalizeTranslationForComparison("先頭_x000d_\n本文_x000d_\n_x000d_\n"),
+    "先頭 本文"
+  );
+  assert.equal(normalizeTranslationForComparison("先頭\r\n本文"), "先頭 本文");
+  assert.notEqual(
+    normalizeTranslationForComparison("先頭_x000d_\n別の本文"),
+    normalizeTranslationForComparison("先頭\r\n本文")
+  );
+  const heading = ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"];
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+    heading, ["goods", "G1", "product_title", "Smart camera", "Cámara_x000d_\ninteligente"]
+  ]), "Sheet2");
+  const importedPackage = readLanguagePackage(
+    XLSX.write(book, { type: "buffer", bookType: "biff8" }), "es-ES"
+  );
+  const imported = languagePackageImportDatasheet(importedPackage);
+  assert.equal(imported.rows[0].translations["Imported translation"], "Cámara inteligente");
+  assert.equal(planLanguagePackageUpdates(importedPackage, parsed, "Spanish").changedCellCount, 0);
 });
 
 test("full-package import follows publishing rules and appends only to Sheet2", () => {

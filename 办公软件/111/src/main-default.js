@@ -543,11 +543,12 @@
         const stylesheetLink = '<link rel="stylesheet" href="__EZVIZ_REMOTE_CSS__">';
         const bodyInner = `<div class="page page-webflow">${includeHead ? "" : stylesheetLink + "\n"}${normalized.html}`;
         const cssStats = sanitizeGeneratedCss(normalized.css);
-        if (!window.EzvizCssScope?.scopeCss) {
+        if (!window.EzvizCssScope?.scopeCss || !window.EzvizCssScope?.pruneUnusedCssClasses) {
           throw new Error("CSS scope module is not loaded.");
         }
+        const prunedCss = window.EzvizCssScope.pruneUnusedCssClasses(cssStats.css, bodyInner);
         const cssContent = window.EzvizCssScope.scopeCss(
-          window.EzvizInlineOutput.appendRequiredCss(cssStats.css),
+          window.EzvizInlineOutput.appendRequiredCss(prunedCss.css),
           ".page.page-webflow"
         );
         const jqueryUrl = "https://ovsmall-statics.ezvizlife.com/ovs_mall/web/js/widget/jquery/3.5.1/jquery.js";
@@ -578,6 +579,7 @@
           webflowScriptFile,
           warnings,
           cssStats,
+          prunedCss,
           normalizedListItemCount
         };
       }
@@ -631,7 +633,7 @@
           }
 
           const indexHtml = fileMap.get(indexEntry) || "";
-          const { resultRaw, cssContent, webflowScriptFile, warnings, cssStats, normalizedListItemCount } = buildResult(indexHtml, fileMap, fileBlobMap, indexEntry);
+          const { resultRaw, cssContent, webflowScriptFile, warnings, cssStats, prunedCss, normalizedListItemCount } = buildResult(indexHtml, fileMap, fileBlobMap, indexEntry);
           const normalizedImagePathResult = normalizeDotDotImagePaths(resultRaw);
           const normalizedResultRaw = normalizedImagePathResult.content;
           const normalizedCssPathResult = normalizeDotDotImagePaths(cssContent);
@@ -716,6 +718,7 @@
           result = result
             .replace("__EZVIZ_REMOTE_CSS__", cssUrl)
             .replace("__EZVIZ_REMOTE_WEBFLOW_JS__", webflowJsUrl);
+          result = window.EzvizInlineOutput.restoreAmpersands(result);
 
           outputEl.value = result;
           packagedCss = normalizedCssContent;
@@ -728,6 +731,7 @@
             replaceMessage,
             `Removed font-family Arial/sans-serif: ${cssStats.removedArialCount + cssStats.removedSansSerifCount}`,
             `Removed ul/ol default reset blocks: ${cssStats.removedUlOlRuleCount}`,
+            `Removed unused CSS selectors: ${prunedCss.removedSelectorCount}`,
             `Normalized list items: ${normalizedListItemCount}`
           ].join("\n");
 

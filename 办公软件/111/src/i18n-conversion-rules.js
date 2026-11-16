@@ -143,6 +143,13 @@
     return `${links.join('\n')}${body ? `\n${body}` : ''}`;
   }
 
+  function replaceTextNodeValue(value, replacement) {
+    const source = String(value || '');
+    const leadingWhitespace = source.match(/^\s*/u)?.[0] || '';
+    const trailingWhitespace = source.match(/\s*$/u)?.[0] || '';
+    return `${leadingWhitespace}${replacement}${trailingWhitespace}`;
+  }
+
   return {
     normalize,
     isNonTranslatableText,
@@ -152,6 +159,7 @@
     detectProductLanguageTableLayout,
     buildSourceKeyIndex,
     buildProductPrefix,
-    preserveStylesheetLinks
+    preserveStylesheetLinks,
+    replaceTextNodeValue
   };
 });

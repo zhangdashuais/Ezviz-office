@@ -4,7 +4,7 @@
   if (root) root.EzvizInlineOutput = api;
 })(typeof window !== "undefined" ? window : globalThis, function () {
   const marker = "<!-- product detail webflow -->";
-  const requiredEmphasisCss = "b, strong {\n  font-weight: medium;\n}";
+  const requiredEmphasisCss = "b, strong {\n  font-weight: 500 !important;\n}";
   const requiredListItemStyle = "list-style: decimal;";
 
   function findBlockEnd(css, openIndex) {
@@ -112,11 +112,15 @@
     return `${marker}\n${withoutMarker}`;
   }
 
+  function restoreAmpersands(content) {
+    return String(content || "").replace(/&amp;/gi, "&");
+  }
+
   function wrap(content, headContent, options = {}) {
     const body = options.includeBody ? `<body>\n${content}\n</body>` : content;
     const head = options.includeHead ? `<head>\n${headContent}\n</head>` : "";
     return ensureMarker([head, body].filter(Boolean).join("\n"));
   }
 
-  return { normalizeNumberedClasses, appendRequiredCss, requiredListItemStyleValue, ensureMarker, wrap };
+  return { normalizeNumberedClasses, appendRequiredCss, requiredListItemStyleValue, ensureMarker, restoreAmpersands, wrap };
 });
