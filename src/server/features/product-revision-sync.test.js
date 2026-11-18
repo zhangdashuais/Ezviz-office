@@ -28,6 +28,8 @@ const {
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
   contentSyncFingerprint,
+  contentSyncDifference,
+  contentSyncCustomFieldChanges,
   normalizeProductAvailabilityName,
   buildProductAvailabilityQueries,
   parseProductSearchResults,
@@ -334,6 +336,45 @@ test("content sync can compare Overview when a local custom field name is unknow
   assert.equal(contentSyncFingerprint({ goodsId: "123", detail }), contentSyncFingerprint({
     goodsId: "123", detail: { overview: "<p>Overview</p>" }
   }));
+});
+
+test("content sync ignores backend-only custom field metadata but reports real content changes", () => {
+  const before = [
+    { name: "Specifications", value: "<p>Original</p>", id: 1 },
+    { name: "FAQ", value: "Keep" }
+  ];
+  const metadataOnly = [
+    { name: "Specifications", value: "<p>Original</p>", id: 2 },
+    { name: "FAQ", value: "Keep", sort: 5 }
+  ];
+  assert.deepEqual(contentSyncCustomFieldChanges(before, metadataOnly), []);
+  const changes = contentSyncCustomFieldChanges(before, [
+    { name: "Specifications", value: "<p>Changed</p>" },
+    { name: "FAQ", value: "Keep" }
+  ]);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].beforeName, "Specifications");
+  assert.equal(changes[0].valueChanged, true);
+  assert.equal(changes[0].difference.beforeExcerpt, "<p>Original</p>");
+  assert.equal(changes[0].difference.afterExcerpt, "<p>Changed</p>");
+});
+
+test("content sync readback difference identifies the first changed character", () => {
+  assert.deepEqual(contentSyncDifference("<p>Old</p>", "<p>New</p>"), {
+    offset: 3,
+    beforeLength: 10,
+    afterLength: 10,
+    beforeExcerpt: "<p>Old</p>",
+    afterExcerpt: "<p>New</p>"
+  });
+  const changes = contentSyncCustomFieldChanges(
+    [{ name: "FAQ", value: "Keep" }],
+    [{ name: "Questions", value: "Keep" }, { name: "More", value: "New" }]
+  );
+  assert.equal(changes.length, 2);
+  assert.equal(changes[0].nameChanged, true);
+  assert.equal(changes[0].valueChanged, false);
+  assert.equal(changes[1].afterName, "More");
 });
 
 test("product availability matching ignores case and whitespace only", () => {

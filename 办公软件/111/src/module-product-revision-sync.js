@@ -649,18 +649,28 @@
       `源站点：International (hq)${result.source?.goodsId ? ` / Goods ID ${result.source.goodsId}` : ""}`,
       preview
         ? `目标 ${result.targetCount}：待同步 ${result.readyCount}，内容相同 ${result.noChangeCount}，产品不存在 ${result.skippedCount}，失败 ${result.failedCount}`
-        : `目标 ${result.targetCount}：完成 ${result.completedCount}，内容相同 ${result.noChangeCount}，产品不存在/无快照 ${result.skippedCount}，失败 ${result.failedCount}`,
+        : `目标 ${result.targetCount}：完成 ${result.completedCount}，已同步但需核查 ${result.warningCount || 0}，已保存待核验 ${result.unverifiedCount || 0}，内容相同 ${result.noChangeCount}，产品不存在/无快照 ${result.skippedCount}，失败 ${result.failedCount}`,
       "",
       "仅同步 PC Details → Overview；不修改 Specifications、语言包、Product Description 或其他配置。"
     ];
     result.results.forEach((item) => {
       const label = item.status === "ready" ? "待同步"
         : item.status === "completed" ? "完成并回读通过"
+          : item.status === "completed-with-warning" ? "Overview 已回读通过，其他字段需核查"
+            : item.status === "saved-unverified" ? "保存请求成功，回读未确认"
           : item.status === "no-change" ? "跳过（内容相同）"
             : item.status === "skipped" ? "跳过（产品不存在或无可执行快照）" : "失败";
       lines.push(`- ${item.site.name} (${item.site.siteCode}) | ${label}${item.error ? ` | ${item.error}` : ""}`);
       if (preview && item.status !== "skipped" && item.status !== "failed") {
         lines.push(`  · Details：${item.detailChanged ? "将替换" : "相同"} (${item.currentOverviewLength} → ${item.desiredOverviewLength} 字符)`);
+      }
+      (item.customFieldChanges || []).forEach((change) => {
+        lines.push(`  · 自定义字段 ${change.index}：${change.beforeName} → ${change.afterName}${change.valueChanged ? "，内容不同" : ""}`);
+        if (change.valueChanged) lines.push(`    首处差异 ${change.difference.offset + 1} 字符，长度 ${change.difference.beforeLength} → ${change.difference.afterLength}；保存前「${change.difference.beforeExcerpt}」，回读「${change.difference.afterExcerpt}」`);
+      });
+      if (item.readback?.overviewDifference && !item.readback.detail) {
+        const difference = item.readback.overviewDifference;
+        lines.push(`  · Overview 首处差异 ${difference.offset + 1} 字符，长度 ${difference.beforeLength} → ${difference.afterLength}；国际站「${difference.beforeExcerpt}」，回读「${difference.afterExcerpt}」`);
       }
     });
     showLines(lines, data);
@@ -1250,12 +1260,14 @@
     try {
       const data = await postForm(productEndpoint("submit"), request.form);
       renderProductResult(data, true);
-      const warningCount = isBatchPublishing()
-        ? (data.result.warnings || []).length
-        : (data.result.results || []).reduce(
-          (count, item) => count + (item.warnings || []).length,
-          0
-        );
+      const warningCount = isContentSync()
+        ? (data.result.warningCount || 0) + (data.result.unverifiedCount || 0)
+        : isBatchPublishing()
+          ? (data.result.warnings || []).length
+          : (data.result.results || []).reduce(
+            (count, item) => count + (item.warnings || []).length,
+            0
+          );
       setStatus(
         `执行完成：失败 ${data.result.failedCount}，跳过 ${data.result.skippedCount || 0}，警告 ${warningCount}。`,
         data.result.failedCount || warningCount ? "warn" : "ok"

@@ -529,6 +529,46 @@ function contentSyncFingerprint(snapshot) {
   }));
 }
 
+function contentSyncDifference(beforeValue, afterValue) {
+  const before = String(beforeValue ?? "");
+  const after = String(afterValue ?? "");
+  let offset = 0;
+  while (offset < Math.min(before.length, after.length) && before[offset] === after[offset]) offset += 1;
+  const excerpt = (value) => value.slice(Math.max(0, offset - 30), offset + 70)
+    .replace(/\s+/g, " ");
+  return {
+    offset,
+    beforeLength: before.length,
+    afterLength: after.length,
+    beforeExcerpt: excerpt(before),
+    afterExcerpt: excerpt(after)
+  };
+}
+
+function contentSyncCustomFieldChanges(beforeFields, afterFields) {
+  const before = Array.isArray(beforeFields) ? beforeFields : [];
+  const after = Array.isArray(afterFields) ? afterFields : [];
+  const changes = [];
+  for (let index = 0; index < Math.max(before.length, after.length); index += 1) {
+    const oldField = before[index];
+    const newField = after[index];
+    const oldName = String(oldField?.name ?? "");
+    const newName = String(newField?.name ?? "");
+    const oldValue = String(oldField?.value ?? "");
+    const newValue = String(newField?.value ?? "");
+    if (oldField && newField && oldName === newName && oldValue === newValue) continue;
+    changes.push({
+      index: index + 1,
+      beforeName: oldField ? oldName : "（无）",
+      afterName: newField ? newName : "（无）",
+      nameChanged: oldName !== newName || !oldField || !newField,
+      valueChanged: oldValue !== newValue || !oldField || !newField,
+      difference: contentSyncDifference(oldValue, newValue)
+    });
+  }
+  return changes;
+}
+
 function normalizeProductAvailabilityName(value) {
   return String(value || "").normalize("NFKC").toLowerCase().replace(/\s+/g, "");
 }
@@ -1468,35 +1508,44 @@ function createProductRevisionSyncFeature(deps) {
       fillAdsProductTitle
     );
     const save = await postProductUpdate(page, payload);
-    const readback = await verifySavedProduct(
-      page,
-      targetProductName,
-      logs,
-      (snapshot) => {
-        const detail = snapshot.detail.overview === overview;
-        const specification = snapshot.detail.specifications === specifications;
-        const specificationName = normalize(snapshot.detail.specificationsFieldName)
-          === normalize(nextSpecificationFieldName);
-        const description = snapshot.productDescription === productDescription;
-        return {
-          passed: detail && specification && specificationName && description,
-          detail,
-          specification,
-          specificationName,
-          description
-        };
-      },
-      goodsId,
-      { requireSpecifications: requireSpecificationField }
-    );
+    let readback;
+    try {
+      readback = await verifySavedProduct(
+        page,
+        targetProductName,
+        logs,
+        (snapshot) => {
+          const detail = snapshot.detail.overview === overview;
+          const specification = snapshot.detail.specifications === specifications;
+          const specificationName = normalize(snapshot.detail.specificationsFieldName)
+            === normalize(nextSpecificationFieldName);
+          const description = snapshot.productDescription === productDescription;
+          return {
+            passed: detail && specification && specificationName && description,
+            detail,
+            specification,
+            specificationName,
+            description
+          };
+        },
+        goodsId,
+        { requireSpecifications: requireSpecificationField }
+      );
+    } catch (error) {
+      error.saveAccepted = true;
+      throw error;
+    }
     if (!readback.verification.passed) {
       const { detail, specification, specificationName, description } = readback.verification;
-      throw new Error(
+      const error = new Error(
         `保存后回读不一致：Detail ${detail ? "通过" : "失败"}，`
         + `Specification 内容 ${specification ? "通过" : "失败"}，`
         + `Specification 字段名 ${specificationName ? "通过" : "失败"}，`
         + `Product Description ${description ? "通过" : "失败"}。`
       );
+      error.saveAccepted = true;
+      error.readback = readback;
+      throw error;
     }
     return { save, readback, after: readback.snapshot };
   }
@@ -1871,24 +1920,33 @@ function createProductRevisionSyncFeature(deps) {
           requireSpecificationField: false,
           fillAdsProductTitle: false
         });
-        if (JSON.stringify(saved.after.pcView.customs || [])
-          !== JSON.stringify(before.pcView.customs || [])) {
-          throw new Error("保存后回读发现目标站的 Specifications/自定义字段发生变化，请人工核查。");
-        }
+        const customFieldChanges = contentSyncCustomFieldChanges(
+          before.pcView.customs, saved.after.pcView.customs
+        );
         results.push({
-          status: "completed",
+          status: customFieldChanges.length ? "completed-with-warning" : "completed",
           site: target.site,
           productName: request.productName,
           goodsId: saved.after.goodsId,
           detail: saved.readback.verification.detail ? "passed" : "failed",
-          specification: "preserved"
+          specification: customFieldChanges.length ? "changed-after-save" : "preserved",
+          customFieldChanges
         });
       } catch (error) {
+        const readback = error?.readback;
         results.push({
-          status: "failed",
+          status: error?.saveAccepted ? "saved-unverified" : "failed",
           site: target.site,
           productName: request.productName,
-          error: error?.message || String(error)
+          error: error?.message || String(error),
+          ...(readback ? {
+            readback: {
+              ...readback.verification,
+              overviewDifference: contentSyncDifference(
+                source.snapshot.detail.overview, readback.snapshot.detail.overview
+              )
+            }
+          } : {})
         });
       }
     }
@@ -1898,6 +1956,8 @@ function createProductRevisionSyncFeature(deps) {
       sourceSite: request.sourceSite,
       targetCount: results.length,
       completedCount: results.filter((item) => item.status === "completed").length,
+      warningCount: results.filter((item) => item.status === "completed-with-warning").length,
+      unverifiedCount: results.filter((item) => item.status === "saved-unverified").length,
       noChangeCount: results.filter((item) => item.status === "no-change").length,
       skippedCount: results.filter((item) => item.status === "skipped").length,
       failedCount: results.filter((item) => item.status === "failed").length,
@@ -3039,6 +3099,8 @@ module.exports = {
   findSpecificationDetailField,
   productSnapshotStabilitySignature,
   contentSyncFingerprint,
+  contentSyncDifference,
+  contentSyncCustomFieldChanges,
   normalizeProductAvailabilityName,
   buildProductAvailabilityQueries,
   parseProductSearchResults,
