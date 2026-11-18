@@ -122,7 +122,6 @@
     if (reviewDownloadButton) reviewDownloadButton.hidden = true;
     if (keepOverwriteChoice !== true) {
       forceTranslationOverwriteInput.checked = false;
-      forceTranslationOverwriteLabel.hidden = true;
     }
   }
 
@@ -1041,6 +1040,7 @@
     sourceSiteLabel.hidden = !revision;
     sourceSiteSelect.hidden = !revision;
     languageHelp.hidden = delist || common || contentSync;
+    forceTranslationOverwriteLabel.hidden = !batch;
     languageHelp.textContent = specificationOnly
       ? "只改 Specification：按目标站点选择 Specification 语言列；系统只更新 Specification 内容及 Custom Page Name 输入框，不改语言包、Overview 或 Product Description。"
       : packageOnly
@@ -1109,7 +1109,17 @@
   sameProductTab.addEventListener("click", () => showRevisionPanel("same"));
   commonPartTab.addEventListener("click", () => showRevisionPanel("common"));
   productNameInput.addEventListener("input", invalidatePreview);
-  forceTranslationOverwriteInput.addEventListener("change", () => previewButton.click());
+  forceTranslationOverwriteInput.addEventListener("change", () => {
+    const shouldRefreshPreview = Boolean(validatedPreview) && isBatchPublishing();
+    invalidatePreview(true);
+    if (shouldRefreshPreview) {
+      previewButton.click();
+      return;
+    }
+    setStatus(forceTranslationOverwriteInput.checked
+      ? "已选择覆盖当前冲突语言包译文；请执行预览确认具体覆盖清单。"
+      : "已关闭冲突译文覆盖；产品上架只填空译文并保留已有译文。");
+  });
   delistProductsInput.addEventListener("input", invalidatePreview);
   folderInput.addEventListener("change", async () => {
     invalidatePreview();
@@ -1172,7 +1182,6 @@
       validatedPreview = data.result;
       validatedSignature = request.signature;
       submitButton.disabled = !data.result.readyCount;
-      if (isBatchPublishing()) forceTranslationOverwriteLabel.hidden = false;
       setStatus(`预览完成：待执行 ${data.result.readyCount}，跳过 ${data.result.skippedCount || 0}，失败 ${data.result.failedCount}。`,
         data.result.failedCount ? "warn" : "ok");
     } catch (error) {

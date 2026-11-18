@@ -598,6 +598,7 @@
             <textarea id="revisionSyncDelistProducts" rows="5" hidden placeholder="每行一个产品，也支持逗号或分号分隔"></textarea>
           </div>
           <p id="revisionSyncLanguageHelp" class="desc">产品上架语言包操作：先按目标站点选择 Datasheet 语种列 → 下载该站当前总语言包 → 以站点包的字段键和原文列为准，仅把 Datasheet 对应译文覆盖到目标列 → 上传新语言包 → 再次下载回读验证。</p>
+          <label id="revisionForceTranslationOverwriteLabel" class="check-row" hidden><input id="revisionForceTranslationOverwrite" type="checkbox"> 覆盖当前冲突语言包译文（默认关闭；仅覆盖目标译文，不修改英文原文或 Sheet1）</label>
           <div class="row">
             <button id="revisionSyncSelectMatched" type="button">一键选择全部可执行站点</button>
             <button id="revisionSyncClearTargets" type="button">清空目标站点</button>
@@ -620,7 +621,6 @@
           <h3>预览与执行结果</h3>
           <button id="revisionSyncReviewDownload" type="button" hidden>下载已有译文人工校对清单 CSV</button>
           <textarea id="revisionSyncOutput" placeholder="源站点图片信息、Detail / Specification / 语言包变更项和回读结果会显示在这里..."></textarea>
-          <label id="revisionForceTranslationOverwriteLabel" class="check-row" hidden><input id="revisionForceTranslationOverwrite" type="checkbox"> 已查看译文对比，强制覆盖目标站已有译文（切换后自动重新预览）</label>
         </div>
         </div>
         <div id="revisionCommonPartPanel" role="tabpanel" hidden>
@@ -817,7 +817,7 @@
 
         <div class="card">
           <h3>按单产品 Datasheet 更新站点语言包</h3>
-          <p class="desc">上传结构类似 Datasheet 的单产品语言表，先下载站点当前包，再按 Key 更新译文；默认覆盖已有译文，Datasheet 空译文跳过，Sheet1 不改，新 Key 有英文原文及译文时追加。英文原文默认保留，可在核对差异后选择覆盖；更改选项须重新预览。先预览，确认后上传并回读验证。</p>
+          <p class="desc">上传结构类似 Datasheet 的单产品语言表，先下载站点当前包，再按 Key 更新译文；默认覆盖已有译文，Datasheet 空译文跳过，Sheet1 不改，新 Key 有英文原文及译文时追加。若英文原文不同，预览会逐条列出两边内容；默认以站点语言包英文为准，其他语种的非空译文仍可按 Key 上传。国际站选择 English (Source) 时，差异字段的英文原文和英文译文都会保留。仅确认 Datasheet 英文更正确时才勾选覆盖；更改选项须重新预览。上传后会回读验证。</p>
           <div class="form-grid">
             <label for="languageDatasheetInput">单产品 Datasheet</label>
             <input id="languageDatasheetInput" type="file" accept=".xls,.xlsx">
@@ -827,7 +827,7 @@
           </div>
           <div id="languageDatasheetMappings" class="revision-targets">选择上方站点并识别 Datasheet 后显示语言列映射。</div>
           <div class="row">
-            <label><input id="languageDatasheetOverwriteEnglishSource" type="checkbox"> 用 Datasheet 英文原文覆盖站点原有英文（默认不覆盖；仅限可写工作表）</label>
+            <label><input id="languageDatasheetOverwriteEnglishSource" type="checkbox"> 确认 Datasheet 英文更正确，覆盖站点原有英文（默认不覆盖；仅限可写工作表）</label>
           </div>
           <div class="row">
             <button id="languageDatasheetPreviewBtn" type="button" disabled>预览站点语言包</button>

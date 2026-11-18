@@ -353,15 +353,16 @@
       if (plan.translationHeader) lines.push("  译文列：" + plan.translationHeader);
       if (item.plan) {
         lines.push("  待更新译文 " + plan.changedCellCount + "，新增 " + plan.appendedFieldCount
-          + "，不变 " + plan.unchangedCellCount + "，Datasheet 空译文跳过 " + plan.skippedBlankCount);
+          + "，不变 " + plan.unchangedCellCount + "，保留站点现值 " + plan.preservedExistingCount
+          + "，Datasheet 空译文跳过 " + plan.skippedBlankCount);
         lines.push("  英文原文：" + (result.overwriteEnglishSource
           ? (item.status === "updated" ? "已覆盖 " : "确认后将覆盖 ")
             + plan.sourceChangedCellCount + " 处差异" : "保留站点现值，不覆盖"));
         if (plan.sourceMismatches?.length) {
-          lines.push("  提醒：" + plan.sourceMismatches.length + " 个字段英文原文与站点语言包不同；"
+          lines.push("  英文原文差异明细：" + plan.sourceMismatches.length + " 个字段；"
             + (result.overwriteEnglishSource
-              ? (item.status === "updated" ? "已按 Datasheet 覆盖。" : "确认上传后将按 Datasheet 覆盖。")
-              : "站点英文原文将保留。"));
+              ? "其中 " + plan.sourceChangedCellCount + " 处纳入英文覆盖，空译文行只提示差异。"
+              : "以站点语言包为准，保留站点英文；可更新的非空译文仍按 Key 上传。"));
           plan.sourceMismatches.forEach((mismatch) => {
             lines.push("    Key：" + mismatch.key);
             lines.push("      Datasheet 英文原文"
@@ -372,6 +373,13 @@
             (mismatch.packageEntries || mismatch.packageSources?.map((source) => ({ source })) || [])
               .forEach((entry) => lines.push("      站点语言包原文"
                 + (entry.location ? "（" + entry.location + "）" : "") + "：" + entry.source));
+            lines.push("      处理：" + (mismatch.translationBlank
+              ? "Datasheet 译文为空，本行仅提示差异，不上传"
+              : result.overwriteEnglishSource
+              ? "按勾选设置覆盖英文原文，并按 Key 更新译文"
+              : plan.translationHeader === "English (Source)"
+                ? "保留站点英文原文和英文译文，不使用错误的 Datasheet 英文"
+                : "保留站点英文原文，仅按 Key 更新非空译文"));
           });
         }
         (plan.inputWarnings || []).forEach((warning) => lines.push("  提示：" + warning.message));
@@ -426,9 +434,12 @@
       }
       const readyCount = (payload.result.sites || []).filter((item) => item.status === "ready").length;
       const skippedCount = (payload.result.sites || []).filter((item) => ["failed", "no-change", "skipped"].includes(item.status)).length;
+      const mismatchCount = (payload.result.sites || []).reduce(
+        (count, item) => count + (item.plan?.sourceMismatches?.length || 0), 0
+      );
       setDatasheetStatus(submit
         ? "语言包更新流程完成；未获批准的站点已跳过。"
-        : `预览完成：可上传 ${readyCount} 个站点，跳过 ${skippedCount} 个；请核对后确认上传。`, "ok");
+        : `预览完成：可上传 ${readyCount} 个站点，跳过 ${skippedCount} 个；英文原文差异 ${mismatchCount} 条${mismatchCount && !payload.result.overwriteEnglishSource ? "（站点原文保留，可更新译文不受影响）" : ""}。请核对下方明细后确认上传。`, "ok");
     } catch (error) {
       setDatasheetStatus("操作失败：" + (error.message || error), "warn");
       el.datasheetOutput.value = "操作失败：\n" + (error.message || error);

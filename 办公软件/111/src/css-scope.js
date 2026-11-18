@@ -205,6 +205,73 @@
     return processRules(css, normalizedScope);
   }
 
+  function hasLegacyMobileBreakpoints(cssText) {
+    const css = String(cssText || "");
+    return /@media\s+(?:(?:only\s+)?screen\s+and\s+)?\(\s*max-width\s*:\s*(?:991|479|476)px\s*\)/i.test(css)
+      || /@media\s+(?:(?:only\s+)?screen\s+and\s+)?\(\s*min-width\s*:\s*(?:480|768)px\s*\)\s+and\s+\(\s*max-width\s*:\s*(?:767|991)px\s*\)/i.test(css);
+  }
+
+  function mergeMobileBreakpoints(cssText) {
+    const css = String(cssText || "");
+    if (!hasLegacyMobileBreakpoints(css)) return css;
+    const mobileRules = [[], [], []];
+    let output = "";
+    let cursor = 0;
+    while (cursor < css.length) {
+      if (css[cursor] === "/" && css[cursor + 1] === "*") {
+        const end = readComment(css, cursor);
+        output += css.slice(cursor, end);
+        cursor = end;
+        continue;
+      }
+      const preludeEnd = findPreludeEnd(css, cursor);
+      if (preludeEnd.delimiter !== "{") {
+        const end = preludeEnd.delimiter ? preludeEnd.index + 1 : css.length;
+        output += css.slice(cursor, end);
+        cursor = end;
+        continue;
+      }
+      const closeIndex = findBlockEnd(css, preludeEnd.index);
+      const prelude = css.slice(cursor, preludeEnd.index).trim();
+      const match = prelude.match(/^@media\s+(?:(?:only\s+)?screen\s+and\s+)?\(\s*max-width\s*:\s*(991|767|479|476)px\s*\)$/i);
+      const tabletOnly = /^@media\s+(?:(?:only\s+)?screen\s+and\s+)?\(\s*min-width\s*:\s*768px\s*\)\s+and\s+\(\s*max-width\s*:\s*991px\s*\)$/i.test(prelude);
+      const mobileLandscape = /^@media\s+(?:(?:only\s+)?screen\s+and\s+)?\(\s*min-width\s*:\s*480px\s*\)\s+and\s+\(\s*max-width\s*:\s*767px\s*\)$/i.test(prelude);
+      if (match || mobileLandscape) {
+        const width = mobileLandscape ? 767 : Number(match[1]);
+        mobileRules[width === 991 ? 0 : width === 767 ? 1 : 2].push(css.slice(preludeEnd.index + 1, closeIndex));
+      } else if (!tabletOnly) {
+        output += css.slice(cursor, closeIndex + 1);
+      }
+      cursor = closeIndex + 1;
+    }
+    const mobileCss = mobileRules.flat().join("\n").trim();
+    return mobileCss ? `${output.trimEnd()}\n@media screen and (max-width: 767px){${mobileCss}}` : output;
+  }
+
+  function mergeMobileBreakpointsInStyleTags(htmlText) {
+    let styleBlockCount = 0;
+    let changedStyleBlockCount = 0;
+    const html = String(htmlText || "");
+    const nextHtml = html.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi, (match, openTag, css, closeTag) => {
+      styleBlockCount += 1;
+      const mergedCss = mergeMobileBreakpoints(css);
+      if (mergedCss === css) return match;
+      changedStyleBlockCount += 1;
+      return `${openTag}${mergedCss}${closeTag}`;
+    });
+    return { html: nextHtml, styleBlockCount, changedStyleBlockCount };
+  }
+
+  function hasUnmergedMobileBreakpointsInStyleTags(htmlText) {
+    const html = String(htmlText || "");
+    const stylePattern = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
+    let match;
+    while ((match = stylePattern.exec(html))) {
+      if (hasLegacyMobileBreakpoints(match[1])) return true;
+    }
+    return false;
+  }
+
   function extractHtmlClassNames(htmlText) {
     const html = String(htmlText || "");
     const classNames = new Set();
@@ -399,6 +466,9 @@
     DEFAULT_SCOPE,
     collectSelectorClasses,
     extractHtmlClassNames,
+    hasUnmergedMobileBreakpointsInStyleTags,
+    mergeMobileBreakpoints,
+    mergeMobileBreakpointsInStyleTags,
     pruneInlineStyleTags,
     pruneUnusedCssClasses,
     scopeCss,

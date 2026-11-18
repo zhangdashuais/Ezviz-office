@@ -293,6 +293,15 @@ test("generates the text-translation workbook with the reference header and no l
     ["CB90F_1", "Reference copy"]
   ]);
   assert.equal(workbook.Sheets["已有字段原文"], undefined);
+  const fontResult = childProcess.spawnSync(resolvePython(), ["-c", [
+    "import sys, json",
+    "from openpyxl import load_workbook",
+    "book = load_workbook(sys.argv[1])",
+    "print(json.dumps([book['Datasheet']['A2'].font.name, book['Datasheet']['B2'].font.name,",
+    "                  book['新语言包字段']['A2'].font.name, book['新语言包字段']['B2'].font.name]))"
+  ].join("\n"), result.outputFile], { encoding: "utf8" });
+  assert.equal(fontResult.status, 0, fontResult.stderr);
+  assert.ok(JSON.parse(fontResult.stdout).every((font) => font && font !== "Calibri"));
 });
 
 test("generated Datasheet writes each source and translation on one line", (t) => {
@@ -333,6 +342,15 @@ test("text-translation Datasheet keeps the reference language columns and transl
     ["REFERENCE_1", "Existing copy", "Texte validé", "Bản dịch đã duyệt"]
   ]), "Reference");
   XLSX.writeFile(source, productWorkbookFile);
+  const fontSetup = childProcess.spawnSync(resolvePython(), ["-c", [
+    "import sys",
+    "from openpyxl import load_workbook",
+    "from openpyxl.styles import Font",
+    "book = load_workbook(sys.argv[1])",
+    "book.active['B2'].font = Font(name='Georgia', size=11)",
+    "book.save(sys.argv[1])"
+  ].join("\n"), productWorkbookFile], { encoding: "utf8" });
+  assert.equal(fontSetup.status, 0, fontSetup.stderr);
   const result = generateTextTranslationWorkbook({
     prefix: "NEW_MODEL",
     productName: "New Model",
@@ -350,6 +368,14 @@ test("text-translation Datasheet keeps the reference language columns and transl
   assert.match(rows[2][0], /^If you have proofread Reference Model/);
   assert.deepEqual(rows[3], ["REFERENCE_1", "Existing copy", "Texte validé", "Bản dịch đã duyệt"]);
   assert.equal(workbook.Sheets.Datasheet.A3.s.fgColor.rgb, "FFFF00");
+  const fontResult = childProcess.spawnSync(resolvePython(), ["-c", [
+    "import sys",
+    "from openpyxl import load_workbook",
+    "book = load_workbook(sys.argv[1])",
+    "print(book['Datasheet']['B2'].font.name)"
+  ].join("\n"), result.outputFile], { encoding: "utf8" });
+  assert.equal(fontResult.status, 0, fontResult.stderr);
+  assert.equal(fontResult.stdout.trim(), "Georgia");
 });
 
 test("generates a styled local Datasheet end to end without the list row", (t) => {
@@ -369,6 +395,15 @@ test("generates a styled local Datasheet end to end without the list row", (t) =
   };
   writeSheet(productFile, [["", "English", "French"], ["CB90F_1", "Reference copy", "Texte validé"]]);
   writeSheet(templateFile, [["", "English", "French"], ["", "", ""]]);
+  const fontSetup = childProcess.spawnSync(resolvePython(), ["-c", [
+    "import sys",
+    "from openpyxl import load_workbook",
+    "from openpyxl.styles import Font",
+    "book = load_workbook(sys.argv[1])",
+    "for cell in book.active[2]: cell.font = Font(name='Georgia', size=11)",
+    "book.save(sys.argv[1])"
+  ].join("\n"), templateFile], { encoding: "utf8" });
+  assert.equal(fontSetup.status, 0, fontSetup.stderr);
   writeSheet(outputFile, [["", "English", "French"], ["HB90F_TRIPLE_KIT_99", "Current product source", "Current product translation"], ["FOREIGN_1", "Old output source", "Incorrect old translation"]]);
   writeSheet(globalFile, [
     ["Category (cannot be modified)", "Serial number (cannot be modified)", "Single word (cannot be modified)", "en-US(cannot be modified)", "en-US(need translation)"],
@@ -395,6 +430,16 @@ test("generates a styled local Datasheet end to end without the list row", (t) =
   assert.equal(rows.some((row) => String(row[0]).toLowerCase() === "list"), false);
   assert.equal(rows.some((row) => row[0] === "If you have proofread CB90f Triple Kit then no need to review the following strings."), true);
   const separator = rows.findIndex((row) => String(row[0]).startsWith("If you have proofread"));
+  const fontResult = childProcess.spawnSync(resolvePython(), ["-c", [
+    "import sys, json",
+    "from openpyxl import load_workbook",
+    "sheet = load_workbook(sys.argv[1])['Datasheet']",
+    "row = int(sys.argv[2])",
+    "print(json.dumps([sheet['A2'].font.name, sheet['B2'].font.name,",
+    "                  sheet.cell(row, 1).font.name, sheet.cell(row, 2).font.name]))"
+  ].join("\n"), outputFile, String(separator + 1)], { encoding: "utf8" });
+  assert.equal(fontResult.status, 0, fontResult.stderr);
+  assert.deepEqual(JSON.parse(fontResult.stdout), ["Georgia", "Georgia", "Georgia", "Georgia"]);
   assert.equal(rows.slice(1, separator).some((row) => row[1] === "Copy in total package only"), true);
   assert.equal(rows.slice(1, separator).some((row) => row[0] === "HB90F_TRIPLE_KIT_99" && row[2] === "Current product translation"), true);
   const rekeyed = rows.slice(1, separator).find((row) => row[1] === "Old output source");

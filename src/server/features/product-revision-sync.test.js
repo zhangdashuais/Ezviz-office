@@ -462,6 +462,36 @@ test("different products can share one exact Detail operation", () => {
   assert.equal(result.results[0].matchCount, 1);
 });
 
+test("Detail responsive normalization merges desktop and mobile breakpoints without changing body HTML", () => {
+  const request = validateDirectRevision({
+    revisionType: "detail",
+    siteCode: "hq",
+    productName: "CP4 Lite",
+    detailOperations: [{ type: "normalize-responsive-breakpoints" }]
+  });
+  const source = '<section class="hero">Keep</section><style>.hero{width:900px}'
+    + '@media screen and (max-width:767px){.hero{width:500px;color:blue}}'
+    + '@media screen and (max-width:479px){.hero{width:320px}}</style>';
+  const result = applyContentOperations(source, request.operations, "Detail");
+  assert.match(result.value, /<section class="hero">Keep<\/section>/);
+  assert.equal((result.value.match(/@media/g) || []).length, 1);
+  assert.match(result.value, /@media screen and \(max-width: 767px\)/);
+  assert.ok(result.value.indexOf("width:500px") < result.value.indexOf("width:320px"));
+  assert.equal(result.results[0].changedStyleBlockCount, 1);
+});
+
+test("responsive Detail normalization is idempotent after backend formatting", () => {
+  const formattedReadback = '<style>\n.hero { width: 900px; }\n'
+    + '@media screen and (max-width: 767px) { .hero { width: 320px; } }\n</style>';
+  const result = applyContentOperations(
+    formattedReadback,
+    [{ type: "normalize-responsive-breakpoints" }],
+    "Detail"
+  );
+  assert.equal(result.value, formattedReadback);
+  assert.equal(result.results[0].changedStyleBlockCount, 0);
+});
+
 test("reads both singular and plural Specification custom field names", () => {
   const singular = readDetailFromPcView({
     summary: "Overview",

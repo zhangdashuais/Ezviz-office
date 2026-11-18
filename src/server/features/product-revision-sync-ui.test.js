@@ -41,9 +41,11 @@ test("batch publishing only renders sites whose Specification language is ready"
 test("batch publishing exposes force translation overwrite and includes it in the request signature", () => {
   assert.match(html, /id="revisionForceTranslationOverwrite" type="checkbox"/);
   assert.ok(html.indexOf('id="revisionForceTranslationOverwriteLabel"')
-    > html.indexOf('id="revisionSyncOutput"'));
+    < html.indexOf('id="revisionSyncSelectMatched"'));
+  assert.match(html, /覆盖当前冲突语言包译文（默认关闭；仅覆盖目标译文，不修改英文原文或 Sheet1）/);
   assert.match(script, /forceTranslationOverwrite: forceTranslationOverwriteInput\.checked/);
   assert.match(script, /form\.append\("forceTranslationOverwrite", forceTranslationOverwriteInput\.checked \? "1" : "0"\)/);
-  assert.match(script, /forceTranslationOverwriteInput\.addEventListener\("change", \(\) => previewButton\.click\(\)\)/);
-  assert.match(script, /if \(isBatchPublishing\(\)\) forceTranslationOverwriteLabel\.hidden = false/);
+  assert.match(script, /forceTranslationOverwriteLabel\.hidden = !batch/);
+  assert.match(script, /const shouldRefreshPreview = Boolean\(validatedPreview\) && isBatchPublishing\(\)/);
+  assert.match(script, /invalidatePreview\(true\)/);
 });

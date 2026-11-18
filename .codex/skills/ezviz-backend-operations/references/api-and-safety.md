@@ -133,7 +133,7 @@ Blog HTML 图片标识：`POST /api/blog-ai-badge?text=AI%20GENERATED`，请求�
 
 视频上传页面实测先 `POST https://ecadmin-api.ys7.com/common/ovs-file-token`，再将 `app=mall`、`flag=file`、`tl=mp4`、`adapt=1`、`appid=ecadmin-api`、临时 `token` 和文件发送至 `POST https://fs.ezvizlife.com/upload.php`。项目通过原页面上传控件发起这两步，不存储 token 或签名；仅接受成功响应中的 `https://mfs.ezvizlife.com/mall/*.mp4`。上传是正式写操作，页面无对应删除入口，勿将实验文件当作可自动回滚的临时记录。
 
-产品修订分为两种：同一产品跨国家修订继续使用 Specifications 与 Datasheet 同步；多个不同产品的相同部分修订可同时选择多个站点，对 Detail 或 Specification 执行同一条精确删除/替换，或只把 Specification 的 Custom Page Name 输入框修成站点固定文案。后者按国家 × 产品逐项预览、保存和回读，单项失败不影响其他任务，一次最多 50 个产品。产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。
+产品修订分为两种：同一产品跨国家修订继续使用 Specifications 与 Datasheet 同步；多个不同产品的相同部分修订可同时选择多个站点，对 Detail 或 Specification 执行同一条精确删除/替换，或只把 Specification 的 Custom Page Name 输入框修成站点固定文案。后者按国家 × 产品逐项预览、保存和回读，单项失败不影响其他任务，一次最多 50 个产品。产品修订和产品上架保存成功后，Detail、Specification 与 Product Description 回读最多重试 6 次、每次间隔 3 秒，以避开商城后台的短暂旧缓存；重试只重新读取，绝不重复提交保存。最终仍不一致时才报告失败。响应式断点归一操作允许商城重排 HTML 空白，但回读内容必须再次执行断点归一后无变化；其他 Detail 操作仍逐字严格校验。
 
 Detail 内容操作递归处理 `vm.pcView` 的字符串值，适用于 Overview、自定义 Specifications 等 PC Details 内容。`operation: "replace"` 精确替换用户填写的文本，可为完整 URL、相对路径或地址片段，不要求 HTTP/HTTPS 协议；`operation: "delete"` 精确删除 `targetText` 指定的完整代码块（替换为空字符串）。直接修订接口也允许只提交 `productDescription` 更新 Basic Information 的 Product Description，或只提交 `specificationFieldName` 更新 Custom Page Name 输入框，同时保留 Overview 与 Specification 内容。先调用 `preview`；输入未变化且存在命中、字段名或 Product Description 发生变化时才能调用 `submit`。无命中且无字段名/描述变化不保存，提交后必须回读并确认目标内容剩余为 0、字段名和描述值一致。它不修改 Mobile Details 或其他产品标签。
 

@@ -548,7 +548,7 @@
         }
         const prunedCss = window.EzvizCssScope.pruneUnusedCssClasses(cssStats.css, bodyInner);
         const cssContent = window.EzvizCssScope.scopeCss(
-          window.EzvizInlineOutput.appendRequiredCss(prunedCss.css),
+          window.EzvizInlineOutput.appendRequiredCss(window.EzvizCssScope.mergeMobileBreakpoints(prunedCss.css)),
           ".page.page-webflow"
         );
         const jqueryUrl = "https://ovsmall-statics.ezvizlife.com/ovs_mall/web/js/widget/jquery/3.5.1/jquery.js";

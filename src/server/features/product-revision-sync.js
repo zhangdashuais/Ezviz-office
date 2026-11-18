@@ -18,6 +18,10 @@ const {
 } = require("./language-package-workbook");
 const { parseProductNames } = require("./product-replacement");
 const { goodsIdFromEditorUrl, readProductBackendRecord, pcViewFromBackendRecord } = require("./product-backend-record");
+const {
+  hasUnmergedMobileBreakpointsInStyleTags,
+  mergeMobileBreakpointsInStyleTags
+} = require("../../../办公软件/111/src/css-scope");
 
 const SITE_LANGUAGE_NEEDLES = {
   hq: ["english"],
@@ -825,7 +829,8 @@ function validateDirectRevision(body) {
   }
   const fieldLabel = revisionType === "detail" ? "Detail" : "Specification";
   operations = operations.map((item, index) => {
-    const type = item?.type === "normalize-spec-layout" ? "normalize-spec-layout"
+    const type = item?.type === "normalize-responsive-breakpoints" ? "normalize-responsive-breakpoints"
+      : item?.type === "normalize-spec-layout" ? "normalize-spec-layout"
       : item?.type === "delete-frame-rate"
       ? "delete-frame-rate"
       : item?.type === "sanitize-wifi6" ? "sanitize-wifi6"
@@ -837,8 +842,11 @@ function validateDirectRevision(body) {
       && revisionType !== "specification") {
       throw new Error("该操作只允许用于 Specification。");
     }
+    if (type === "normalize-responsive-breakpoints" && revisionType !== "detail") {
+      throw new Error("响应式断点合并只允许用于 Detail。");
+    }
     if (type !== "delete-frame-rate" && type !== "sanitize-wifi6"
-      && type !== "normalize-spec-layout" && !targetText) {
+      && type !== "normalize-spec-layout" && type !== "normalize-responsive-breakpoints" && !targetText) {
       throw new Error(`第 ${index + 1} 条 ${fieldLabel} 操作缺少目标内容。`);
     }
     if (type === "replace" && !replacementText) throw new Error(`第 ${index + 1} 条 ${fieldLabel} 替换操作缺少替换内容。`);
@@ -862,6 +870,16 @@ function validateDirectRevision(body) {
 function applyContentOperations(source, operations, fieldLabel = "Specification") {
   let value = source;
   const results = operations.map((operation) => {
+    if (operation.type === "normalize-responsive-breakpoints") {
+      const merged = mergeMobileBreakpointsInStyleTags(value);
+      value = merged.html;
+      return {
+        ...operation,
+        matchCount: merged.changedStyleBlockCount,
+        styleBlockCount: merged.styleBlockCount,
+        changedStyleBlockCount: merged.changedStyleBlockCount
+      };
+    }
     if (operation.type === "normalize-spec-layout") {
       const normalized = normalizeSpecificationLayout(value);
       const changed = normalized.value !== value;
@@ -1493,7 +1511,8 @@ function createProductRevisionSyncFeature(deps) {
     nextSpecificationFieldName,
     goodsId = "",
     requireSpecificationField = true,
-    fillAdsProductTitle = true
+    fillAdsProductTitle = true,
+    verifyOverview = (actualOverview) => actualOverview === overview
   }) {
     const payload = await buildSavePayload(
       page,
@@ -1515,7 +1534,7 @@ function createProductRevisionSyncFeature(deps) {
         targetProductName,
         logs,
         (snapshot) => {
-          const detail = snapshot.detail.overview === overview;
+          const detail = verifyOverview(snapshot.detail.overview);
           const specification = snapshot.detail.specifications === specifications;
           const specificationName = normalize(snapshot.detail.specificationsFieldName)
             === normalize(nextSpecificationFieldName);
@@ -1620,6 +1639,8 @@ function createProductRevisionSyncFeature(deps) {
       specificationOperations: prepared.specification.results
     };
     if (body?.includeHtml === true || body?.includeHtml === "true") {
+      result.currentDetailHtml = prepared.before.detail.overview;
+      result.desiredDetailHtml = prepared.detail.value;
       result.currentSpecificationHtml = prepared.before.detail.specifications;
       result.desiredSpecificationHtml = prepared.specification.value;
     }
@@ -1631,6 +1652,9 @@ function createProductRevisionSyncFeature(deps) {
     if (!body?.fingerprint || body.fingerprint !== prepared.fingerprint) {
       throw new Error("产品内容在预览后发生变化，请重新预览后再提交。");
     }
+    const responsiveNormalizationOnly = prepared.request.revisionType === "detail"
+      && prepared.request.operations.length === 1
+      && prepared.request.operations[0].type === "normalize-responsive-breakpoints";
     const { save, after } = await saveProductContentAndVerify({
       page: prepared.session.page,
       productName: prepared.request.productName,
@@ -1641,7 +1665,10 @@ function createProductRevisionSyncFeature(deps) {
       currentSpecificationFieldName: prepared.before.detail.specificationsFieldName,
       nextSpecificationFieldName: prepared.specificationFieldName,
       goodsId: prepared.before.goodsId,
-      requireSpecificationField: prepared.requireSpecificationField
+      requireSpecificationField: prepared.requireSpecificationField,
+      verifyOverview: responsiveNormalizationOnly
+        ? (actualOverview) => !hasUnmergedMobileBreakpointsInStyleTags(actualOverview)
+        : (actualOverview) => actualOverview === prepared.detail.value
     });
     return {
       mode: "product-direct-revision-submit",

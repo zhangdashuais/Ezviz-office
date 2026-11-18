@@ -568,13 +568,15 @@ function generateTextTranslationWorkbook(input = {}) {
   const productWorkbookFile = input.productWorkbookFile || "";
   const templateFile = productWorkbookFile && /\.xlsx$/i.test(productWorkbookFile)
     ? productWorkbookFile
-    : path.join(folder, "datasheet-template.xlsx");
-  if (!productWorkbookFile) {
+    : !productWorkbookFile && fs.existsSync(DEFAULT_TEMPLATE_PATH)
+      ? DEFAULT_TEMPLATE_PATH
+      : path.join(folder, "datasheet-template.xlsx");
+  if (!productWorkbookFile && !fs.existsSync(templateFile)) {
     const template = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(template,
       XLSX.utils.aoa_to_sheet([["", "1_English (English-英文)"], ["", ""]]), "Datasheet");
     XLSX.writeFile(template, templateFile);
-  } else if (templateFile !== productWorkbookFile) {
+  } else if (productWorkbookFile && templateFile !== productWorkbookFile) {
     XLSX.writeFile(XLSX.readFile(productWorkbookFile), templateFile);
   }
   const productData = initializeProductData(productWorkbookFile, templateFile);

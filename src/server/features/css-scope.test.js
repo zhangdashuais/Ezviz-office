@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   extractHtmlClassNames,
+  mergeMobileBreakpoints,
   pruneInlineStyleTags,
   pruneUnusedCssClasses,
   scopeCss
@@ -101,6 +102,27 @@ test("inline packaging keeps only selected HTML classes before scoping", () => {
   assert.match(result, /@media[^{}]+\{\s*\.page\.page-webflow \.hero/);
   assert.match(result, /font-weight: 500 !important/);
   assert.doesNotMatch(result, /\.other/);
+});
+
+test("inline packaging uses PC above 767px and merges smaller breakpoints into one mobile override", () => {
+  const css = [
+    ".card { width: 900px; color: black; }",
+    "@media screen and (max-width: 479px) { .card { width: 320px; } }",
+    "@media screen and (max-width: 991px) { .card { width: 700px; } }",
+    "@media screen and (max-width: 767px) { .card { width: 500px; color: blue; } }",
+    "@media screen and (min-width: 480px) and (max-width: 767px) { .card { padding: 10px; } }",
+    "@media screen and (min-width: 768px) and (max-width: 991px) { .card { display: none; } }",
+    "@media (max-width: 476px) { .card { color: red; } }"
+  ].join("\n");
+  const result = scopeCss(mergeMobileBreakpoints(css));
+  assert.equal((result.match(/@media/g) || []).length, 1);
+  assert.match(result, /@media screen and \(max-width: 767px\)/);
+  assert.ok(result.indexOf("width: 700px") < result.indexOf("width: 500px"));
+  assert.ok(result.indexOf("width: 500px") < result.indexOf("width: 320px"));
+  assert.ok(result.indexOf("color: blue") < result.indexOf("color: red"));
+  assert.match(result, /padding: 10px/);
+  assert.doesNotMatch(result, /display: none/);
+  assert.match(result, /\.page\.page-webflow \.card\{ width: 900px; color: black; \}/);
 });
 
 test("keeps default webflow dynamic classes even when absent from html", () => {

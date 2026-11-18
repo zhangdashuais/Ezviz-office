@@ -8,11 +8,11 @@
 
 i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进和连续空格会规范为单个空格，再写入页面结果和字段结果 Excel。HTML 替换直接使用文本节点的源码起止位置或当前 DOM 文本节点，不再以规范化文案严格匹配原源码；首尾排版空白与相邻 `<sup>` 等元素会保留。
 
-文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。预设样式模板不存在时，结果 Excel 使用默认表头样式。
+文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。i18n 语言转换下载字段结果时，优先保留所选单产品工作簿的字体；未选择单产品工作簿时使用现有 Datasheet 参考模板的字体，参考模板不存在才以 Arial 作为无样式单元格的后备字体。附加字段工作表的正文同样继承模板字体。本地 i18n Datasheet 生成则使用“样式模板路径”的字体，黄色提示行也继承该模板的字体和其他样式。
 
 | 分组 | 页面入口 | 主要能力 | 默认风险 |
 | --- | --- | --- | --- |
-| 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；自动合并编辑器产生的同族数字后缀类（含组合选择器，保留 `w-*` 系统类），按所选 HTML 清理未使用的 CSS 类选择器（保留 Webflow 动态类与非类规则）；最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: 500 !important; }`，并将每个 `li` 的 `style` 统一为 `list-style: decimal;`，保留原有 class；最终 HTML 输出前把 `&amp;` 还原为 `&`；可选输出 `head`、`body` 标签，最终代码最开头固定添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
+| 基础工具 | 一键内联打包 | 将页面 CSS、图片和 HTML 处理为带 Webflow 页面作用域的上线代码；自动合并编辑器产生的同族数字后缀类（含组合选择器，保留 `w-*` 系统类），按所选 HTML 清理未使用的 CSS 类选择器（保留 Webflow 动态类与非类规则）；将 991/767/479（兼容 476）断点按顺序合并为唯一的 `max-width: 767px` 移动端规则，>767px 使用 PC 样式；最终 CSS 固定附加 `.page.page-webflow b, .page.page-webflow strong { font-weight: 500 !important; }`，并将每个 `li` 的 `style` 统一为 `list-style: decimal;`，保留原有 class；最终 HTML 输出前把 `&amp;` 还原为 `&`；可选输出 `head`、`body` 标签，最终代码最开头固定添加 `<!-- product detail webflow -->`；打包后下载 `store.html`，同时展示并下载作用域 CSS；不处理语言字段 | 本地生成；图片模式可能上传文件 |
 | 基础工具 | 图片 AI 标志 | 图片文件模式用 Canvas 在所选位置叠加默认文案 `AI MODIFIED`，输出超过 512 KB 时保持原分辨率并转为 JPG；字号可选择自动或 8–64 px，自动时图片按宽度取 8–20 px；网页 HTML 模式复用文案和字号选项，自动字号仍为 12 px，仅在每个可见 `section` 的所选位置显示标识，不单独标记 `img`，无背景图的 `section` 也会打标；生成的脚本避免相邻双右花括号，兼容商城 Detail 模板处理 | 本地生成；不上传、不覆盖原文件；网页模式保留原始图片地址和页面结构 |
 | 基础工具 | Blog 图片 AI 标志 | Blog HTML 可上传或粘贴，为每个真实 `<img>` 右下角生成缩放至原尺寸 75% 的 `AI GENERATED` 标识；`<picture>` 整体作为一张图片处理，重复处理不叠加；使用内联 HTML/CSS，不依赖运行时脚本 | 本地生成；不上传、不覆盖原文件；保留图片 URL 和原始 `<img>` 标记 |
 | 基础工具 | 视频上传-海外 | 选择 MP4，经项目已登录的 UMP“视频上传-海外”页面取得动态 token 并上传至文件服务，回传 MFS 视频地址；限 500 MB | 写入正式文件服务；不创建产品记录；不要重复提交 |
@@ -23,9 +23,9 @@ i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进
 | 产品资料处理 | Datasheet 生成 Spec 表 | 从 PDF/文本生成 Spec Excel | 本地生成 |
 | 产品资料处理 | 网站翻译表精简 | 自动识别 Datasheet 与 Specification 的语言列；选择目标语言后分别导出仅含英文和目标语言的工作簿，并保留原模板及字体颜色 | 本地生成 |
 | 产品上架与维护 | Specification 翻译上架 | 预览翻译结果或提交后台 | `preview` 只读；`submit` 写后台 |
-| 产品上架与维护 | 产品批量上架 | 自动识别产品 Excel；目标站点列表只显示全部所选产品的 Specification 语言列状态均为 `OK` 的站点。首次预览显示已有译文对比后，结果区才出现“强制覆盖已有译文”；切换会自动重新预览，默认关闭。开启后仍只改目标译文列，不改英文源列或 `Sheet1`。读取译文时把 Excel `_x000d_`、回车及换行统一转为空格；回读比较不忽略正文差异。没有状态行的普通独立 Specification 文件保持原有兼容行为 | `preview` 只读；`submit` 写后台并回读 |
+| 产品上架与维护 | 产品批量上架 | 自动识别产品 Excel；目标站点列表只显示全部所选产品的 Specification 语言列状态均为 `OK` 的站点。上架表单直接提供“覆盖当前冲突语言包译文”，默认关闭；开启后仍只改目标译文列，不改英文源列或 `Sheet1`。已有预览时切换会自动重新预览，首次选择则要求先预览具体覆盖清单。读取译文时把 Excel `_x000d_`、回车及换行统一转为空格；回读比较不忽略正文差异。没有状态行的普通独立 Specification 文件保持原有兼容行为 | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | 语言包上传 | 上传 `.xls/.xlsx` 到 Language Management | 写后台 |
-| 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；英文原文不一致时在预览及上传结果中逐条列出全部 Key、Datasheet 英文单元格及内容、后台英文单元格及内容。默认保留站点英文原文，可勾选覆盖，切换后须重新预览；只写可写工作表，提交后双列回读，失败回滚 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
+| 产品上架与维护 | 单产品 Datasheet 更新语言包 | 识别 Datasheet 语种列，按该语种锁定后台语言行，再逐站按稳定 Key 覆盖译文；英文原文不一致时在预览及上传结果中逐条列出全部 Key、Datasheet 英文单元格及内容、后台英文单元格及内容，以及每条处理方式。默认以站点英文原文为准，原文差异不阻止其他语种匹配 Key 的非空译文上传；国际站选 `English (Source)` 时，差异字段的英文原文和英文译文都保留。只有确认 Datasheet 英文更正确时才勾选覆盖，切换后须重新预览；只写可写工作表，提交后双列回读，失败回滚 | `inspect/preview` 只读；`submit` 写后台并可回滚 |
 | 产品上架与维护 | 已上架产品单独更新 Specification | `updateScope=specification-only` 时只保存并回读 Specification；可直接上传欧洲云盘的 Datasheet + Spec/Specification 双工作表 Excel，自动选择规格工作表。操作下拉中的“只改语言包”会跳转至独立的单产品 Datasheet 更新语言包功能，不再读取产品 Detail/Spec | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | Details 一键同步 | 固定以国际站同名产品为源，只需填写产品名并选择目标站点；仅同步 PC Details Overview，目标站不存在产品时跳过；未识别的规格字段名不会阻止仅同步 Overview。保存后区分“回读通过”“Overview 通过但其他自定义字段需核查”“保存请求成功但回读未确认”，逐字段列出差异，避免把已接受保存误报成未保存；不修改语言包或 Product Description | `preview` 只读；`submit` 写后台并回读 |
 | 产品上架与维护 | 产品上线站点搜索（独立 Tab） | 输入产品名称后只读搜索全部启用的 EZVIZ 国家官网；匹配忽略大小写和所有空格，返回命中站点、产品链接及失败站点 | 只读官网搜索 |

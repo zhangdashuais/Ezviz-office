@@ -136,7 +136,7 @@ function findLanguagePackageSections(workbook, langCode) {
         const header = normalize(cellValue(sheet, row, column));
         const lower = header.toLowerCase();
         if (/single\s*word/.test(lower)) keyColumn = column;
-        if (/^en-us\b/.test(lower)) sourceColumn = column;
+        if (/^en-us\b/.test(lower) && !/\bneed\s*translation\b/.test(lower)) sourceColumn = column;
         if (/\bneed\s*translation\b/.test(lower)) targetColumn = column;
         if (langCode && lower.startsWith(String(langCode).toLowerCase())) {
           targetColumn = column;
@@ -324,7 +324,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
     const translation = normalizeTranslationLineBreaks(entry.translations[translationHeader]);
     if (!normalize(translation)) {
       skippedBlank.push({ key: entry.key, datasheetRow: entry.rowNumber });
-      return;
+      if (!options.reportSourceMismatchesForBlank) return;
     }
     const datasheetColumn = parsedDatasheet.headerColumns?.[translationHeader];
     const location = `${parsedDatasheet.sheetName}!${XLSX.utils.encode_cell({
@@ -354,8 +354,10 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
 
   selectedByKey.forEach((entry) => {
     const translation = normalizeTranslationLineBreaks(entry.translations[translationHeader]);
+    const translationBlank = !normalize(translation);
     const candidates = candidatesByKey.get(entry.key) || [];
     if (!candidates.length) {
+      if (translationBlank) return;
       if (!entry.source) {
         const datasheetColumn = parsedDatasheet.headerColumns?.[translationHeader];
         const location = `${parsedDatasheet.sheetName}!${XLSX.utils.encode_cell({
@@ -398,6 +400,7 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
           r: entry.rowNumber - 1, c: 1
         })}`,
         location,
+        translationBlank,
         expectedSource: entry.source,
         packageSources: [...new Set(candidates.map((candidate) => candidate.source))],
         packageEntries: candidates.map((candidate) => ({
@@ -408,9 +411,16 @@ function planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHea
         }))
       });
     }
+    if (translationBlank) return;
     candidates.forEach((candidate) => {
       const sourceMatches = normalizeSourceForComparison(candidate.source)
         === normalizeSourceForComparison(entry.source);
+      if (!sourceMatches && options.preserveMismatchedTranslation) {
+        preservedExisting.push({ ...candidate, key: entry.key, translation,
+          datasheetSource: entry.source, datasheetRow: entry.rowNumber,
+          sourceMismatch: true, same: false });
+        return;
+      }
       if (options.fillBlankOnly && !sourceMatches) {
         const item = { ...candidate, key: entry.key, translation,
           datasheetSource: entry.source, datasheetRow: entry.rowNumber,
@@ -525,7 +535,9 @@ function assertPlanPreservesSheet(packageInfo, plan, sheetName) {
 function planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader, options = {}) {
   const plan = planLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader,
     { fillBlankOnly: options.forceOverwriteExisting !== true,
-      preserveSource: options.overwriteEnglishSource !== true });
+      preserveSource: options.overwriteEnglishSource !== true,
+      preserveMismatchedTranslation: options.preserveMismatchedTranslation === true,
+      reportSourceMismatchesForBlank: options.reportSourceMismatchesForBlank === true });
   assertSafePlan(plan);
   if (plan.newFields.length && selectAppendSection(packageInfo, plan).sheetName === "Sheet1") {
     const sheet2 = packageInfo.sections.find((section) => section.sheetName === "Sheet2");
@@ -540,7 +552,11 @@ function planDatasheetRevisionLanguagePackageUpdates(
   packageInfo, parsedDatasheet, translationHeader, options = {}
 ) {
   const plan = planPublishingLanguagePackageUpdates(packageInfo, parsedDatasheet, translationHeader,
-    { forceOverwriteExisting: true, overwriteEnglishSource: options.overwriteEnglishSource === true });
+    { forceOverwriteExisting: true,
+      overwriteEnglishSource: options.overwriteEnglishSource === true,
+      preserveMismatchedTranslation: translationHeader === "English (Source)"
+        && options.overwriteEnglishSource !== true,
+      reportSourceMismatchesForBlank: true });
   if (options.overwriteEnglishSource && plan.sourceUpdates.some((update) => !update.source)) {
     throw new Error("Datasheet 英文原文为空，不能覆盖站点语言包英文原文。");
   }

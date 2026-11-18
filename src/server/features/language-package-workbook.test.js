@@ -543,6 +543,107 @@ test("Datasheet revision overwrites English only when requested and preserves Sh
   }
 });
 
+test("Datasheet revision uploads a translation despite wrong Datasheet English and keeps site English", () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["common", "C1", "protected_key", "Protected source", "保留"]
+  ]), "Sheet1");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "product_title", "Correct site English", "Old translation"]
+  ]), "Sheet2");
+  const original = readLanguagePackage(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }), "es-ES");
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["product_title", "Wrong Datasheet English", "New translation"]
+  ]));
+  const plan = planDatasheetRevisionLanguagePackageUpdates(original, datasheet, "Spanish");
+  assert.doesNotThrow(() => assertSafePlan(plan));
+  assert.equal(plan.changedCellCount, 1);
+  assert.equal(plan.sourceChangedCellCount, 0);
+  assert.deepEqual(plan.sourceMismatches[0].packageEntries, [
+    { location: "Sheet2!D2", source: "Correct site English" }
+  ]);
+  assert.equal(plan.sourceMismatches[0].datasheetSourceLocation, "Sheet1!B2");
+  assert.equal(plan.sourceMismatches[0].expectedSource, "Wrong Datasheet English");
+
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "language-mismatched-source-"));
+  try {
+    const output = path.join(directory, "updated.xlsx");
+    writeUpdatedLanguagePackage(original, plan, output, { preserveSheets: ["Sheet1"] });
+    const verified = readLanguagePackage(output, "es-ES");
+    assert.equal(verified.workbook.Sheets.Sheet2.D2.v, "Correct site English");
+    assert.equal(verified.workbook.Sheets.Sheet2.E2.v, "New translation");
+    const readbackPlan = planDatasheetRevisionLanguagePackageUpdates(verified, datasheet, "Spanish");
+    assert.equal(readbackPlan.changedCellCount, 0);
+    assert.equal(readbackPlan.sourceMismatches.length, 1);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("Datasheet revision reports source differences even when the translation cell is blank", () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "es-ES(need translation)"],
+    ["goods", "G1", "blank_translation", "Correct site source", "Existing translation"]
+  ]), "Sheet2");
+  const original = readLanguagePackage(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }), "es-ES");
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "Spanish"],
+    ["blank_translation", "Wrong Datasheet source", ""]
+  ]));
+  const plan = planDatasheetRevisionLanguagePackageUpdates(original, datasheet, "Spanish");
+  assert.equal(plan.skippedBlankCount, 1);
+  assert.equal(plan.changedCellCount, 0);
+  assert.equal(plan.sourceChangedCellCount, 0);
+  assert.equal(plan.sourceMismatches[0].translationBlank, true);
+  assert.deepEqual(plan.sourceMismatches[0].packageEntries, [
+    { location: "Sheet2!D2", source: "Correct site source" }
+  ]);
+});
+
+test("English Source revision keeps both English cells when Datasheet source is wrong", () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "en-US(need translation)"],
+    ["common", "C1", "protected_key", "Protected", "Protected"]
+  ]), "Sheet1");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ["Category", "Serial", "Single word", "en-US", "en-US(need translation)"],
+    ["goods", "G1", "wrong_in_datasheet", "Correct site English", "Correct site English"],
+    ["goods", "G2", "same_source", "Same source", ""]
+  ]), "Sheet2");
+  const original = readLanguagePackage(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }), "en-US");
+  const datasheet = parseLanguageDatasheet(workbookBuffer([
+    ["Field", "Source", "English (Source)"],
+    ["wrong_in_datasheet", "Wrong Datasheet English", "Wrong Datasheet English"],
+    ["same_source", "Same source", "Same source"]
+  ]));
+  const plan = planDatasheetRevisionLanguagePackageUpdates(original, datasheet, "English (Source)");
+  assert.equal(plan.sourceMismatches.length, 1);
+  assert.equal(plan.changedCellCount, 1);
+  assert.equal(plan.preservedExistingCount, 1);
+  assert.equal(plan.sourceChangedCellCount, 0);
+  assert.equal(plan.updates[0].key, "same_source");
+
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "language-english-source-"));
+  try {
+    const output = path.join(directory, "updated.xlsx");
+    writeUpdatedLanguagePackage(original, plan, output, { preserveSheets: ["Sheet1"] });
+    const verified = readLanguagePackage(output, "en-US");
+    assert.equal(verified.workbook.Sheets.Sheet2.D2.v, "Correct site English");
+    assert.equal(verified.workbook.Sheets.Sheet2.E2.v, "Correct site English");
+    assert.equal(verified.workbook.Sheets.Sheet2.E3.v, "Same source");
+    assert.equal(planDatasheetRevisionLanguagePackageUpdates(
+      verified, datasheet, "English (Source)"
+    ).changedCellCount, 0);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("reading translations converts Excel carriage returns and line breaks to spaces", () => {
   const parsed = parseLanguageDatasheet(workbookBuffer([
     ["Field", "Source", "Spanish"],
