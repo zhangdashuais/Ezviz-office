@@ -8,7 +8,7 @@
 
 i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进和连续空格会规范为单个空格，再写入页面结果和字段结果 Excel。HTML 替换直接使用文本节点的源码起止位置或当前 DOM 文本节点，不再以规范化文案严格匹配原源码；首尾排版空白与相邻 `<sup>` 等元素会保留。
 
-文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。i18n 语言转换下载字段结果时，优先保留所选单产品工作簿的字体；未选择单产品工作簿时使用现有 Datasheet 参考模板的字体，参考模板不存在才以 Arial 作为无样式单元格的后备字体。附加字段工作表的正文同样继承模板字体。本地 i18n Datasheet 生成则使用“样式模板路径”的字体，黄色提示行也继承该模板的字体和其他样式。
+文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。生成工作簿的全部字体统一为 Calibri 11，所有工作表首行固定为 `#a6a6a6` 填充；黄色 `If you have proofread …` 提示行按 DL10 模板合并 A、B 单元格，并只把其中的产品名称标红。
 
 | 分组 | 页面入口 | 主要能力 | 默认风险 |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ i18n 转换从 HTML 生成新字段时，英文原文中的源码换行、缩进
 | 产品上架与维护 | 后台产品替换 | 批量读取 Overview/Specifications | 当前只读，不保存产品 |
 | 临时功能 | Detail 批量替换/删除 | 七列表格逐产品配置 Detail 地址、代码块和 Product Album 本地高清图路径；提交时上传并覆盖 | `preview` 只读；`submit` 每产品保存一次并逐项回读 |
 | 资料平台 | 资料上传平台 | 识别资料并按选项上传/创建/归档；扩展语言接口可仅凭产品标题独立访问；SharePoint 素材类目固定为四类 | 依勾选项可能写外部后台 |
-| 营销运营 | Banner / Popup / 巡查 | 生成清单、提交活动、发布、巡查、按前台可见顺序修复 UTM；Banner 各站默认第 1 位，图片使用带签名上传 | plan/audit/fix dryRun 只读；submit/fix 写后台 |
+| 营销运营 | Banner / Popup / 巡查 | 生成清单、提交活动、发布；可从独立国家下拉框只读列出全部当前可见 Banner/Popup 链接、HTTP 状态、最终地址与 UTM 结果；可按前台可见顺序修复 UTM；Banner 各站默认第 1 位，图片使用带签名上传 | plan/audit/fix dryRun 只读；submit/fix 写后台 |
 | 巡查与质量 | EZVIZ 官网定时巡查 | 产品文案/详情巡查、随机任务、定时执行 | 只读巡查并生成报告 |
 
 离线分享包：`outputs/i18n-converter-sheet1-20261028.zip`。解压后双击 `index.html`；总语言包只读取 Sheet1（Category + Single word），不读取 Sheet2；保留 HTML 转换、单产品包对齐和结果下载，不包含依赖服务端路径的 Datasheet 生成。

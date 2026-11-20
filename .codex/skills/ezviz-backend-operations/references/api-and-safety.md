@@ -30,6 +30,8 @@
 | POST | `/api/campaign/audit-job` | 创建异步巡查 |
 | GET | `/api/campaign/audit-job/:jobId` | 读取巡查进度 |
 
+`audit-job` 可只传一个指定国家并将 `placement` 设为 `all`（界面默认），完成后的 `job.result.issues.links` 返回全部当前可见 Banner/Popup 链接及 HTTP 状态、最终地址和 UTM 校验；`brokenLinks` 与 `invalidUtmLinks` 仍分别提供问题清单。该流程只读。
+
 Popup 为单资源位。提交前先读取列表：无记录时直接新增；唯一记录的 `Period` 已过期时删除并回读确认后新增；未过期、日期无法解析或出现多条记录时停止并汇报。
 Popup 新建固定使用 Playwright 操作真实后台页面：填写表单、通过文件控件上传图片、点击 Submit，并在列表页点击 Enable；不调用创建、启用或图片上传接口模拟提交。
 

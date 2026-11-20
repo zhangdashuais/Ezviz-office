@@ -56,6 +56,14 @@ test("Specifications 不存在时不回退到其他 Detail 字段", () => {
   assert.equal(result.specificationsFound, false);
 });
 
+test("兼容历史拼写错误 Specificaton", () => {
+  const detail = readDetailFieldsFromModel({
+    pcView: { customs: [{ name: "Specificaton", value: "legacy typo" }] }
+  });
+  assert.equal(detail.specificationsFound, true);
+  assert.equal(detail.specifications, "legacy typo");
+});
+
 test("Spec 简称支持读取且不匹配其他自定义字段", () => {
   const result = readDetailFieldsFromModel({ pcView: { customs: [
     { name: "Special features", value: "Keep" },

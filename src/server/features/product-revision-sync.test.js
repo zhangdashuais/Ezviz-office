@@ -112,6 +112,7 @@ test("publishing replaces a Spec field without requiring an existing image", () 
 test("an empty existing Specification can be populated without an image", () => {
   assert.deepEqual(extractSpecificationImage(""), { src: "", alt: "", emptyPlaceholder: true });
   assert.equal(readDetailFromPcView({ customs: [{ name: " Spec ", value: "" }] }).specificationsFound, true);
+  assert.equal(readDetailFromPcView({ customs: [{ name: "Specificaton", value: "legacy typo" }] }).specificationsFound, true);
 });
 
 test("international product copy always uses the legacy global page", () => {
@@ -742,6 +743,18 @@ test("parses paired language columns and generates Specification HTML", () => {
   assert.match(html, /<tr><th class="title"[^>]*>Réseau<\/th><\/tr>/);
   assert.match(html, /<th colspan="1" rowspan="1" width="200">Modèle<\/th>/);
   assert.doesNotMatch(html, /<td class="tdline3" colspan="1" rowspan="1" width="200">Modèle<\/td>/);
+});
+
+test("Spain auto matching excludes the Latin American Spanish column", () => {
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    ["15_Español (Spanish-西班牙语)", "", "42_Español (Latinoamérica)(Spanish(Latin)_拉美西班牙语）", ""],
+    ["Especificaciones", "", "Especificaciones", ""]
+  ]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Spec");
+  const parsed = parseSpecificationWorkbook(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+  assert.equal(resolveWorkbookLanguage(parsed, { siteCode: "es" }).header,
+    "15_Español (Spanish-西班牙语)");
 });
 
 test("Europe-drive Specification skips OK status and keeps the reference table structure", () => {

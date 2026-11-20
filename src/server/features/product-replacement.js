@@ -5,6 +5,7 @@ function normalizeDetailFieldName(value) {
 const SPECIFICATION_FIELD_NAMES = [
   "specifications",
   "specification",
+  "specificaton",
   "specs",
   "spec",
   "specificaties",

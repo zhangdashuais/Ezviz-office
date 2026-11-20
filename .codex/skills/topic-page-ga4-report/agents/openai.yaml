@@ -1,0 +1,7 @@
+interface:
+  display_name: "专题页 GA4 数据读取"
+  short_description: "给出页面地址，读取访问、UTM 来源、商品点击和转化率"
+  default_prompt: "使用 $topic-page-ga4-report 读取这个专题页的 GA4 数据："
+
+policy:
+  allow_implicit_invocation: true

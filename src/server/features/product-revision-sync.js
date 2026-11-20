@@ -38,7 +38,7 @@ const SITE_LANGUAGE_NEEDLES = {
   fr: ["france", "french", "français"],
   be: ["france", "french", "français"],
   it: ["italian", "italiano"],
-  es: ["spanish-", "español"],
+  es: ["spanish-西班牙语"],
   pl: ["polish", "polski"],
   cz: ["czech", "český"],
   nl: ["dutch", "nederlands"],
@@ -108,6 +108,7 @@ function specificationFieldTitleForSite(siteCode, fallback = "Specifications") {
 const SPECIFICATION_DETAIL_FIELD_NAMES = [
   "specifications",
   "specification",
+  "specificaton",
   "specs",
   "spec",
   "especificaciones",

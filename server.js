@@ -612,6 +612,7 @@ function campaignAuditIssues(auditResult) {
         text: link.text,
         url: link.resolvedUrl || link.href,
         status: link.status,
+        finalUrl: link.finalUrl || "",
         ok: link.ok,
         internal: link.internal,
         utmValid: link.utmValid,
@@ -626,6 +627,7 @@ function campaignAuditIssues(auditResult) {
   return {
     reportPath: loaded?.path || "",
     summary: report?.summary || null,
+    links,
     brokenLinks,
     invalidUtmLinks
   };

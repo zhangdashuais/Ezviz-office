@@ -4,11 +4,16 @@ const {
   DEFAULT_EMPTY_DETAIL,
   parseProductNames,
   buildEmptyProductPayload,
+  legacyReferenceEditorUrl,
+  normalizedDetailHtml,
   publicProductUrl
 } = require("./product-empty-link");
 
 test("empty-link names are trimmed and de-duplicated", () => {
   assert.deepEqual(parseProductNames("A\nB，a; C"), ["A", "B", "C"]);
+  assert.equal(legacyReferenceEditorUrl("351076"),
+    "https://shop.ezvizlife.com/goods/add?id=351076");
+  assert.equal(normalizedDetailHtml("<p>1<p>"), "<p>1</p>");
 });
 
 test("empty-link payload keeps product configuration and clears identity/detail content", () => {

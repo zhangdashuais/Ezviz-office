@@ -268,7 +268,7 @@ test("copies the first-row format from the header reference workbook", (t) => {
   );
   assert.equal(result.status, 0, result.stderr);
   const styledSheet = XLSX.readFile(outputFile, { cellStyles: true }).Sheets.Datasheet;
-  assert.equal(styledSheet.B1.s.fgColor.rgb, "123456");
+  assert.equal(styledSheet.B1.s.fgColor.rgb, "A6A6A6");
   assert.equal(styledSheet["!rows"][0].hpt, 36);
 });
 
@@ -284,8 +284,7 @@ test("generates the text-translation workbook with the reference header and no l
   const generatedSheet = workbook.Sheets["新语言包字段"];
   const alignedSheet = workbook.Sheets["产品包复用字段"];
 
-  assert.equal(generatedSheet.A1.s.fgColor.theme, 0);
-  assert.equal(generatedSheet.A1.s.fgColor.tint, -0.3499862666707358);
+  assert.equal(generatedSheet.A1.s.fgColor.rgb, "A6A6A6");
   assert.equal(generatedSheet["!rows"][0].hpt, 36);
   assert.equal(generatedSheet.B2.v, "New copy");
   assert.deepEqual(XLSX.utils.sheet_to_json(alignedSheet, { header: 1 }), [
@@ -301,7 +300,7 @@ test("generates the text-translation workbook with the reference header and no l
     "                  book['新语言包字段']['A2'].font.name, book['新语言包字段']['B2'].font.name]))"
   ].join("\n"), result.outputFile], { encoding: "utf8" });
   assert.equal(fontResult.status, 0, fontResult.stderr);
-  assert.ok(JSON.parse(fontResult.stdout).every((font) => font && font !== "Calibri"));
+  assert.ok(JSON.parse(fontResult.stdout).every((font) => font === "Calibri"));
 });
 
 test("generated Datasheet writes each source and translation on one line", (t) => {
@@ -375,7 +374,21 @@ test("text-translation Datasheet keeps the reference language columns and transl
     "print(book['Datasheet']['B2'].font.name)"
   ].join("\n"), result.outputFile], { encoding: "utf8" });
   assert.equal(fontResult.status, 0, fontResult.stderr);
-  assert.equal(fontResult.stdout.trim(), "Georgia");
+  assert.equal(fontResult.stdout.trim(), "Calibri");
+  assert.deepEqual(workbook.Sheets.Datasheet["!merges"], [{ s: { c: 0, r: 2 }, e: { c: 1, r: 2 } }]);
+  const noteResult = childProcess.spawnSync(resolvePython(), ["-c", [
+    "import sys, json",
+    "from openpyxl import load_workbook",
+    "from openpyxl.cell.rich_text import CellRichText",
+    "cell = load_workbook(sys.argv[1], rich_text=True)['Datasheet']['A3']",
+    "print(json.dumps([[str(run), run.font.rFont, run.font.sz, run.font.color.rgb] for run in cell.value]))"
+  ].join("\n"), result.outputFile], { encoding: "utf8" });
+  assert.equal(noteResult.status, 0, noteResult.stderr);
+  assert.deepEqual(JSON.parse(noteResult.stdout), [
+    ["If you have proofread ", "Calibri", 11, "FF1E293B"],
+    ["Reference Model", "Calibri", 11, "FFFF0000"],
+    [" then no need to review the following strings.", "Calibri", 11, "FF1E293B"]
+  ]);
 });
 
 test("generates a styled local Datasheet end to end without the list row", (t) => {
@@ -425,7 +438,7 @@ test("generates a styled local Datasheet end to end without the list row", (t) =
   const sheet = workbook.Sheets.Datasheet;
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
-  assert.equal(sheet.B1.s.fgColor.theme, 0);
+  assert.equal(sheet.B1.s.fgColor.rgb, "A6A6A6");
   assert.equal(sheet["!rows"][0].hpt, 36);
   assert.equal(rows.some((row) => String(row[0]).toLowerCase() === "list"), false);
   assert.equal(rows.some((row) => row[0] === "If you have proofread CB90f Triple Kit then no need to review the following strings."), true);
@@ -439,7 +452,8 @@ test("generates a styled local Datasheet end to end without the list row", (t) =
     "                  sheet.cell(row, 1).font.name, sheet.cell(row, 2).font.name]))"
   ].join("\n"), outputFile, String(separator + 1)], { encoding: "utf8" });
   assert.equal(fontResult.status, 0, fontResult.stderr);
-  assert.deepEqual(JSON.parse(fontResult.stdout), ["Georgia", "Georgia", "Georgia", "Georgia"]);
+  assert.deepEqual(JSON.parse(fontResult.stdout), ["Calibri", "Calibri", "Calibri", "Calibri"]);
+  assert.deepEqual(sheet["!merges"], [{ s: { c: 0, r: separator }, e: { c: 1, r: separator } }]);
   assert.equal(rows.slice(1, separator).some((row) => row[1] === "Copy in total package only"), true);
   assert.equal(rows.slice(1, separator).some((row) => row[0] === "HB90F_TRIPLE_KIT_99" && row[2] === "Current product translation"), true);
   const rekeyed = rows.slice(1, separator).find((row) => row[1] === "Old output source");

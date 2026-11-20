@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EZVIZ i18n 语言转换</title>
+  <style>
+    :root { font: 14px/1.5 Arial, sans-serif; color: #1f2937; background: #f4f6fa; }
+    * { box-sizing: border-box; }
+    body { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 6px; font-size: 24px; }
+    p { margin: 0 0 16px; color: #5b6472; }
+    .card { background: #fff; border: 1px solid #dce2ea; border-radius: 10px; padding: 18px; margin: 16px 0; }
+    .row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+    label { font-weight: 600; }
+    input[type="text"] { min-width: 180px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 5px; }
+    input[type="file"] { max-width: 300px; }
+    button { padding: 8px 12px; border: 0; border-radius: 5px; color: #fff; background: #2563eb; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    .status { padding: 10px 12px; border-radius: 5px; background: #eff6ff; }
+    .status.ok { background: #ecfdf5; color: #065f46; }
+    .status.warn { background: #fff7ed; color: #9a3412; }
+    textarea { width: 100%; min-height: 260px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 5px; font: 12px/1.5 Consolas, monospace; resize: vertical; }
+    iframe { width: 100%; height: 400px; border: 1px solid #cbd5e1; border-radius: 5px; background: #fff; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; overflow-wrap: anywhere; }
+    .tabs button { color: #1f2937; background: #e2e8f0; }
+    @media (max-width: 700px) { body { padding: 12px; } .row { align-items: flex-start; flex-direction: column; } input[type="file"] { max-width: 100%; } }
+  </style>
+</head>
+<body data-global-language-sheet="Sheet1">
+  <h1>EZVIZ i18n 语言转换</h1>
+  <p>双击此文件即可使用。文件只在本机浏览器中处理；可选上传单产品语言包和总语言包进行字段对齐。</p>
+  <section class="card">
+    <div class="row">
+      <label for="textFileInput">HTML 源码</label><input id="textFileInput" type="file" accept=".html,.htm">
+      <label for="langPrefixInput">新字段产品名称</label><input id="langPrefixInput" type="text" value="Alarm_light" placeholder="无需 goods.">
+      <label for="langProductNameInput">页面产品名称（可选，不转换）</label><input id="langProductNameInput" type="text" placeholder="例如 H9c Dual">
+    </div>
+    <div class="row">
+      <label for="productLangExcelInput">单产品语言包（可选）</label><input id="productLangExcelInput" type="file" accept=".xlsx,.xls,.csv">
+      <button id="productLangExcelParseBtn" type="button">解析并用于字段对齐</button>
+    </div>
+    <div class="row">
+      <label for="langExcelInput">总语言包 Sheet1（可选）</label><input id="langExcelInput" type="file" accept=".xlsx,.xls,.csv">
+      <button id="langExcelParseBtn" type="button">解析 Sheet1</button>
+    </div>
+    <div class="row">
+      <button id="textProcessBtn" type="button">解析并提取</button>
+      <button id="textDownloadBtn" type="button" disabled>下载转换后 HTML</button>
+      <button id="langExcelDownloadBtn" type="button" disabled>下载字段结果 Excel</button>
+    </div>
+    <p>单产品语言包按 Datasheet 结构读取：第 1 列字段键、第 2 列英文原文；总语言包可使用既有布局。缺少语言包时仍可生成新字段。</p>
+    <div id="textStatus" class="status" role="status">请选择 HTML 文件。</div>
+  </section>
+
+  <section id="tableContainer" class="card" style="display:none">
+    <div class="row tabs">
+      <button id="convertedTabBtn" type="button">新生成字段</button>
+      <button id="alignedTabBtn" type="button">产品包复用字段</button>
+      <button id="existingTabBtn" type="button">已有字段原文</button>
+    </div>
+    <div id="convertedTablePanel"><table id="langTable"><thead><tr><th>完整语言包字段</th><th>英文原文</th></tr></thead><tbody></tbody></table></div>
+    <div id="alignedTablePanel" style="display:none"><table id="alignedLangTable"><thead><tr><th>复用字段</th><th>单产品语言包英文原文</th></tr></thead><tbody></tbody></table></div>
+    <div id="existingTablePanel" style="display:none"><table id="existingLangTable"><thead><tr><th>已有字段</th><th>总语言包 en-US 原文</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <label for="textOutput">转换后 HTML</label>
+    <textarea id="textOutput" readonly placeholder="转换后的 HTML 会显示在这里"></textarea>
+    <p>下方为安全预览：不会执行上传 HTML 中的脚本。离线时，原 HTML 引用的线上图片和样式可能无法显示。</p>
+    <iframe id="textPreviewFrame" title="转换后页面预览" sandbox=""></iframe>
+  </section>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="src/inline-output.js"></script>
+  <script src="src/i18n-conversion-rules.js"></script>
+  <script src="src/module-text.js"></script>
+</body>
+</html>

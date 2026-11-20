@@ -1,11 +1,23 @@
 const crypto = require("crypto");
 const { normalizeProductNameForMatch } = require("./product-name-utils");
-const { goodsIdFromEditorUrl, readProductBackendRecord } = require("./product-backend-record");
+const { goodsIdFromEditorUrl } = require("./product-backend-record");
 
 const DEFAULT_EMPTY_DETAIL = "<p>1<p>";
 const MAX_EMPTY_LINK_PRODUCTS = 20;
 const GOODS_ADD_URL = "https://shop.ezvizlife.com/goods/do-add";
+const GOODS_EDIT_URL = "https://shop.ezvizlife.com/goods/do-edit-goods";
 const GOODS_INDEX_URL = "https://shop.ezvizlife.com/goods/index";
+const GOODS_EDITOR_URL = "https://shop.ezvizlife.com/goods/add";
+
+function legacyReferenceEditorUrl(goodsId) {
+  if (!/^\d+$/.test(String(goodsId || ""))) throw new Error("参考产品缺少有效 goods_id。");
+  return `${GOODS_EDITOR_URL}?id=${encodeURIComponent(goodsId)}`;
+}
+
+function normalizedDetailHtml(value) {
+  const html = String(value || "").trim();
+  return html === "<p>1<p>" ? "<p>1</p>" : html;
+}
 
 function parseProductNames(value) {
   const seen = new Set();
@@ -144,12 +156,10 @@ function createProductEmptyLinkFeature(deps) {
       logs,
       { exactOnly: true }
     );
-    if (goodsIdFromEditorUrl(page.url())) {
-      const payload = await readProductBackendRecord(page, { productName: referenceProductName });
-      if (!payload.images?.length || !payload.spec?.length) {
-        throw new Error("参考产品尚未完整加载 Product Album 或规格，请稍后重试。");
-      }
-      return { goodsId: String(payload.goods_id), payload, editUrl: edit.editUrl };
+    const goodsId = goodsIdFromEditorUrl(edit.editUrl || page.url());
+    const legacyEditUrl = legacyReferenceEditorUrl(goodsId);
+    if (page.url() !== legacyEditUrl) {
+      await page.goto(legacyEditUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     }
     const expectedName = normalizeProductNameForMatch(referenceProductName);
     await page.waitForFunction((name) => {
@@ -180,7 +190,7 @@ function createProductEmptyLinkFeature(deps) {
     if (!source.payload?.images?.length || !source.payload?.spec?.length) {
       throw new Error("参考产品尚未完整加载 Product Album 或规格，请稍后重试。");
     }
-    return { ...source, editUrl: edit.editUrl };
+    return { ...source, editUrl: legacyEditUrl };
   }
 
   async function inspect(body, logs) {
@@ -248,7 +258,8 @@ function createProductEmptyLinkFeature(deps) {
       throw new Error("产品新增接口返回的不是 JSON：" + text.slice(0, 200));
     }
     if (!response.ok() || Number(data?.status) !== 1) {
-      throw new Error(data?.msg || data?.message || `产品新增失败（HTTP ${response.status()}）`);
+      throw new Error(`产品新增失败（HTTP ${response.status()}）：`
+        + (data?.msg || data?.message || "后台未返回原因"));
     }
     return data;
   }
@@ -263,6 +274,50 @@ function createProductEmptyLinkFeature(deps) {
       throw new Error(data?.msg || `产品回读失败（HTTP ${response.status()}）`);
     }
     return data.data;
+  }
+
+  async function saveCreatedProductDetails(page, goodsId, productName, detailHtml) {
+    const editorUrl = legacyReferenceEditorUrl(goodsId);
+    await page.goto(editorUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    const expectedName = normalizeProductNameForMatch(productName);
+    await page.waitForFunction((name) => {
+      const normalize = (value) => String(value || "")
+        .normalize("NFKC")
+        .replace(/\u207a/g, "+")
+        .replace(/\s*([()])\s*/g, "$1")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+      const element = document.querySelector("#replenish");
+      const scope = window.angular && element ? window.angular.element(element).scope() : null;
+      return Boolean(
+        String(scope?.goodsId || "")
+        && normalize(scope?.vm?.basic?.name) === name
+        && typeof scope?.md?.toModel === "function"
+      );
+    }, expectedName, { timeout: 30000 });
+    const payload = await page.evaluate(({ id, html }) => {
+      const scope = window.angular.element(document.querySelector("#replenish")).scope();
+      const model = scope.md.toModel(scope.vm);
+      model.goods_id = id;
+      model.summary_intro = html;
+      model.mobile_summary_intro = html;
+      model.is_search = 0;
+      return model;
+    }, { id: String(goodsId), html: normalizedDetailHtml(detailHtml) });
+    const response = await page.request.post(GOODS_EDIT_URL, {
+      data: { data: payload },
+      headers: { "x-requested-with": "XMLHttpRequest" },
+      timeout: 60000
+    });
+    const text = await response.text().catch(() => "");
+    let data;
+    try { data = JSON.parse(text); } catch { data = null; }
+    if (!response.ok() || Number(data?.status) !== 1) {
+      throw new Error(`产品占位详情保存失败（HTTP ${response.status()}）：`
+        + (data?.msg || data?.message || text.slice(0, 200) || "后台未返回原因"));
+    }
+    return payload;
   }
 
   async function submit(body, logs) {
@@ -291,13 +346,20 @@ function createProductEmptyLinkFeature(deps) {
           logs,
           { exactOnly: true }
         );
-        const goodsId = new URL(edit.editUrl).searchParams.get("id") || "";
+        const goodsId = goodsIdFromEditorUrl(edit.editUrl);
         if (!goodsId) throw new Error("创建后未能读取 goods_id。");
+        const expectedDetail = normalizedDetailHtml(internal.values.detailHtml);
+        await saveCreatedProductDetails(
+          internal.session.page,
+          goodsId,
+          item.productName,
+          expectedDetail
+        );
         const readback = await rawProductReadback(internal.session.page, goodsId);
         const verified = readback.name === item.productName
           && readback.bn === item.productName
-          && readback.summary_intro === internal.values.detailHtml
-          && readback.mobile_summary_intro === internal.values.detailHtml
+          && readback.summary_intro === expectedDetail
+          && readback.mobile_summary_intro === expectedDetail
           && Number(readback.is_search) === 0
           && Number(readback.cat_id) === Number(payload.cat_id)
           && Number(readback.type_id) === Number(payload.type_id)
@@ -341,6 +403,8 @@ module.exports = {
   MAX_EMPTY_LINK_PRODUCTS,
   parseProductNames,
   buildEmptyProductPayload,
+  legacyReferenceEditorUrl,
+  normalizedDetailHtml,
   publicProductUrl,
   createProductEmptyLinkFeature
 };

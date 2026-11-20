@@ -51,6 +51,7 @@
     wtbExcel: "wtbExcelInput",
     wtbBuildPlan: "wtbBuildPlanBtn",
     wtbSubmit: "wtbSubmitBtn",
+    auditSite: "campaignAuditSiteSelect",
     auditPlacement: "campaignAuditPlacementSelect",
     auditPopupWait: "campaignPopupWaitInput",
     runAudit: "campaignRunAuditBtn",
@@ -109,6 +110,7 @@
 
   function renderAuditIssues(result) {
     const issues = result && result.issues ? result.issues : {};
+    const checked = issues.links || [];
     const broken = issues.brokenLinks || [];
     const invalidUtm = issues.invalidUtmLinks || [];
     const summary = issues.summary || {};
@@ -122,9 +124,13 @@
       + "；UTM 问题：" + invalidUtm.length);
     lines.push("");
 
-    if (!broken.length && !invalidUtm.length) {
-      lines.push("未发现 Banner / Popup 链接失效或 UTM 命名问题。");
-      return lines.join("\n");
+    if (checked.length) {
+      lines.push("链接明细：");
+      checked.forEach((item, index) => lines.push(renderLinkIssue(item, index)));
+      lines.push("");
+    } else {
+      lines.push("未识别到当前可见的 Banner / Popup 跳转链接。");
+      lines.push("");
     }
 
     if (broken.length) {
@@ -136,6 +142,8 @@
     if (invalidUtm.length) {
       lines.push("UTM 命名问题：");
       invalidUtm.forEach((item, index) => lines.push(renderLinkIssue(item, index)));
+    } else if (!broken.length) {
+      lines.push("结论：未发现链接失效或 UTM 命名问题。");
     }
 
     return lines.join("\n");
@@ -146,9 +154,16 @@
       + " / " + (item.placement || "未知位置")
       + (item.position ? " 第 " + item.position + " 位" : ""));
     if (item.text) lines.push("   标题：" + item.text);
-    if (item.status || item.error) lines.push("   状态：" + (item.status || item.error));
+    if (item.ok === true) lines.push("   状态：可用" + (item.status ? "（HTTP " + item.status + "）" : ""));
+    else if (item.ok === false) lines.push("   状态：不可用" + (item.status ? "（HTTP " + item.status + "）" : ""));
+    else if (item.status || item.error) lines.push("   状态：" + (item.status || item.error));
+    if (item.error) lines.push("   访问错误：" + item.error);
+    if (item.internal === false) lines.push("   UTM：外部链接，不要求 EZVIZ UTM");
+    else if (item.utmValid === true) lines.push("   UTM：配置正确");
+    else if (item.utmValid === false) lines.push("   UTM：配置错误");
     if (item.utmProblems && item.utmProblems.length) lines.push("   UTM 问题：" + item.utmProblems.join("；"));
     lines.push("   链接：" + item.url);
+    if (item.finalUrl && item.finalUrl !== item.url) lines.push("   最终地址：" + item.finalUrl);
     if (item.correctedUrl) lines.push("   修正后：" + item.correctedUrl);
     return lines.join("\n");
   }
@@ -375,6 +390,18 @@
     if (enabledSites.some((site) => site.siteCode === "hq")) el.wtbSiteSelect.value = "hq";
   }
 
+  function renderAuditSites() {
+    if (!el.auditSite) return;
+    const enabledSites = sites.filter((site) => site.enabled !== false);
+    el.auditSite.innerHTML = '<option value="">请选择国家站点</option>';
+    enabledSites.forEach((site) => {
+      const option = document.createElement("option");
+      option.value = site.siteCode;
+      option.textContent = site.name + " (" + site.siteCode + ")";
+      el.auditSite.appendChild(option);
+    });
+  }
+
   async function loadSites() {
     setStatus("正在加载站点配置...");
     setWtbStatus("正在加载站点配置...");
@@ -385,6 +412,7 @@
       sites = payload.sites || [];
       renderSites();
       renderWtbSites();
+      renderAuditSites();
       setStatus("站点已加载：" + sites.length + " 个。", "ok");
       setWtbStatus("站点已加载：" + sites.length + " 个。", "ok");
     } catch (error) {
@@ -717,13 +745,14 @@
     }
   }
   async function runAudit() {
-    const selected = selectedSiteCodes();
-    if (!selected.length) {
-      setStatus("请至少勾选一个站点。", "warn");
+    const siteCode = el.auditSite ? el.auditSite.value : "";
+    if (!siteCode) {
+      setStatus("请选择要检查的国家站点。", "warn");
       return;
     }
+    const selected = [siteCode];
     el.runAudit.disabled = true;
-    setStatus("正在运行巡查，站点较多时会花几分钟...");
+    setStatus("正在检查所选国家的 Banner / Popup 链接...");
     writeProgress("巡查任务启动中...");
     try {
       const response = await fetch(serviceBase + "/api/campaign/audit-job", {
@@ -748,7 +777,12 @@
         writeProgress(renderAuditJob(job));
       }
       if (job.status !== "completed") throw new Error(job.error || job.result?.stderr || "巡查失败");
-      setStatus("巡查完成。", "ok");
+      const issues = job.result?.issues || {};
+      const problemCount = (issues.brokenLinks || []).length + (issues.invalidUtmLinks || []).length;
+      setStatus(
+        problemCount ? `链接检查完成，发现 ${problemCount} 个问题，请查看明细。` : "链接检查完成，未发现问题。",
+        problemCount ? "warn" : "ok"
+      );
     } catch (error) {
       setStatus("巡查失败：" + (error.message || error), "warn");
     } finally {
@@ -790,11 +824,12 @@
     return lines.join("\n");
   }
   async function inspectFirstLink() {
-    const selected = selectedSiteCodes();
-    if (selected.length !== 1) {
-      setStatus("读取首个活动链接时请只勾选一个站点。", "warn");
+    const siteCode = el.auditSite ? el.auditSite.value : "";
+    if (!siteCode) {
+      setStatus("请选择要检查的国家站点。", "warn");
       return;
     }
+    const selected = [siteCode];
     el.inspectFirstLink.disabled = true;
     setStatus("正在读取首页首个活动跳转链接...");
     writeOutput("正在打开所选站点首页并检查链接，请稍候...");

@@ -71,6 +71,7 @@ TDK 当前会从 `shop.ezvizlife.com/tdk/index` 跳转到 `new-eu-shop.ezvizlife
 
 普通 Banner 对所有站点（含波兰）插入轮播第 1 位；PC/Mobile 图片使用项目共用的带签名文件服务上传方式，避免旧版 `op_image` 参数被拒绝。
 Banner UTM 修复按前台当前可见顺序匹配后台轮播链接，兼容新版后台存储的 `/category/...` 相对链接并保留其相对格式，跳过定时隐藏的轮播；`banner-fix-utm` 可带 `dryRun=1` 只读预览。官网巡查请求带一次性查询参数，避免误读发布前的缓存页面。
+本地“指定国家 Banner / Popup 链接检查”使用独立国家下拉框，默认同时检查两类资源，返回全部当前可见链接的 HTTP 状态、最终地址和 UTM 校验结果；它只读前台，不保存商城后台。
 新版 Banner 只调用 `website-theme/get-detail`、`modify`、`publish` 处理 `swipeBanner` 组件；保存前确认组件未被并发修改，保存后回读字段。旧版仍沿用 widget 接口。检查期间不要点击后台 Save/Publish。
 
 DTC 德法西意荷批量入口只要求本地素材绝对路径和统一上线/下线时间，并可在界面选择“Banner + Popup”“仅 Banner”或“仅 Popup”；选择 Banner 时还可指定 White / Black 字体颜色。它不读取普通 Banner/Popup 表单：标题固定为空白占位，Model 使用五国固定文案，链接固定为 `https://www.ezviz.com/{siteCode}/store/topic/hot-sale` 并分别添加 Banner/Popup UTM；Banner 通过后台当前 WebUploader 上传，默认隐藏 More、新窗口打开、直接发布，Popup 通过 Playwright 填写真实后台表单、文件控件上传图片、点击 Submit 并在列表页点击 Enable。接口可用 `includeBanner=false` 或 `includePopup=false` 只执行另一类资源，并用 `bannerColor=White|Black` 选择颜色。根目录下按 `de/fr/es/it/nl`（亦支持国家英文名、本地名和中文名）分类；文件名或子目录名用 `banner-pc`、`banner-mobile`、`popup` 标识用途。`POST /api/campaign/dtc-assets` 只读预检目录；单文件超过 10 MB、必需素材缺失或同一用途匹配多个文件时，该国家会被跳过并返回原因，不影响其他国家继续执行。
@@ -124,7 +125,7 @@ Detail 批量替换默认选择“全选”，可在一次预览中同时处理�
 
 HTML 文本节点中的换行、缩进和连续空格会压缩为单个空格后写入新字段英文原文；替换 HTML 时直接使用解析器返回的文本节点源码起止位置，不再用规范化文案反查源码。源码换行、缩进和 HTML 实体不会造成漏转换，节点两侧排版空白及相邻 `<sup>` 等子元素保持不变。
 
-文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。i18n 语言转换下载字段结果时，优先保留所选单产品工作簿的字体；未选择单产品工作簿时使用现有 Datasheet 参考模板的字体，参考模板不存在才以 Arial 作为无样式单元格的后备字体。附加字段工作表的正文同样继承模板字体。本地 i18n Datasheet 生成使用“样式模板路径”的字体，黄色提示行也继承模板字体和其他样式。
+文字翻译字段结果 Excel 和本地 Datasheet 的样式处理优先使用 `PYTHON` 指定的解释器；未指定时查找 Codex 随附的 Python，最后使用系统 PATH 中的 `python`。所选 Python 需安装 `openpyxl`。所有输出工作表统一使用 Calibri 11，首行固定为 `#a6a6a6` 填充。黄色 `If you have proofread …` 提示行合并 A、B 单元格，产品名称单独标红，其余文字保持深色；该行的其他列继续保留黄色填充。
 
 离线分享版位于 `outputs/i18n-converter-sheet1-20261028.zip`：解压后直接打开 `index.html`。总语言包仅读取 Sheet1，将 Category 与 Single word 拼成完整字段名，不读取 Sheet2；单产品语言包仍按 Datasheet 结构读取。支持转换后 HTML 与字段结果 Excel 下载，不包含需本地服务和绝对路径的 Datasheet 生成。
 

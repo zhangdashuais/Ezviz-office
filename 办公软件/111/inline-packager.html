@@ -1044,18 +1044,22 @@
         </div>
 
         <div class="card">
-          <h3>巡查</h3>
-          <p class="desc">按勾选站点运行首页活动 rendered 巡查，检查 banner / popup 链接可达性和 UTM。</p>
+          <h3>指定国家 Banner / Popup 链接检查</h3>
+          <p class="desc">选择一个国家站点，读取前台当前显示的全部 Banner / Popup 跳转链接，检查可达性、最终地址和 UTM；此功能只读，不修改后台。</p>
           <div class="row">
+            <label>目标国家</label>
+            <select id="campaignAuditSiteSelect">
+              <option value="">请先加载站点</option>
+            </select>
             <label>巡查类型</label>
             <select id="campaignAuditPlacementSelect">
-              <option value="banner" selected>banner</option>
+              <option value="all" selected>banner + popup</option>
+              <option value="banner">banner</option>
               <option value="popup">popup</option>
-              <option value="all">banner + popup</option>
             </select>
             <label>Popup 等待 ms</label>
             <input id="campaignPopupWaitInput" type="number" value="5000" min="0">
-            <button id="campaignRunAuditBtn" type="button">开始巡查</button>
+            <button id="campaignRunAuditBtn" type="button">检查所选国家链接</button>
             <button id="campaignInspectFirstLinkBtn" type="button">读取首个跳转链接</button>
             <button id="campaignFixBannerUtmBtn" type="button">修复 Banner UTM</button>
           </div>
@@ -1227,7 +1231,7 @@
   <script src="src/module-product-direct-revision.js?v=20260825-1"></script>
   <script src="src/module-detail-address-replacement.js?v=20260814-6"></script>
   <script src="src/module-tdk-config.js"></script>
-  <script src="src/module-campaign-tools.js?v=20260724-4"></script>
+  <script src="src/module-campaign-tools.js?v=20261120-1"></script>
   <script src="src/module-ezviz-site-audit.js"></script>
   <script src="src/module-ga4.js"></script>
   <script src="src/module-specification-translation.js?v=20260814-2"></script>
